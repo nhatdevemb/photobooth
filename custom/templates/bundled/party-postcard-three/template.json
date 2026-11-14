@@ -1,0 +1,17 @@
+{
+    "id": "party-postcard-three",
+    "name": "Party",
+    "style": "party",
+    "version": "1.0.0",
+    "layout_id": "postcard-three",
+    "layout_version": "1.0.0",
+    "overlay": "overlay.png",
+    "background": "background.png",
+    "preview": "preview.jpg",
+    "license": "Original project artwork; MIT",
+    "hashes": {
+        "overlay.png": "b4dd98adf1a1ec49dad87d5c5b76b01eb6126c37a1f0e15d35ca01ff1e7c490f",
+        "background.png": "b8e12bd7efa067b3f065a5053cfe76de0287db1878b16513dc8799043a0983ba",
+        "preview.jpg": "9a6b78250e341340de84bc86d032275ef7807e09483d4b1290b30b7d3a8835d3"
+    }
+}

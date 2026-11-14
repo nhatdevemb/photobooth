@@ -1,0 +1,17 @@
+@import 'classic_live_chromakeying';
+
+.backgrounds {
+  margin-top: 5px;
+}
+
+@media (max-height: 740px) and (orientation: landscape) {
+  .backgrounds {
+    &.shrinked {
+      height: 350px;
+    }
+  }
+}
+
+.pswp-rotary-focus {
+  background: radial-gradient($hoverColor, $mainColor, $secondaryColor) !important;
+}

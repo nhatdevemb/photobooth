@@ -1,0 +1,17 @@
+{
+    "id": "floral-postcard-three",
+    "name": "Hoa",
+    "style": "floral",
+    "version": "1.0.0",
+    "layout_id": "postcard-three",
+    "layout_version": "1.0.0",
+    "overlay": "overlay.png",
+    "background": "background.png",
+    "preview": "preview.jpg",
+    "license": "Original project artwork; MIT",
+    "hashes": {
+        "overlay.png": "b3191e9859ebca404ce7fc1502d9e10014da3aa7fd5a220470b359f8d7b702d6",
+        "background.png": "114bccd50e4a8ec63d2c2f9f92d22fa74f3185268828a5bc6554c516ed1d2100",
+        "preview.jpg": "e7ccb322a0d4ce61974d0d4e4e05150877622ca83872f681a9f0bedd66c885dd"
+    }
+}

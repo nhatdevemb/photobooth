@@ -1,0 +1,17 @@
+{
+    "id": "floral-strip-three",
+    "name": "Hoa",
+    "style": "floral",
+    "version": "1.0.0",
+    "layout_id": "strip-three",
+    "layout_version": "1.0.0",
+    "overlay": "overlay.png",
+    "background": "background.png",
+    "preview": "preview.jpg",
+    "license": "Original project artwork; MIT",
+    "hashes": {
+        "overlay.png": "758c4bb352e38e920c5f1ba2a17a48155eae758c495c45ea60d2553dcc20c8aa",
+        "background.png": "114bccd50e4a8ec63d2c2f9f92d22fa74f3185268828a5bc6554c516ed1d2100",
+        "preview.jpg": "10b2529e1f1ca34fec963a6385454d0d0f0ec4a7f92df249af0f447a21cbdf04"
+    }
+}

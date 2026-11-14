@@ -1,0 +1,12 @@
+{
+  "name": "photobooth-operator-tests",
+  "private": true,
+  "scripts": {
+    "test:browser": "playwright test --grep-invert UNKNOWN",
+    "test:browser:unknown": "PB_BROWSER_PRINTER_SCENARIO=post_submit_timeout playwright test --grep UNKNOWN",
+    "test:browser:camera": "PB_BROWSER_CAMERA=browser playwright test"
+  },
+  "devDependencies": {
+    "playwright": "1.64.1"
+  }
+}

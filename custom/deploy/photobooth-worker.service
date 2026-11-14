@@ -1,0 +1,21 @@
+[Unit]
+Description=Photobooth Operator Edition Single CLI Worker
+After=network.target cups.service
+
+[Service]
+Type=simple
+User=www-data
+Group=www-data
+WorkingDirectory=/var/www/photobooth/custom
+EnvironmentFile=-/etc/photobooth-operator/operator.env
+ExecStart=/usr/bin/php /var/www/photobooth/custom/bin/worker.php
+Restart=always
+RestartSec=2
+KillMode=mixed
+TimeoutStopSec=20
+NoNewPrivileges=true
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target
+

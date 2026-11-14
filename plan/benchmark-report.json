@@ -1,0 +1,82 @@
+{
+    "generated_at": "2026-11-10T08:52:04Z",
+    "environment": {
+        "os": "Linux 6.8.0-138-generic x86_64",
+        "cpu_model": "Intel(R) Core(TM) i5-14400",
+        "ram_total_mib": 31783,
+        "php_version": "8.1.2-1ubuntu2.28",
+        "python_stack": "Python 3.10.12, Pillow 12.3.0, NumPy 2.2.6"
+    },
+    "summary": {
+        "total_runs": 8,
+        "p50_ms": 849,
+        "p95_ms": 870,
+        "max_ms": 871,
+        "target_p95_ms": 2500,
+        "target_max_ms": 10000,
+        "p95_within_2500ms_target": true,
+        "all_within_10s_target": true
+    },
+    "benchmarks": {
+        "original": {
+            "lut_id": "original",
+            "runs_wall_ms": [
+                263,
+                264
+            ],
+            "pipeline_duration_ms": 152,
+            "p50_wall_ms": 263,
+            "max_wall_ms": 264,
+            "output_dimensions": "1181x1748",
+            "output_bytes": 458555,
+            "sha256": "522d642c44f337dcf61febde3e70139a26a8451db7846eb26f6de6a12fb829a8",
+            "within_2500ms_target": true,
+            "within_10s_target": true
+        },
+        "korean-soft": {
+            "lut_id": "korean-soft",
+            "runs_wall_ms": [
+                868,
+                871
+            ],
+            "pipeline_duration_ms": 777,
+            "p50_wall_ms": 868,
+            "max_wall_ms": 871,
+            "output_dimensions": "1181x1748",
+            "output_bytes": 437160,
+            "sha256": "0c5147abb5e981a4c80e680ecd655177736d47296f273c589dd7f06eff2d6944",
+            "within_2500ms_target": true,
+            "within_10s_target": true
+        },
+        "film-400": {
+            "lut_id": "film-400",
+            "runs_wall_ms": [
+                847,
+                870
+            ],
+            "pipeline_duration_ms": 732,
+            "p50_wall_ms": 847,
+            "max_wall_ms": 870,
+            "output_dimensions": "1181x1748",
+            "output_bytes": 513399,
+            "sha256": "05aa950b65ab4458243218d7b83ea3f7e57586a6ad0dfc44aef5ab70f2396452",
+            "within_2500ms_target": true,
+            "within_10s_target": true
+        },
+        "vintage-fade": {
+            "lut_id": "vintage-fade",
+            "runs_wall_ms": [
+                849,
+                868
+            ],
+            "pipeline_duration_ms": 758,
+            "p50_wall_ms": 849,
+            "max_wall_ms": 868,
+            "output_dimensions": "1181x1748",
+            "output_bytes": 415473,
+            "sha256": "5442f2f729d78ea71b7098074faea4424e7d745c519e0423605d4c0a08aeedd4",
+            "within_2500ms_target": true,
+            "within_10s_target": true
+        }
+    }
+}

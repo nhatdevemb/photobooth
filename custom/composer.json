@@ -1,0 +1,26 @@
+{
+  "name": "photobooth/operator-edition",
+  "description": "Photobooth Operator Edition extension layer (M0-M4 simulated MVP + H1-H3 hardware adapters)",
+  "type": "project",
+  "license": "MIT",
+  "require": {
+    "php": ">=8.1"
+  },
+  "require-dev": {
+    "phpunit/phpunit": "^10.5 || ^9.6"
+  },
+  "autoload": {
+    "psr-4": {
+      "Photobooth\\Operator\\": "src/"
+    }
+  },
+  "autoload-dev": {
+    "psr-4": {
+      "Photobooth\\Operator\\Tests\\": "tests/php/"
+    }
+  },
+  "config": {
+    "sort-packages": true
+  }
+}
+

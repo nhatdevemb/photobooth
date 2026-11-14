@@ -1,0 +1,1087 @@
+/** Local-only operator booth. Server revisions, pinned configuration and jobs are authoritative. */
+import { BrowserCamera, parseCubeLut, LutCanvasRenderer } from './browser-camera.js';
+const $ = (id) => document.getElementById(id);
+const browserMode = document.body.dataset.camera === 'browser';
+const browserCamera = new BrowserCamera($('webcam-video'), $('webcam-status'), $('camera-badge'), $('webcam-device'), updateCropGuide, $('btn-webcam-mirror'), $('webcam-lut-canvas'));
+const lutCache = new Map();
+let thumbLutCanvas = null, thumbLutRenderer = null;
+const state = {
+    user: null, csrf: null, session: null, step: 1, view: 'workspace', busy: false,
+    layouts: [], templates: [], presets: [], share: null, previewKey: null,
+    previewReady: false, renderError: '', job: null, history: [], cursor: null,
+    detail: null, print: null, resolve: null, templatePreview: null, sampleGeneration: 0,
+    lutEditor: null, lutQuery: '', captureSlot: null,
+};
+const labels = { NEW: 'Chưa chụp', CAPTURING: 'Đang chụp', CAPTURED: 'Đã chụp', RENDERING: 'Đang ghép ảnh', REVIEW: 'Chờ duyệt', FINALIZED: 'Đã duyệt', CLOSED: 'Đã hoàn tất', CANCELLED: 'Đã hủy' };
+const stepTitles = ['Chọn filter yêu thích', 'Chọn bố cục ảnh', 'Chọn template yêu thích'];
+const descriptions = ['Filter sẽ áp dụng cho tất cả ảnh trong phiên này.', 'Chọn số lượng và vị trí ảnh trên giấy 100 × 148 mm.', 'Trang trí phù hợp với bố cục đã chọn.'];
+const esc = (value) => String(value ?? '').replace(/[&<>"']/g, (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[char]));
+const code = (id) => `PB-${id.slice(0, 8).toUpperCase()}`;
+const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+function uuid()
+{
+    if (crypto.randomUUID) return crypto.randomUUID();
+    return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (char) => {
+        const value = crypto.getRandomValues(new Uint8Array(1))[0] & 15;
+        return (char === 'x' ? value : (value & 3) | 8).toString(16);
+    });
+}
+
+function toast(message, error = false)
+{
+    const item = document.createElement('div');
+    item.className = `toast${error ? ' error' : ''}`;
+    item.textContent = message;
+    $('toast-container').append(item);
+    setTimeout(() => item.remove(), 5000);
+}
+
+async function api(method, path, data = null, key = null)
+{
+    const headers = { Accept: 'application/json' };
+    const options = { method, headers, credentials: 'same-origin' };
+    if (method !== 'GET') {
+        headers['X-CSRF-Token'] = state.csrf || '';
+        headers['Idempotency-Key'] = key || uuid();
+    }
+    if (data instanceof FormData) {
+        options.body = data;
+    } else if (data instanceof File) {
+        headers['Content-Type'] = 'application/zip';
+        options.body = data;
+    } else if (data !== null) {
+        headers['Content-Type'] = 'application/json';
+        options.body = JSON.stringify(data);
+    }
+    // A network retry reuses the same request and key, including for print and restart.
+    let response;
+    for (let attempt = 0; attempt < 2; attempt++) {
+        try {
+            response = await fetch(`/custom/api${path}`, options);
+            break;
+        } catch (error) {
+            if (attempt === 1) throw error;
+        }
+    }
+    const result = await response.json();
+    if (!response.ok) {
+        const error = new Error(result.error?.message || `Lỗi HTTP ${response.status}`);
+        error.status = response.status;
+        error.code = result.error?.code;
+        throw error;
+    }
+    return result;
+}
+
+async function run(action)
+{
+    if (state.busy) return;
+    state.busy = true;
+    render();
+    try {
+        await action();
+    } catch (error) {
+        toast(error.message || 'Không kết nối được hệ thống.', true);
+        if (error.status === 401) {
+            signOut();
+        } else if (state.session) {
+            try { await loadSession(state.session.id); } catch { /* Preserve the error message. */ }
+        }
+    } finally {
+        state.busy = false;
+        state.job = null;
+        render();
+    }
+}
+
+async function loadSession(id, restoreStep = false)
+{
+    const session = await api('GET', `/sessions/${id}`);
+    if (state.session?.id !== id) state.share = null;
+    state.session = session;
+    if (restoreStep) state.step = session.ui_step;
+    return session;
+}
+
+async function enter()
+{
+    const [presets, layouts, templates, active] = await Promise.all([
+        api('GET', '/presets'), api('GET', '/layouts'), api('GET', '/templates'), api('GET', '/sessions/active'),
+    ]);
+    state.presets = presets.presets;
+    state.layouts = layouts.items;
+    state.templates = templates.items;
+    state.session = active.active_session;
+    state.step = state.session?.ui_step || 1;
+    state.view = 'workspace';
+    render();
+    await health();
+    if (state.session?.active_job) {
+        const jobId = state.session.active_job.id;
+        if (state.busy) await waitJob(jobId);
+        else await run(() => waitJob(jobId));
+    }
+}
+
+function signOut()
+{
+    closeLutEditor();
+    state.user = null;
+    state.csrf = null;
+    state.session = null;
+    state.share = null;
+    state.previewKey = null;
+    state.print = null;
+    document.querySelectorAll('.modal-backdrop').forEach((element) => { element.hidden = true; });
+    render();
+}
+
+function layoutFor(session = state.session)
+{
+    return state.layouts.find((item) => item.id === session?.layout_id);
+}
+
+function templateFor(session = state.session)
+{
+    return session?.template || state.templates.find((item) => item.id === session?.template_id && item.version === session.template_version);
+}
+
+function allCaptured()
+{
+    return state.session && state.session.slots.length === state.session.capture_count && state.session.slots.every((slot) => slot.photo);
+}
+
+function printAction(session, finalId)
+{
+    return session.state === 'CLOSED' || session.print_summary.requests.some((request) =>
+        request.final_asset_id === finalId && request.action === 'print' &&
+        (request.status !== 'FAILED' || request.resolution_outcome === 'observed_completed')
+    ) ? 'reprint' : 'print';
+}
+
+function render()
+{
+    const loggedIn = Boolean(state.user);
+    if (browserMode && (!loggedIn || state.view !== 'workspace' || state.step !== 4 || !state.session)) browserCamera.stop();
+    $('login-view').hidden = loggedIn;
+    $('auth-user-bar').hidden = !loggedIn;
+    for (const view of ['workspace', 'history', 'admin', 'luts']) $(view + '-view').hidden = !loggedIn || state.view !== view;
+    $('wizard-nav').hidden = !loggedIn || state.view !== 'workspace' || !state.session;
+    if (!loggedIn) return;
+    $('current-user-display').textContent = state.user.username;
+    $('current-role-badge').textContent = state.user.role === 'admin' ? 'Quản trị viên' : 'Người vận hành';
+    $('btn-nav-admin').hidden = state.user.role !== 'admin';
+    $('btn-nav-luts').hidden = state.user.role !== 'admin';
+    $('btn-import-luts').disabled = state.busy;
+    updateLutButtons();
+    const session = state.session;
+    $('empty-session').hidden = Boolean(session);
+    $('btn-restart-session').hidden = !session;
+    $('btn-restart-session').disabled = state.busy || Boolean(session?.active_job);
+    $('session-code-display').textContent = session ? code(session.id) : 'Chưa có phiên đang mở';
+    $('session-state-badge').textContent = session ? `${labels[session.state]} · rev ${session.revision}` : '';
+    $('configuration-summary').hidden = !session?.configuration_locked;
+    if (session?.configuration_locked) {
+        const beautyDesc = session.beauty ? (session.beauty.enabled ? `Làm đẹp: ${session.beauty.preset}` : 'Làm đẹp: Tắt') : '';
+        $('configuration-summary').textContent = `🔒 ${session.lut.name} · ${session.lut_intensity}% · v${session.lut_version} · ${layoutFor()?.name} · ${templateFor()?.name} · ${beautyDesc} · ${session.capture_count} ảnh. Bắt đầu lại để đổi lựa chọn.`;
+    }
+    for (const id of ['selection-panel', 'capture-panel', 'review-panel', 'wizard-footer']) $(id).hidden = true;
+    if (!session) {
+        $('btn-new-session').disabled = state.busy;
+        return;
+    }
+    if (session.configuration_locked && state.step < 4) state.step = 4;
+    document.querySelectorAll('[data-step]').forEach((button) => {
+        const step = Number(button.dataset.step);
+        button.disabled = state.busy || (session.configuration_locked ? step < 4 || (step === 5 && !allCaptured()) : step > session.ui_step);
+        if (step === state.step) button.setAttribute('aria-current', 'step');
+        else button.removeAttribute('aria-current');
+    });
+    $('wizard-footer').hidden = state.step === 5;
+    $('wizard-progress').textContent = `${state.step} / 5${session.configuration_locked ? ' · Cấu hình đã khóa' : ''}`;
+    $('btn-back').disabled = state.busy || state.step === 1 || session.configuration_locked;
+    $('btn-next').disabled = state.busy || (state.step === 4 && !allCaptured());
+    $('btn-next').textContent = state.step === 4 ? 'Xem ảnh ghép →' : 'Tiếp tục →';
+    if (state.step <= 3) renderSelection();
+    else if (state.step === 4) renderCapture();
+    else renderReview();
+}
+
+function renderSelection()
+{
+    $('selection-panel').hidden = false;
+    $('selection-title').textContent = `✦ ${stepTitles[state.step - 1]}`;
+    $('selection-description').textContent = descriptions[state.step - 1];
+    $('configuration-note').textContent = 'Bạn có thể đổi lựa chọn trước khi bắt đầu chụp.';
+    const session = state.session;
+    $('filter-search-wrap').hidden = state.step !== 1;
+    if (document.activeElement !== $('filter-search')) $('filter-search').value = state.lutQuery;
+    let items;
+    if (state.step === 1) {
+        const available = [...state.presets];
+        if (!available.some((item) => item.id === session.selected_lut && item.version === session.lut_version)) available.unshift(session.lut);
+        items = available.filter((item) => item.name.toLocaleLowerCase('vi').includes(state.lutQuery.toLocaleLowerCase('vi'))).map((preset) => ({ ...preset, image:preset.sample_url, attr:'data-lut-id', detail:`${preset.intensity}%${preset.readonly ? '' : ` · v${preset.version}`}`, selected:preset.id === session.selected_lut && preset.version === session.lut_version }));
+    } else if (state.step === 2) {
+        items = state.layouts.map((layout) => ({ id: layout.id, name: layout.name, detail: `${layout.capture_count} ảnh`, image: layout.thumbnail, attr: 'data-layout-id', selected: layout.id === session.layout_id }));
+    } else {
+        items = state.templates.filter((item) => item.layout_id === session.layout_id).map((item) => ({ ...item, image: item.preview_url, attr: 'data-template-id', selected: item.id === session.template_id && item.version === session.template_version }));
+    }
+    $('selection-cards').className = `selection-cards ${state.step === 2 ? 'layout-cards' : state.step === 3 ? 'template-cards' : 'filter-cards'}`;
+    $('selection-cards').innerHTML = items.map((item) => `<button type="button" class="choice-card ${item.selected ? 'selected' : ''}" ${item.attr}="${esc(item.id)}" ${item.version ? `data-version="${esc(item.version)}"` : ''} ${item.style ? `data-style="${esc(item.style)}"` : ''} aria-pressed="${Boolean(item.selected)}" ${state.busy ? 'disabled' : ''}><div class="choice-image"><img src="${esc(item.image)}" alt=""><span class="choice-check" aria-hidden="true">✓</span></div><strong>${esc(item.name)}</strong>${item.detail ? `<small>${esc(item.detail)}</small>` : ''}</button>`).join('');
+    $('selection-cards').querySelectorAll('button').forEach((button) => button.addEventListener('click', () => run(async () => {
+        const update = button.dataset.lutId ? { lut_id: button.dataset.lutId, lut_version:button.dataset.version } : button.dataset.layoutId ? { layout_id: button.dataset.layoutId } : { template_id: button.dataset.templateId, template_version: button.dataset.version };
+        await configure(update);
+    })));
+    const beautyBox = $('beauty-settings');
+    if (beautyBox) {
+        beautyBox.hidden = state.step !== 1;
+        if (state.step === 1 && session.beauty) {
+            const currentPreset = session.beauty.preset || 'natural';
+            document.querySelectorAll('.beauty-preset-btn').forEach((btn) => {
+                const p = btn.dataset.beautyPreset;
+                btn.classList.toggle('active', p === currentPreset);
+                btn.disabled = state.busy || Boolean(session.configuration_locked);
+            });
+            if ($('val-smooth')) $('val-smooth').textContent = `${session.beauty.smooth}%`;
+            if ($('range-smooth')) {
+                $('range-smooth').value = session.beauty.smooth;
+                $('range-smooth').disabled = state.busy || Boolean(session.configuration_locked);
+            }
+            if ($('val-brighten')) $('val-brighten').textContent = `${session.beauty.brighten}%`;
+            if ($('range-brighten')) {
+                $('range-brighten').value = session.beauty.brighten;
+                $('range-brighten').disabled = state.busy || Boolean(session.configuration_locked);
+            }
+            if ($('val-tone')) $('val-tone').textContent = `${session.beauty.tone}%`;
+            if ($('range-tone')) {
+                $('range-tone').value = session.beauty.tone;
+                $('range-tone').disabled = state.busy || Boolean(session.configuration_locked);
+            }
+        }
+    }
+    paintSample($('selection-preview'), layoutFor(), templateFor(), session.lut).catch(() => {
+        if (state.step <= 3) $('configuration-note').textContent = 'Không tải được ảnh mẫu. Hãy tải lại trang.';
+    });
+}
+
+async function configure(update)
+{
+    const updated = await api('POST', `/sessions/${state.session.id}/configuration`, { revision: state.session.revision, ...update });
+    state.session = updated;
+    if (updated.template_fallback) toast('Không có mẫu cùng phong cách. Đã chọn mẫu mặc định cho bố cục mới.');
+}
+
+function loadImage(url)
+{
+    return new Promise((resolve, reject) => {
+        const image = new Image();
+        image.onload = () => resolve(image);
+        image.onerror = () => reject(new Error('Không tải được tài nguyên ảnh.'));
+        image.src = url;
+    });
+}
+
+async function paintSample(canvas, layout, template, lut = 'original')
+{
+    if (!layout || !template) throw new Error('Chưa có template tương thích.');
+    const generation = String(++state.sampleGeneration);
+    canvas.dataset.generation = generation;
+    const preset = typeof lut === 'string' ? state.presets.find((item) => item.id === lut) : lut;
+    const [photo, overlay, background] = await Promise.all([
+        loadImage(preset.sample_url), loadImage(template.overlay_url),
+        template.background_url ? loadImage(template.background_url) : Promise.resolve(null),
+    ]);
+    if (canvas.dataset.generation !== generation) return false;
+    const context = canvas.getContext('2d');
+    context.fillStyle = 'white';
+    context.fillRect(0, 0, 1181, 1748);
+    if (background) context.drawImage(background, 0, 0, 1181, 1748);
+    for (const slot of layout.slots) {
+        const scale = Math.max(slot.width / photo.width, slot.height / photo.height);
+        const width = slot.width / scale, height = slot.height / scale;
+        context.drawImage(photo, (photo.width - width) / 2, (photo.height - height) / 2, width, height, slot.x, slot.y, slot.width, slot.height);
+    }
+    context.drawImage(overlay, 0, 0, 1181, 1748);
+    return true;
+}
+
+function renderCapture()
+{
+    $('capture-panel').hidden = false;
+    const session = state.session;
+    $('capture-title').textContent = `Chụp ${session.capture_count} ảnh liên tiếp`;
+    $('capture-progress').textContent = `${session.accepted_slots} / ${session.capture_count} ảnh${session.configuration_locked ? ' · Cấu hình đã khóa' : ''}`;
+    $('slots-container').innerHTML = session.slots.map((slot) => `<div class="slot-card"><div class="slot-thumb-box">${slot.photo ? `<img src="${esc(slot.photo.url)}" data-raw-src="${esc(slot.photo.url)}" alt="Ảnh ${slot.slot}">` : '<span aria-hidden="true">◎</span>'}</div><div><strong>Ảnh ${slot.slot}</strong><small>${slot.photo ? `Đã chụp · v${slot.photo.version}` : 'Chưa chụp'}</small><button type="button" class="btn-slot-action" data-slot="${slot.slot}" ${state.busy ? 'disabled' : ''}>${slot.photo ? 'Chụp lại ảnh này' : 'Chụp khung này'}</button></div></div>`).join('');
+    $('slots-container').querySelectorAll('[data-slot]').forEach((button) => button.addEventListener('click', () => run(() => capture(Number(button.dataset.slot)))));
+    $('btn-auto-capture-all').disabled = state.busy || allCaptured();
+    $('btn-auto-capture-all').textContent = session.accepted_slots ? 'Chụp các ảnh còn lại' : 'Bắt đầu chụp';
+    $('countdown-overlay').hidden = !state.job;
+    if (state.job) {
+        $('countdown-number').textContent = state.job.phase?.startsWith('countdown-') ? state.job.phase.split('-')[1] : '…';
+        $('countdown-label').textContent = state.job.phase?.startsWith('countdown') ? 'Sẵn sàng tạo dáng nhé!' : 'Đang nhận ảnh…';
+    }
+    for (const id of ['btn-webcam-enable', 'btn-webcam-switch', 'btn-webcam-mirror', 'btn-webcam-stop', 'webcam-device']) $(id).disabled = state.busy;
+    updateCropGuide();
+    syncCaptureLut(session);
+}
+
+async function getCubeLut(session)
+{
+    if (!session || !session.selected_lut || session.selected_lut === 'original' || !session.lut_intensity) return null;
+    const key = `${session.selected_lut}/${session.lut_version}/${session.lut?.sha256 || ''}`;
+    if (lutCache.has(key)) return lutCache.get(key);
+    const promise = fetch(`/custom/api/catalog/luts/${encodeURIComponent(session.selected_lut)}/${encodeURIComponent(session.lut_version)}/filter.cube`, { credentials: 'same-origin' })
+        .then((res) => (res.ok ? res.text() : ''))
+        .then((text) => (text ? parseCubeLut(text) : null))
+        .catch(() => null);
+    lutCache.set(key, promise);
+    return promise;
+}
+
+async function syncCaptureLut(session = state.session)
+{
+    if (!session || state.view !== 'workspace' || state.step !== 4) return;
+    const lutData = await getCubeLut(session);
+    if (state.session?.id !== session.id || state.step !== 4) return;
+    browserCamera.setFilter(lutData, session.lut_intensity, session.lut?.name || session.selected_lut);
+    const lutCanvas = $('webcam-lut-canvas');
+    if (!browserMode && lutCanvas) {
+        lutCanvas.classList.remove('mirrored');
+        const mockImg = $('live-preview-img');
+        if (lutData && session.lut_intensity > 0 && mockImg && mockImg.complete && mockImg.naturalWidth > 0) {
+            if (browserCamera.lutRenderer?.render(mockImg, lutData, session.lut_intensity / 100)) {
+                lutCanvas.hidden = false;
+            }
+        } else {
+            lutCanvas.hidden = true;
+        }
+    }
+    if (lutData && session.lut_intensity > 0) {
+        if (!thumbLutCanvas) {
+            thumbLutCanvas = document.createElement('canvas');
+            thumbLutRenderer = new LutCanvasRenderer(thumbLutCanvas);
+        }
+        const tag = `${session.selected_lut}:${session.lut_version}:${session.lut_intensity}`;
+        $('slots-container').querySelectorAll('img[data-raw-src]').forEach((img) => {
+            const applyThumb = () => {
+                if (img.dataset.lutApplied === tag || !img.naturalWidth) return;
+                if (thumbLutRenderer.render(img, lutData, session.lut_intensity / 100)) {
+                    img.dataset.lutApplied = tag;
+                    img.src = thumbLutCanvas.toDataURL('image/jpeg', 0.9);
+                }
+            };
+            if (img.complete && img.naturalWidth > 0) applyThumb();
+            else img.addEventListener('load', applyThumb, { once: true });
+        });
+    }
+}
+
+function updateCropGuide()
+{
+    fitBrowserPreview();
+    const empty = state.captureSlot || state.session?.slots.find((slot) => !slot.photo)?.slot || 1;
+    const slot = layoutFor()?.slots.find((item) => item.slot === empty);
+    if (slot) {
+        const ratio = slot.width / slot.height;
+        const source = browserMode ? $('webcam-video') : $('live-preview-img');
+        const sourceWidth = source.videoWidth || source.naturalWidth || 2;
+        const sourceHeight = source.videoHeight || source.naturalHeight || 1;
+        const box = $('crop-guide').parentElement;
+        if (!box.clientWidth || !box.clientHeight) return;
+        const scale = Math.min(box.clientWidth / sourceWidth, box.clientHeight / sourceHeight);
+        const width = sourceWidth * scale, height = sourceHeight * scale;
+        const cropWidth = Math.min(width, height * ratio);
+        const cropHeight = Math.min(height, width / ratio);
+        $('crop-guide').style.width = `${cropWidth / box.clientWidth * 100}%`;
+        $('crop-guide').style.height = `${cropHeight / box.clientHeight * 100}%`;
+    }
+}
+
+function fitBrowserPreview()
+{
+    if (!browserMode || $('capture-panel').hidden) return;
+    const box = $('crop-guide').parentElement;
+    if (window.innerWidth <= 800) {
+        box.style.removeProperty('--camera-preview-height');
+        return;
+    }
+    const column = box.parentElement;
+    if (!column.clientWidth) return;
+    const footer = $('wizard-footer');
+    const footerStyle = getComputedStyle(footer);
+    const workspaceStyle = getComputedStyle($('workspace-view'));
+    const boxStyle = getComputedStyle(box);
+    const borders = parseFloat(boxStyle.borderTopWidth) + parseFloat(boxStyle.borderBottomWidth);
+    const contentWidth = column.clientWidth - parseFloat(boxStyle.borderLeftWidth) - parseFloat(boxStyle.borderRightWidth);
+    const source = $('webcam-video');
+    const ratio = source.videoWidth && source.videoHeight ? source.videoWidth / source.videoHeight : 16 / 9;
+    const fullHeight = contentWidth / ratio + borders;
+    const controlsHeight = column.offsetHeight - box.offsetHeight;
+    const footerHeight = footer.offsetHeight + parseFloat(footerStyle.marginTop) + parseFloat(footerStyle.marginBottom);
+    const panelTop = $('capture-panel').getBoundingClientRect().top + window.scrollY;
+    const available = window.innerHeight - panelTop - controlsHeight - footerHeight - parseFloat(workspaceStyle.paddingBottom) - 8;
+    // Short or zoomed viewports may scroll; keep a useful viewfinder size.
+    const height = Math.max(Math.min(320, fullHeight), Math.min(fullHeight, available));
+    box.style.setProperty('--camera-preview-height', `${Math.floor(height)}px`);
+}
+
+async function waitJob(id)
+{
+    const sessionId = state.session.id;
+    for (let attempt = 0; attempt < 240; attempt++) {
+        const job = await api('GET', `/jobs/${id}`);
+        state.job = job;
+        render();
+        if (job.status === 'SUCCEEDED' || job.status === 'FAILED') {
+            await loadSession(sessionId);
+            state.job = null;
+            if (job.status === 'FAILED') {
+                state.renderError = job.error?.message || 'Tác vụ thất bại.';
+                throw new Error(state.renderError);
+            }
+            return job;
+        }
+        await sleep(250);
+    }
+    throw new Error('Chưa nhận được kết quả worker. Tải lại trang để tiếp tục theo dõi, không tự chụp lại.');
+}
+
+async function capture(slot)
+{
+    const source = state.session.slots.find((item) => item.slot === slot);
+    const operation = source.photo ? 'retake' : 'capture';
+    const sessionId = state.session.id;
+    const revision = state.session.revision;
+    let payload = { revision };
+    state.captureSlot = slot;
+    try {
+        if (browserMode) {
+            if (!browserCamera.ready()) throw new Error('Bật camera và cho phép truy cập trước khi chụp.');
+            for (let remaining = Number(document.body.dataset.countdown || 3); remaining > 0; remaining--) {
+                if (!browserCamera.ready() || document.hidden) throw new Error('Camera bị ngắt hoặc màn hình đã ẩn. Bật lại camera rồi chụp lại.');
+                state.job = { phase: `countdown-${remaining}` };
+                render();
+                await sleep(1000);
+            }
+            const blob = await browserCamera.photo();
+            payload = new FormData();
+            payload.append('revision', String(revision));
+            payload.append('file', blob, 'camera.jpg');
+        }
+    } finally {
+        state.job = null;
+        state.captureSlot = null;
+    }
+    const job = await api('POST', `/sessions/${sessionId}/slots/${slot}/${operation}`, payload);
+    await loadSession(state.session.id);
+    await waitJob(job.job_id);
+}
+
+async function renderCollage()
+{
+    state.renderError = '';
+    state.previewReady = false;
+    state.previewKey = null;
+    const job = await api('POST', `/sessions/${state.session.id}/render`, { revision: state.session.revision });
+    await loadSession(state.session.id);
+    await waitJob(job.job_id);
+}
+
+function renderReview()
+{
+    $('review-panel').hidden = false;
+    const session = state.session;
+    const final = session.current_final;
+    const renderData = session.current_render;
+    const isFinal = session.state === 'FINALIZED' && final;
+    const preview = isFinal ? final : renderData;
+    const url = isFinal ? final.url : renderData?.preview_url;
+    const key = preview ? `${session.id}:${preview.id}:${isFinal ? 'final' : 'review'}` : null;
+    if (key !== state.previewKey) {
+        state.previewKey = key;
+        state.previewReady = false;
+        $('collage-preview-img').hidden = true;
+        $('review-placeholder').hidden = false;
+        if (url) {
+            loadImage(url).then((image) => {
+                if (state.previewKey !== key) return;
+                $('collage-preview-img').src = image.src;
+                $('collage-preview-img').hidden = false;
+                $('review-placeholder').hidden = true;
+                state.previewReady = true;
+                updateApproval();
+            }).catch(() => {
+                if (state.previewKey !== key) return;
+                state.renderError = 'Không tải được bản xem trước. Hãy tải lại trang trước khi duyệt.';
+                updateApproval();
+            });
+        }
+    }
+    $('post-finalize-actions').hidden = !isFinal;
+    $('btn-close-session').hidden = !isFinal;
+    $('btn-review-retake').disabled = state.busy || session.print_summary.has_active || session.print_summary.has_unknown;
+    $('btn-retry-render').hidden = Boolean(preview) || Boolean(session.active_job);
+    $('btn-retry-render').disabled = state.busy;
+    $('btn-open-print-modal').textContent = final && printAction(session, final.id) === 'reprint' ? 'In lại · 1 bản' : 'In ảnh · 1 bản';
+    $('btn-open-print-modal').disabled = state.busy;
+    $('btn-finalize-session').hidden = Boolean(isFinal);
+    $('btn-close-session').disabled = state.busy;
+    renderShare();
+    renderPrints(session);
+    updateApproval();
+}
+
+function updateApproval()
+{
+    const session = state.session;
+    $('btn-finalize-session').disabled = state.busy || !state.previewReady || session?.state !== 'REVIEW' || !session.current_render || Boolean(session.active_job);
+    $('review-error').hidden = !state.renderError;
+    $('review-error').textContent = state.renderError;
+    $('render-status-text').textContent = session?.state === 'FINALIZED' ? 'Ảnh đã duyệt. In và QR dùng đúng ảnh này.' : state.renderError || (state.previewReady ? 'Kiểm tra ảnh rồi nhấn Duyệt ảnh và tạo QR.' : 'Đang chờ bản xem trước…');
+}
+
+async function issueShare(session = state.session)
+{
+    state.share = await api('POST', `/sessions/${session.id}/shares`, { revision: session.revision, final_asset_id: session.current_final.id });
+    await loadSession(session.id);
+    renderShare();
+}
+
+function renderShare()
+{
+    const share = state.share;
+    $('modal-qr-img').hidden = !share;
+    $('qr-placeholder').hidden = Boolean(share);
+    $('btn-revoke-qr').hidden = !share;
+    $('modal-qr-url').textContent = share?.url || '';
+    $('modal-qr-expires').textContent = share ? `Hết hạn: ${new Date(share.expires_at).toLocaleString('vi-VN')}` : '';
+    $('modal-qr-open-link').hidden = !share;
+    if (share) {
+        $('modal-qr-img').src = share.qr_data_uri;
+        $('modal-qr-open-link').href = new URL(share.url).pathname;
+    }
+}
+
+function renderPrints(session)
+{
+    $('session-prints-list').innerHTML = session.print_summary.requests.length ? session.print_summary.requests.map((item) => `<div class="print-item"><span>${item.action === 'print' ? 'In' : 'In lại'} · 1 bản · <strong>${esc(item.status)}</strong></span>${item.status === 'UNKNOWN' && state.user.role === 'admin' ? `<button type="button" class="btn-resolve-print" data-print="${item.id}">Đối chiếu UNKNOWN</button>` : ''}</div>`).join('') : '<p class="muted">Chưa có lệnh in.</p>';
+    $('session-prints-list').querySelectorAll('[data-print]').forEach((button) => button.addEventListener('click', () => openResolve(session, button.dataset.print)));
+}
+
+function openPrint(session = state.session, asset = session?.current_final)
+{
+    if (!session || !asset || !['FINALIZED', 'CLOSED'].includes(session.state)) return;
+    state.print = { session, asset, key: uuid(), action: printAction(session, asset.id) };
+    $('modal-print-thumb').src = asset.url;
+    $('modal-print-session-code').textContent = code(session.id);
+    $('modal-print-action-label').textContent = state.print.action === 'reprint' ? 'In lại (reprint) · 1 bản' : 'In lần đầu (print) · 1 bản';
+    $('modal-print-unknown-warning').hidden = !session.print_summary.has_unknown;
+    $('modal-print-confirm').hidden = false;
+}
+
+async function submitPrint()
+{
+    const context = state.print;
+    if (!context) return;
+    state.print = null;
+    $('modal-print-confirm').hidden = true;
+    const result = await api('POST', `/sessions/${context.session.id}/prints`, { revision: context.session.revision, final_asset_id: context.asset.id, copies: 1, action: context.action }, context.key);
+    for (let attempt = 0; attempt < 60; attempt++) {
+        const print = await api('GET', `/prints/${result.print_request_id}`);
+        if (['COMPLETED', 'FAILED', 'UNKNOWN'].includes(print.status)) break;
+        await sleep(500);
+    }
+    if (state.session?.id === context.session.id) await loadSession(context.session.id);
+    if (state.view === 'history') await loadHistory();
+    toast('Đã cập nhật trạng thái yêu cầu in.');
+}
+
+function openResolve(session, id)
+{
+    state.resolve = { session, id };
+    $('resolve-print-id-display').textContent = id;
+    $('resolve-note').value = '';
+    $('modal-resolve-unknown').hidden = false;
+}
+
+async function loadHistory(append = false)
+{
+    const result = await api('GET', `/sessions?limit=20${append && state.cursor ? `&cursor=${encodeURIComponent(state.cursor)}` : ''}`);
+    state.history = append ? [...state.history, ...result.items] : result.items;
+    state.cursor = result.next_cursor;
+    $('btn-history-load-more').hidden = !state.cursor;
+    $('history-table-body').innerHTML = state.history.map((session) => `<tr><td>${code(session.id)}</td><td>${esc(labels[session.state])}</td><td>${esc(layoutFor(session)?.name || session.layout_id)}</td><td>${session.accepted_slots}/${session.capture_count}</td><td>Đã in: ${session.print_summary.requests.filter((item) => item.status === 'COMPLETED').length}${session.print_summary.has_unknown ? ' · UNKNOWN' : ''}</td><td><button class="btn-history-detail" data-session="${session.id}" type="button">Chi tiết</button></td></tr>`).join('');
+    $('history-table-body').querySelectorAll('[data-session]').forEach((button) => button.addEventListener('click', () => run(() => openDetail(button.dataset.session))));
+}
+
+async function openDetail(id)
+{
+    const session = await api('GET', `/sessions/${id}`);
+    state.detail = session;
+    $('history-detail-title').textContent = `${code(id)} · ${labels[session.state]}`;
+    $('modal-history-body').innerHTML = session.final_assets.length ? `<label>Ảnh đã duyệt<select id="history-final-select">${session.final_assets.map((asset) => `<option value="${asset.id}">${esc(new Date(asset.created_at).toLocaleString('vi-VN'))} · ${asset.id.slice(0, 8)}</option>`).join('')}</select></label><img id="history-final-preview" class="print-thumb" src="${esc(session.final_assets[0].url)}" alt="Ảnh cuối trong lịch sử">` : '<p>Phiên chưa có ảnh cuối.</p>';
+    const select = $('history-final-select');
+    if (select) select.addEventListener('change', () => { $('history-final-preview').src = session.final_assets.find((item) => item.id === select.value).url; });
+    const unresolved = session.print_summary.requests.filter((item) => item.status === 'UNKNOWN');
+    if (state.user.role === 'admin') {
+        for (const request of unresolved) {
+            const button = document.createElement('button');
+            button.textContent = 'Đối chiếu UNKNOWN';
+            button.addEventListener('click', () => openResolve(session, request.id));
+            $('modal-history-body').append(button);
+        }
+    }
+    $('btn-detail-reprint').hidden = !session.final_assets.length || !['FINALIZED','CLOSED'].includes(session.state);
+    $('btn-detail-share').hidden = $('btn-detail-reprint').hidden;
+    $('btn-detail-admin-delete').hidden = state.user.role !== 'admin';
+    $('modal-history-detail').hidden = false;
+}
+
+async function loadAdmin()
+{
+    const result = await api('GET', '/admin/templates');
+    $('admin-template-list').innerHTML = result.items.map((item, index) => `<article class="panel admin-template"><img src="${esc(item.preview_url)}" alt=""><h2>${esc(item.name)}</h2><p>${esc(layoutFor({ layout_id: item.layout_id })?.name)} · ${esc(item.version)} · ${esc(item.status)}</p><button type="button" data-preview="${index}">Xem thử / kích hoạt</button>${item.status === 'active' ? `<button type="button" data-disable="${index}">Tắt mẫu</button>` : ''}</article>`).join('');
+    $('admin-template-list').querySelectorAll('[data-preview]').forEach((button) => button.addEventListener('click', () => run(async () => {
+        const item = result.items[Number(button.dataset.preview)];
+        state.templatePreview = item;
+        $('template-preview-title').textContent = `${item.name} · ${item.layout_id} · ${item.version}`;
+        $('modal-template-preview').hidden = false;
+        $('btn-activate-template').disabled = true;
+        const painted = await paintSample($('admin-preview'), layoutFor({ layout_id: item.layout_id }), item);
+        $('btn-activate-template').disabled = !painted;
+    })));
+    $('admin-template-list').querySelectorAll('[data-disable]').forEach((button) => button.addEventListener('click', () => run(async () => {
+        const item = result.items[Number(button.dataset.disable)];
+        await api('POST', `/admin/templates/${item.id}/${item.version}/disable`, {});
+        await loadAdmin();
+        state.templates = (await api('GET', '/templates')).items;
+    })));
+}
+
+async function health()
+{
+    if (!state.user) return;
+    try {
+        const result = await api('GET', '/health');
+        $('health-summary').textContent = `Worker: ${result.worker.status} · Camera: ${result.camera.camera_state} · Máy in: ${result.printer.queue_state} · Trống: ${result.disk.free_gib} GiB`;
+        $('health-warnings').replaceChildren(...result.warnings.map((warning) => { const p = document.createElement('p'); p.textContent = warning; return p; }));
+    } catch (error) {
+        $('health-summary').textContent = error.message;
+        if (error.status === 401) signOut();
+    }
+}
+
+$('login-form').addEventListener('submit', (event) => {
+    event.preventDefault();
+    run(async () => {
+        const result = await api('POST', '/auth/login', { username: $('login-username').value, password: $('login-password').value });
+        state.user = result.user;
+        state.csrf = result.csrf_token;
+        $('login-password').value = '';
+        await enter();
+    });
+});
+$('btn-logout').addEventListener('click', () => run(async () => { await api('POST', '/auth/logout', {}); signOut(); }));
+$('btn-new-session').addEventListener('click', () => run(async () => {
+    state.session = await api('POST', '/sessions', {});
+    state.step = 1;
+    state.lutQuery = '';
+    state.share = null;
+    state.renderError = '';
+}));
+$('btn-restart-session').addEventListener('click', () => {
+    if (!confirm('Bắt đầu phiên mới? Bộ ảnh hiện tại sẽ được giữ trong lịch sử; các lựa chọn mới chỉ áp dụng cho phiên mới.')) return;
+    run(async () => {
+        state.session = await api('POST', `/sessions/${state.session.id}/restart`, { revision: state.session.revision, confirm: true });
+        state.step = 1;
+        state.lutQuery = '';
+        state.share = null;
+        state.previewKey = null;
+        state.renderError = '';
+    });
+});
+$('btn-next').addEventListener('click', () => run(async () => {
+    if (state.step < 4) {
+        const next = state.step + 1;
+        await configure({ ui_step: next });
+        state.step = next;
+    } else if (allCaptured()) {
+        state.step = 5;
+        await renderCollage();
+    }
+}));
+$('btn-back').addEventListener('click', () => run(async () => {
+    if (!state.session.configuration_locked && state.step > 1) {
+        await configure({ ui_step: state.step - 1 });
+        state.step--;
+    }
+}));
+document.querySelectorAll('[data-step]').forEach((button) => button.addEventListener('click', () => run(async () => {
+    const next = Number(button.dataset.step);
+    if (state.session.configuration_locked) {
+        if (next < 4 || (next === 5 && !allCaptured())) return;
+        state.step = next;
+        if (next === 5 && state.session.state === 'CAPTURED' && !state.session.current_render) await renderCollage();
+    } else if (next <= state.session.ui_step) {
+        state.step = next;
+    }
+})));
+$('btn-auto-capture-all').addEventListener('click', () => run(async () => {
+    for (const slot of state.session.slots.map((item) => item.slot)) {
+        if (!state.session.slots.find((item) => item.slot === slot).photo) await capture(slot);
+    }
+}));
+$('btn-retry-render').addEventListener('click', () => run(renderCollage));
+$('btn-finalize-session').addEventListener('click', () => {
+    if (!state.previewReady || state.session?.state !== 'REVIEW' || state.busy) return;
+    run(async () => {
+        await api('POST', `/sessions/${state.session.id}/finalize`, { revision: state.session.revision, render_id: state.session.current_render.id });
+        await loadSession(state.session.id);
+        await issueShare();
+    });
+});
+$('btn-review-retake').addEventListener('click', () => run(async () => {
+    if (state.session.state === 'FINALIZED') {
+        if (!confirm('Chụp lại sẽ tạo ảnh cuối mới sau khi duyệt. Ảnh và QR cũ vẫn được giữ.')) return;
+        await api('POST', `/sessions/${state.session.id}/reopen`, { revision: state.session.revision });
+        await loadSession(state.session.id);
+    }
+    state.step = 4;
+    state.share = null;
+}));
+$('btn-close-session').addEventListener('click', () => run(async () => {
+    await api('POST', `/sessions/${state.session.id}/close`, { revision: state.session.revision });
+    state.session = null;
+    state.share = null;
+}));
+$('btn-open-print-modal').addEventListener('click', () => openPrint());
+$('btn-confirm-print-submit').addEventListener('click', () => run(submitPrint));
+$('btn-open-qr-modal').addEventListener('click', () => run(() => issueShare()));
+$('btn-revoke-qr').addEventListener('click', () => run(async () => {
+    await api('POST', `/shares/${state.share.share_id}/revoke`, { revision: state.session.revision });
+    state.share = null;
+    await loadSession(state.session.id);
+}));
+$('btn-resolve-unknown-submit').addEventListener('click', () => run(async () => {
+    const context = state.resolve;
+    const note = $('resolve-note').value.trim();
+    if (!note) throw new Error('Vui lòng nhập ghi chú đối chiếu.');
+    await api('POST', `/prints/${context.id}/resolve`, { revision: context.session.revision, outcome: $('resolve-outcome').value, note });
+    $('modal-resolve-unknown').hidden = true;
+    if (state.session?.id === context.session.id) await loadSession(context.session.id);
+    if (state.view === 'history') { await loadHistory(); await openDetail(context.session.id); }
+}));
+$('btn-nav-workspace').addEventListener('click', () => { state.view = 'workspace'; render(); });
+$('btn-nav-history').addEventListener('click', () => run(async () => { state.view = 'history'; await loadHistory(); }));
+$('btn-nav-admin').addEventListener('click', () => run(async () => { state.view = 'admin'; await loadAdmin(); }));
+$('btn-nav-luts').addEventListener('click', () => run(async () => { state.view = 'luts'; await loadLuts(); }));
+$('filter-search').addEventListener('input', () => { state.lutQuery = $('filter-search').value; renderSelection(); });
+$('btn-nav-health').addEventListener('click', () => { $('health-panel').hidden = !$('health-panel').hidden; health(); });
+document.querySelectorAll('.beauty-preset-btn').forEach((button) => {
+    button.addEventListener('click', () => run(async () => {
+        if (!state.session || state.session.configuration_locked) return;
+        const preset = button.dataset.beautyPreset;
+        await configure({ beauty_preset: preset });
+    }));
+});
+if ($('range-smooth')) {
+    $('range-smooth').addEventListener('input', () => {
+        $('val-smooth').textContent = `${$('range-smooth').value}%`;
+    });
+    $('range-smooth').addEventListener('change', () => run(async () => {
+        if (!state.session || state.session.configuration_locked) return;
+        await configure({ beauty_smooth: Number($('range-smooth').value) });
+    }));
+}
+if ($('range-brighten')) {
+    $('range-brighten').addEventListener('input', () => {
+        $('val-brighten').textContent = `${$('range-brighten').value}%`;
+    });
+    $('range-brighten').addEventListener('change', () => run(async () => {
+        if (!state.session || state.session.configuration_locked) return;
+        await configure({ beauty_brighten: Number($('range-brighten').value) });
+    }));
+}
+if ($('range-tone')) {
+    $('range-tone').addEventListener('input', () => {
+        $('val-tone').textContent = `${$('range-tone').value}%`;
+    });
+    $('range-tone').addEventListener('change', () => run(async () => {
+        if (!state.session || state.session.configuration_locked) return;
+        await configure({ beauty_tone: Number($('range-tone').value) });
+    }));
+}
+$('btn-refresh-history').addEventListener('click', () => run(() => loadHistory()));
+$('btn-history-load-more').addEventListener('click', () => run(() => loadHistory(true)));
+$('btn-detail-reprint').addEventListener('click', () => {
+    const asset = state.detail.final_assets.find((item) => item.id === $('history-final-select').value);
+    $('modal-history-detail').hidden = true;
+    openPrint(state.detail, asset);
+});
+$('btn-detail-share').addEventListener('click', () => run(async () => {
+    const session = state.detail;
+    const assetId = $('history-final-select').value;
+    const share = await api('POST', `/sessions/${session.id}/shares`, { revision: session.revision, final_asset_id: assetId });
+    state.detail = await api('GET', `/sessions/${session.id}`);
+    if (state.session?.id === session.id) await loadSession(session.id);
+    const old = $('history-qr');
+    if (old) old.remove();
+    const box = document.createElement('div');
+    box.id = 'history-qr';
+    const image = document.createElement('img');
+    image.src = share.qr_data_uri;
+    image.alt = 'QR tải ảnh ghép trong lịch sử';
+    image.className = 'print-thumb';
+    const link = document.createElement('a');
+    link.href = new URL(share.url).pathname;
+    link.target = '_blank';
+    link.rel = 'noopener';
+    link.textContent = 'Mở ảnh đã chia sẻ';
+    box.append(image, link);
+    $('modal-history-body').append(box);
+}));
+$('btn-detail-admin-delete').addEventListener('click', () => {
+    if (!confirm('Xóa phiên này? Các mã QR sẽ được thu hồi.')) return;
+    run(async () => {
+        await api('POST', `/sessions/${state.detail.id}/delete`, { revision: state.detail.revision, confirm: true });
+        $('modal-history-detail').hidden = true;
+        if (state.session?.id === state.detail.id) state.session = null;
+        await loadHistory();
+    });
+});
+$('btn-import-template').addEventListener('click', () => run(async () => {
+    const file = $('template-zip').files[0];
+    if (!file || file.size > 30 * 1024 * 1024) throw new Error('Chọn tệp ZIP tối đa 30 MiB.');
+    await api('POST', '/admin/templates/import', file);
+    $('template-zip').value = '';
+    await loadAdmin();
+    toast('Đã nhập bản nháp. Xem thử trước khi kích hoạt.');
+}));
+$('btn-activate-template').addEventListener('click', () => run(async () => {
+    const item = state.templatePreview;
+    if (!item || $('btn-activate-template').disabled) return;
+    await api('POST', `/admin/templates/${item.id}/${item.version}/activate`, {});
+    $('modal-template-preview').hidden = true;
+    state.templates = (await api('GET', '/templates')).items;
+    await loadAdmin();
+    toast('Template đã sẵn sàng cho phiên mới.');
+}));
+document.querySelectorAll('[data-close]').forEach((button) => button.addEventListener('click', () => {
+    $(button.dataset.close).hidden = true;
+    if (button.dataset.close === 'modal-print-confirm') state.print = null;
+    if (button.dataset.close === 'modal-lut-editor') closeLutEditor();
+}));
+
+async function loadLuts()
+{
+    const result = await api('GET', '/admin/luts');
+    $('admin-lut-list').innerHTML = result.items.map((item, index) => `<article class="panel admin-template lut-card" data-lut-key="${esc(item.id)}/${esc(item.version)}" data-status="${esc(item.status)}"><img src="${esc(item.sample_url)}" alt="Ảnh mẫu filter ${esc(item.name)}"><h2>${esc(item.name)}</h2><p>v${esc(item.version)} · ${item.intensity}% · ${esc(item.status)}</p><button type="button" data-lut-edit="${index}">Xem thử${item.status === 'draft' ? ' / chỉnh nháp' : ''}</button>${item.readonly ? '<p class="muted">Filter đi kèm · giữ nguyên</p>' : `${item.status !== 'draft' ? `<button type="button" data-lut-version="${index}">Tạo phiên bản nháp</button>` : ''}${item.status === 'active' ? `<button type="button" data-lut-disable="${index}">Tắt filter</button>` : ''}`}</article>`).join('');
+    $('admin-lut-list').querySelectorAll('[data-lut-edit]').forEach((button) => button.addEventListener('click', () => run(async () => {
+        const selected = result.items[Number(button.dataset.lutEdit)];
+        const latest = (await api('GET', '/admin/luts')).items.find((item) => item.id === selected.id && item.version === selected.version);
+        openLutEditor(latest);
+    })));
+    $('admin-lut-list').querySelectorAll('[data-lut-version]').forEach((button) => button.addEventListener('click', () => run(async () => {
+        const item = result.items[Number(button.dataset.lutVersion)];
+        const draft = await api('POST', `/admin/luts/${item.id}/${item.version}/versions`, { revision:item.revision });
+        const records = await loadLuts();
+        openLutEditor(records.find((item) => item.id === draft.id && item.version === draft.version));
+    })));
+    $('admin-lut-list').querySelectorAll('[data-lut-disable]').forEach((button) => button.addEventListener('click', () => run(async () => {
+        const item = result.items[Number(button.dataset.lutDisable)];
+        await api('POST', `/admin/luts/${item.id}/${item.version}/disable`, { revision:item.revision });
+        state.presets = (await api('GET', '/presets')).presets;
+        await loadLuts();
+        toast('Đã tắt filter cho lựa chọn mới. Phiên đã ghim vẫn giữ nguyên.');
+    })));
+    return result.items;
+}
+
+function closeLutEditor()
+{
+    if (state.lutEditor) clearTimeout(state.lutEditor.timer);
+    state.lutEditor = null;
+    $('modal-lut-editor').hidden = true;
+}
+
+function openLutEditor(item)
+{
+    closeLutEditor();
+    const editor = { item, dirty:false, busy:false, ready:false, timer:null, changes:0 };
+    state.lutEditor = editor;
+    $('modal-lut-editor').hidden = false;
+    $('lut-editor-title').textContent = item.name;
+    $('lut-editor-meta').textContent = `v${item.version} · ${item.status} · LUT 3D size 33`;
+    $('lut-name').value = item.name;
+    $('lut-intensity').value = item.intensity;
+    $('lut-amount').textContent = `${item.intensity}%`;
+    $('lut-replacement').value = '';
+    const editable = item.status === 'draft' && !item.readonly;
+    $('lut-name').disabled = !editable;
+    $('lut-intensity').disabled = !editable;
+    $('lut-replacement-wrap').hidden = !editable;
+    showLutPreview(editor);
+}
+
+function updateLutButtons()
+{
+    const editor = state.lutEditor;
+    if (!editor) return;
+    $('btn-save-lut').hidden = editor.item.status !== 'draft';
+    $('btn-save-lut').disabled = editor.busy;
+    $('btn-activate-lut').hidden = editor.item.readonly || editor.item.status === 'active';
+    $('btn-activate-lut').disabled = state.busy || editor.busy || editor.dirty || !editor.ready;
+}
+
+function showLutPreview(editor)
+{
+    if (state.lutEditor !== editor) return;
+    const item = editor.item;
+    editor.ready = false;
+    $('lut-preview-state').textContent = `Đang tải ảnh mẫu ${item.intensity}%…`;
+    const image = new Image();
+    image.id = 'lut-after';
+    image.alt = `Ảnh mẫu ${item.name}, cường độ ${item.intensity}%`;
+    $('lut-after').replaceWith(image);
+    image.onload = () => {
+        if (state.lutEditor !== editor || editor.item.revision !== item.revision || editor.dirty || $('lut-after') !== image) return;
+        editor.ready = true;
+        $('lut-preview-state').textContent = `Đã tải đúng ảnh mẫu ${item.intensity}% · v${item.version}.`;
+        updateLutButtons();
+    };
+    image.onerror = () => {
+        if (state.lutEditor !== editor || $('lut-after') !== image) return;
+        editor.ready = false;
+        $('lut-preview-state').textContent = 'Không tải được ảnh mẫu. Hãy thử tải lại trước khi kích hoạt.';
+        updateLutButtons();
+    };
+    image.src = item.sample_url;
+    updateLutButtons();
+}
+
+function markLutDirty()
+{
+    const editor = state.lutEditor;
+    if (!editor || editor.item.status !== 'draft') return;
+    editor.dirty = true;
+    editor.ready = false;
+    editor.changes++;
+    $('lut-amount').textContent = `${$('lut-intensity').value}%`;
+    $('lut-preview-state').textContent = 'Đang chờ cập nhật ảnh mẫu…';
+    updateLutButtons();
+    clearTimeout(editor.timer);
+    editor.timer = setTimeout(() => saveLutPreview(editor), 400);
+}
+
+async function saveLutPreview(editor)
+{
+    if (!editor || state.lutEditor !== editor || editor.busy) return;
+    clearTimeout(editor.timer);
+    if (!editor.dirty) { showLutPreview(editor); return; }
+    editor.busy = true;
+    updateLutButtons();
+    try {
+        while (state.lutEditor === editor && editor.dirty) {
+            const name = $('lut-name').value.trim();
+            const intensity = Number($('lut-intensity').value);
+            const replacement = $('lut-replacement').files[0];
+            if (!name) throw new Error('Vui lòng đặt tên filter.');
+            if (replacement && (!replacement.name.toLowerCase().endsWith('.cube') || replacement.size > 5 * 1024 * 1024)) throw new Error('Chọn file .cube tối đa 5 MiB.');
+            const payload = replacement ? new FormData() : { revision:editor.item.revision, name, intensity };
+            if (replacement) {
+                payload.set('revision', String(editor.item.revision));
+                payload.set('name', name);
+                payload.set('intensity', String(intensity));
+                payload.set('file', replacement);
+            }
+            editor.dirty = false;
+            const item = editor.item;
+            const updated = await api('POST', `/admin/luts/${item.id}/${item.version}/draft`, payload);
+            if (state.lutEditor !== editor) return;
+            editor.item = updated;
+            if (replacement && $('lut-replacement').files[0] === replacement) $('lut-replacement').value = '';
+            if (!editor.dirty) showLutPreview(editor);
+            await loadLuts();
+        }
+    } catch (error) {
+        if (state.lutEditor !== editor) return;
+        editor.dirty = true;
+        editor.ready = false;
+        $('lut-preview-state').textContent = error.message;
+        toast(error.message, true);
+        if (error.status === 401) signOut();
+    } finally {
+        editor.busy = false;
+        if (state.lutEditor === editor) updateLutButtons();
+    }
+}
+
+$('btn-import-luts').addEventListener('click', () => run(async () => {
+    const files = [...$('lut-files').files];
+    if (!files.length || files.length > 30) throw new Error('Chọn từ 1 đến 30 file .cube mỗi lượt.');
+    $('lut-import-results').replaceChildren();
+    for (const file of files) {
+        const row = document.createElement('li');
+        row.textContent = `${file.name} — Đang nhập…`;
+        $('lut-import-results').append(row);
+        try {
+            if (!file.name.toLowerCase().endsWith('.cube') || file.size > 5 * 1024 * 1024) throw new Error('Chọn file .cube tối đa 5 MiB.');
+            const form = new FormData();
+            form.set('file', file);
+            const draft = await api('POST', '/admin/luts/import', form);
+            row.textContent = `${file.name} — Đã nhập nháp: ${draft.name}`;
+        } catch (error) {
+            row.textContent = `${file.name} — ${error.message}`;
+            row.className = 'import-error';
+            if (error.status === 401) throw error;
+        }
+    }
+    $('lut-files').value = '';
+    await loadLuts();
+}));
+$('lut-name').addEventListener('input', markLutDirty);
+$('lut-intensity').addEventListener('input', markLutDirty);
+$('lut-replacement').addEventListener('change', markLutDirty);
+$('btn-save-lut').addEventListener('click', () => saveLutPreview(state.lutEditor));
+$('btn-activate-lut').addEventListener('click', () => run(async () => {
+    const editor = state.lutEditor;
+    if (!editor || editor.dirty || editor.busy || !editor.ready) return;
+    const item = editor.item;
+    await api('POST', `/admin/luts/${item.id}/${item.version}/activate`, { revision:item.revision, preview_sha256:item.preview_sha256 });
+    closeLutEditor();
+    state.presets = (await api('GET', '/presets')).presets;
+    await loadLuts();
+    toast('Filter đã sẵn sàng cho phiên mới.');
+}));
+
+async function checkAuthOnBoot()
+{
+    try {
+        const result = await api('GET', '/auth/me');
+        state.user = result.user;
+        state.csrf = result.csrf_token;
+        await enter();
+    } catch { signOut(); }
+}
+setInterval(health, 5000);
+let frame = 1;
+$('live-preview-img')?.addEventListener('load', () => {
+    if (!browserMode && state.user && state.view === 'workspace' && state.step === 4) syncCaptureLut(state.session);
+});
+setInterval(() => {
+    if (document.body.dataset.mock === 'true' && state.user && state.view === 'workspace' && state.step === 4) {
+        frame = frame % 3 + 1;
+        $('live-preview-img').src = `/custom/assets/mock-preview/frame-${frame}.jpg`;
+    }
+}, 1200);
+checkAuthOnBoot();
+
+$('btn-webcam-enable').addEventListener('click', () => run(() => browserCamera.open($('webcam-device').value)));
+$('btn-webcam-switch').addEventListener('click', () => run(() => browserCamera.open('', true)));
+$('btn-webcam-mirror').addEventListener('click', () => browserCamera.toggleMirror());
+$('webcam-device').addEventListener('change', () => run(() => browserCamera.open($('webcam-device').value)));
+$('btn-webcam-stop').addEventListener('click', () => browserCamera.stop());
+window.addEventListener('pagehide', () => browserCamera.stop());
+window.addEventListener('resize', updateCropGuide);
+document.fonts.ready.then(updateCropGuide);

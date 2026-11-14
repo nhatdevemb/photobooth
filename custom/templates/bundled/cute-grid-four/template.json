@@ -1,0 +1,17 @@
+{
+    "id": "cute-grid-four",
+    "name": "Cute",
+    "style": "cute",
+    "version": "1.0.0",
+    "layout_id": "grid-four",
+    "layout_version": "1.0.0",
+    "overlay": "overlay.png",
+    "background": "background.png",
+    "preview": "preview.jpg",
+    "license": "Original project artwork; MIT",
+    "hashes": {
+        "overlay.png": "8a7243262acd09388750988a3265fdbeb52e76e9548bf029338e293fc6d90f55",
+        "background.png": "4b88c17a7b1dc49d8a07459fb235885d701fb14530f967664990c8847b18af5c",
+        "preview.jpg": "453d6fee3a5a4b8cdbd37cfe4e701c39a14a19ed7363af188477b00a90fb8568"
+    }
+}

@@ -1,0 +1,53 @@
+{
+    "paper_mm": {
+        "width": 100,
+        "height": 148
+    },
+    "dpi": 300,
+    "canvas": {
+        "width": 1181,
+        "height": 1748,
+        "background_rgb": [
+            255,
+            255,
+            255
+        ]
+    },
+    "encoder": {
+        "format": "JPEG",
+        "quality": 95,
+        "subsampling": 0,
+        "dpi": 300,
+        "color_space": "sRGB",
+        "strip_exif_gps": true,
+        "preview_max_edge_px": 1000,
+        "preview_quality": 90
+    },
+    "id": "postcard-three",
+    "name": "Postcard 3 ảnh",
+    "version": "1.0.0",
+    "capture_count": 3,
+    "slots": [
+        {
+            "slot": 1,
+            "x": 35,
+            "y": 35,
+            "width": 1111,
+            "height": 543
+        },
+        {
+            "slot": 2,
+            "x": 35,
+            "y": 602,
+            "width": 1111,
+            "height": 543
+        },
+        {
+            "slot": 3,
+            "x": 35,
+            "y": 1169,
+            "width": 1111,
+            "height": 544
+        }
+    ]
+}

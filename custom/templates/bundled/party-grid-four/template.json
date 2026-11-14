@@ -1,0 +1,17 @@
+{
+    "id": "party-grid-four",
+    "name": "Party",
+    "style": "party",
+    "version": "1.0.0",
+    "layout_id": "grid-four",
+    "layout_version": "1.0.0",
+    "overlay": "overlay.png",
+    "background": "background.png",
+    "preview": "preview.jpg",
+    "license": "Original project artwork; MIT",
+    "hashes": {
+        "overlay.png": "07664b45ceec88b7899d21b653449d1832ef65f290c2051f9e3560d92d7fcb16",
+        "background.png": "b8e12bd7efa067b3f065a5053cfe76de0287db1878b16513dc8799043a0983ba",
+        "preview.jpg": "31b55db944b5d4e039ec0f79a9b5273956b62608a4fb9bd58b6b625596f8e945"
+    }
+}

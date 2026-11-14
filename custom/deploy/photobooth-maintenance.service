@@ -1,0 +1,14 @@
+[Unit]
+Description=Photobooth Operator Edition Hourly Maintenance (Retention, Two-Phase Delete, Log Rotation)
+After=network.target
+
+[Service]
+Type=oneshot
+User=www-data
+Group=www-data
+WorkingDirectory=/var/www/photobooth/custom
+EnvironmentFile=-/etc/photobooth-operator/operator.env
+ExecStart=/usr/bin/php /var/www/photobooth/custom/bin/maintenance.php
+NoNewPrivileges=true
+PrivateTmp=true
+

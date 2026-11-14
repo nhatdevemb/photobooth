@@ -1,0 +1,92 @@
+import { test, expect } from 'playwright/test';
+import { login, setup, review, cleanup } from './helpers.mjs';
+test.afterEach(cleanup);
+
+test('locked configuration requires a new session, while retake keeps all choices', async ({ page }) => {
+    await login(page);
+    await review(page);
+    const previousCode = await page.locator('#session-code-display').textContent();
+    await expect(page.locator('[data-step="1"]')).toBeDisabled();
+    await expect(page.locator('[data-step="2"]')).toBeDisabled();
+    await expect(page.locator('[data-step="3"]')).toBeDisabled();
+    await page.locator('#btn-review-retake').click();
+    await page.locator('[data-slot="2"]').click();
+    await expect(page.locator('.slot-card').nth(1)).toContainText('v2');
+    await page.locator('#btn-next').click();
+    await expect(page.locator('#btn-finalize-session')).toBeEnabled();
+    page.once('dialog', (dialog) => dialog.accept());
+    await page.locator('#btn-restart-session').click();
+    await expect(page.locator('[data-step="1"]')).toHaveAttribute('aria-current', 'step');
+    await expect(page.locator('#session-code-display')).not.toHaveText(previousCode);
+    await expect(page.locator('[data-lut-id="original"]')).toHaveAttribute('aria-pressed', 'true');
+});
+
+test('failed preview cannot be approved and reload recovers without another capture', async ({ page }) => {
+    await login(page);
+    await page.route('**/custom/api/assets/*?variant=preview*', (route) => route.abort());
+    await review(page, 'single', false);
+    await expect(page.locator('#review-error')).toContainText('Không tải được');
+    await expect(page.locator('#btn-finalize-session')).toBeDisabled();
+    await page.unroute('**/custom/api/assets/*?variant=preview*');
+    await page.reload();
+    await expect(page.locator('#btn-finalize-session')).toBeEnabled();
+    const session = (await (await page.request.get('/custom/api/sessions/active')).json()).active_session;
+    expect(session.slots).toHaveLength(1);
+    expect(session.slots[0].photo.version).toBe(1);
+});
+
+test('closed history reprint and share preserve the active session', async ({ page, request }) => {
+    await login(page);
+    await review(page, 'single');
+    const previousCode = await page.locator('#session-code-display').textContent();
+    await page.locator('#btn-finalize-session').click();
+    await expect(page.locator('#modal-qr-img')).toBeVisible();
+    const share = new URL(await page.locator('#modal-qr-url').textContent());
+    const guest = `http://127.0.0.1:${Number(process.env.PB_BROWSER_PORT || 18080) + 1}`;
+    const downloaded = await request.get(guest + share.pathname + '/download');
+    expect(downloaded.status()).toBe(200);
+    const active = (await (await page.request.get('/custom/api/sessions/active')).json()).active_session;
+    expect(await downloaded.body()).toEqual(await (await page.request.get(active.current_final.url)).body());
+    expect((await request.get(guest + '/custom/api/layouts')).status()).toBe(403);
+    await page.locator('#btn-open-print-modal').click();
+    await page.locator('#btn-confirm-print-submit').click();
+    await expect(page.locator('#session-prints-list')).toContainText('COMPLETED');
+    await page.locator('#btn-close-session').click();
+    await page.locator('#btn-new-session').click();
+    await expect(page.locator('#session-code-display')).toHaveText(/^PB-/);
+    await expect(page.locator('#session-code-display')).not.toHaveText(previousCode);
+    const newCode = await page.locator('#session-code-display').textContent();
+    await page.locator('#btn-nav-history').click();
+    const row = page.locator('#history-table-body tr').filter({ hasText: previousCode.trim() });
+    await row.locator('.btn-history-detail').click();
+    await page.locator('#btn-detail-share').click();
+    await expect(page.locator('#history-qr img')).toBeVisible();
+    await page.locator('#btn-detail-reprint').click();
+    await expect(page.locator('#modal-print-action-label')).toContainText('reprint');
+    await expect(page.locator('#modal-print-session-code')).toHaveText(previousCode);
+    await page.locator('#btn-confirm-print-submit').click();
+    await expect(row).toContainText('Đã in: 2');
+    await page.locator('#btn-nav-workspace').click();
+    await expect(page.locator('#session-code-display')).toHaveText(newCode);
+});
+
+test('UNKNOWN warns before reprint and admin resolution never submits automatically', async ({ page }) => {
+    await login(page, true);
+    await review(page, 'single');
+    await page.locator('#btn-finalize-session').click();
+    await expect(page.locator('#modal-qr-img')).toBeVisible();
+    await page.locator('#btn-open-print-modal').click();
+    await page.locator('#btn-confirm-print-submit').click();
+    await expect(page.locator('#session-prints-list')).toContainText('UNKNOWN');
+    await page.locator('#btn-open-print-modal').click();
+    await expect(page.locator('#modal-print-unknown-warning')).toBeVisible();
+    await page.locator('[data-close="modal-print-confirm"]').click();
+    await page.locator('.btn-resolve-print').click();
+    await page.locator('#resolve-outcome').selectOption('confirmed_not_printed');
+    await page.locator('#resolve-note').fill('Đã đối chiếu khay giấy trong kiểm thử mô phỏng.');
+    await page.locator('#btn-resolve-unknown-submit').click();
+    await expect(page.locator('#modal-resolve-unknown')).toBeHidden();
+    await expect(page.locator('#session-prints-list')).toContainText('FAILED');
+    const session = (await (await page.request.get('/custom/api/sessions/active')).json()).active_session;
+    expect(session.print_summary.requests).toHaveLength(1);
+});

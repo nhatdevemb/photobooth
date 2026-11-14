@@ -1,0 +1,39 @@
+{
+    "generated_at": "2026-11-10T08:48:44Z",
+    "test_cases": [
+        "TC-25",
+        "TC-26"
+    ],
+    "mode": "mock",
+    "duration_seconds": 53.54,
+    "passed": true,
+    "soak_metrics": {
+        "target_sessions": 30,
+        "completed_closed_sessions": 30,
+        "active_slot_photos": 81,
+        "expected_slot_photos": 81,
+        "layouts": [
+            "single",
+            "strip-three",
+            "postcard-three",
+            "grid-four"
+        ],
+        "imported_lut_sessions": 12,
+        "total_captured_photos_including_superseded": 93,
+        "retake_sessions_count": 12,
+        "finalized_collages_count": 30,
+        "corrupt_finals_count": 0,
+        "missing_slots_count": 0,
+        "initial_prints_count": 30,
+        "reprints_count": 5,
+        "total_printed_db_rows": 35,
+        "total_printer_receipt_files": 35,
+        "verified_guest_qr_downloads": 30
+    },
+    "backup_restore_rehearsal": {
+        "manifest_assets_count": 227,
+        "verified_restored_assets": 227,
+        "restored_closed_sessions": 30,
+        "restored_imported_luts": 3
+    }
+}

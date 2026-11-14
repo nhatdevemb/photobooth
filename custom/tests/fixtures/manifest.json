@@ -1,0 +1,16 @@
+{
+  "fixtures": {
+    "slot-1-v1.jpg": "873201f3998b5eea031ced00a6cb9a6b687a9f8ce9fd37eef46d527e889776cd",
+    "slot-1-v2.jpg": "d66849291ed6f8aab9040a7773d8568e7a118c18f6fa41f5dcb9a569fb5e478a",
+    "slot-1-v3.jpg": "506aba9935c1edd7f32e412a3da1b9cb9a1c02b1aa9d2aef9005d88f288542cf",
+    "slot-1-v4.jpg": "7751fde9ae53c7ef6eb1715da4124651ce4f8e4ee7ea2792f1a460141b24f55e",
+    "slot-2-v1.jpg": "b6f1b74a23a9fb7765a3abfaffc8d0877165a3763c4799749f77091c0dcc993f",
+    "slot-2-v2.jpg": "9fa64f3f01a8ead158628691e6ca70b37bf216c35017f6628ffc152d02b530cd",
+    "slot-2-v3.jpg": "d9e1250d0f6b05656496bc8a2d5e92be4ceb4a1988a328c4cfcf12fd87a9d4eb",
+    "slot-2-v4.jpg": "f487a9a23b78899ee61fbe59dcb453717dc1a71c41718fb7f073cbe5b56968c9",
+    "slot-3-v1.jpg": "87c1cc46e27c5b02220d758c9392b07a2315e559e7f57ce13f066ba106492f71",
+    "slot-3-v2.jpg": "ee7e95037c599f83fc5b81f70a03d7e13bff9f5e7682040e28fec173b4520ec0",
+    "slot-3-v3.jpg": "a534177f517e8d9ff0faa9fbe3194824bbd6e15e00fdedfb98afd5683ad3488e",
+    "slot-3-v4.jpg": "1fbf3b31737decd34626469329f70d3f36c90ec6b762b3ea4b9d25fe042ab49b"
+  }
+}

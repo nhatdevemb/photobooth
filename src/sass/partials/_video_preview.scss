@@ -1,0 +1,74 @@
+#video--view,
+#picture--frame,
+#collage--frame {
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%) rotate($previewRotation);
+  position: absolute;
+  height: 100%;
+  width: 100%;
+  z-index: 0;
+  &.fill {
+    object-fit: fill;
+  }
+  &.contain {
+    object-fit: contain;
+  }
+  &.cover {
+    object-fit: cover;
+  }
+  &.none {
+    object-fit: none;
+  }
+  &.scale-down {
+    object-fit: scale-down;
+  }
+  &.flip-horizontal {
+    transform: translate(-50%, -50%) rotate($previewRotation) scalex(-1);
+  }
+  &.flip-vertical {
+    transform: translate(-50%, -50%) rotate($previewRotation) scaleY(-1);
+  }
+}
+
+#picture--frame,
+#collage--frame {
+  display: none;
+  z-index: 100;
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+#ipcam--view {
+  top: 0;
+  left: 0;
+  position: fixed;
+  height: 100%;
+  width: 100%;
+  background-image: none;
+  background-size: contain;
+  background-position: center center;
+  background-repeat: no-repeat;
+  transform: rotate($previewRotation);
+
+  &.cover {
+    background-size: cover;
+  }
+
+  &.streaming {
+    background-image: $urlBackground;
+  }
+}
+
+.flip-horizontal {
+  -webkit-transform: scaleX(-1);
+  transform: scaleX(-1);
+  filter: FlipH;
+}
+
+.flip-vertical {
+  -webkit-transform: scaleY(-1);
+  transform: scaleY(-1);
+  filter: FlipV;
+}

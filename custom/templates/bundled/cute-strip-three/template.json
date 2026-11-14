@@ -1,0 +1,17 @@
+{
+    "id": "cute-strip-three",
+    "name": "Cute",
+    "style": "cute",
+    "version": "1.0.0",
+    "layout_id": "strip-three",
+    "layout_version": "1.0.0",
+    "overlay": "overlay.png",
+    "background": "background.png",
+    "preview": "preview.jpg",
+    "license": "Original project artwork; MIT",
+    "hashes": {
+        "overlay.png": "6ea88678384ff5a1314b1105cd2b724a03b76c560102e307ce105b44de4a07fc",
+        "background.png": "4b88c17a7b1dc49d8a07459fb235885d701fb14530f967664990c8847b18af5c",
+        "preview.jpg": "a8319dd684d356ed75544a59c2a0f3cb567d5b7e0bb48864aa3f04523988ae1b"
+    }
+}

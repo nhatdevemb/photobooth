@@ -1,0 +1,17 @@
+{
+    "id": "party-strip-three",
+    "name": "Party",
+    "style": "party",
+    "version": "1.0.0",
+    "layout_id": "strip-three",
+    "layout_version": "1.0.0",
+    "overlay": "overlay.png",
+    "background": "background.png",
+    "preview": "preview.jpg",
+    "license": "Original project artwork; MIT",
+    "hashes": {
+        "overlay.png": "e56bec96abfed6f52617c6ee1d36d15320431876a04f310e506a9836be744728",
+        "background.png": "b8e12bd7efa067b3f065a5053cfe76de0287db1878b16513dc8799043a0983ba",
+        "preview.jpg": "f9ef608eea71706555baed80e38fcd91aa28e4a77ec5dccd70924c12516e41c6"
+    }
+}

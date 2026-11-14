@@ -1,0 +1,17 @@
+{
+    "id": "cute-single",
+    "name": "Cute",
+    "style": "cute",
+    "version": "1.0.0",
+    "layout_id": "single",
+    "layout_version": "1.0.0",
+    "overlay": "overlay.png",
+    "background": "background.png",
+    "preview": "preview.jpg",
+    "license": "Original project artwork; MIT",
+    "hashes": {
+        "overlay.png": "2c8aee9a0cc778dc243a86ceb4458e83d1bbb0a3b1b02b5fc92f766afba382f6",
+        "background.png": "4b88c17a7b1dc49d8a07459fb235885d701fb14530f967664990c8847b18af5c",
+        "preview.jpg": "66410d49244416e01d9fd0459d565caf686a2a2426732b25be8e8f87c490e541"
+    }
+}

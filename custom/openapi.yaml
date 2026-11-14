@@ -1,0 +1,869 @@
+openapi: 3.1.0
+info:
+  title: Photobooth Operator Edition API
+  version: 1.1.0
+  description: |
+    Hợp đồng API điều khiển Photobooth năm bước: bốn layout, template có phiên bản và khóa cấu hình từ capture đầu tiên.
+    - Mọi endpoint nghiệp vụ dưới `/custom/api` yêu cầu cookie phiên đăng nhập (`pb_operator_sid`).
+    - Mọi thao tác thay đổi dữ liệu yêu cầu header `X-CSRF-Token`, kiểm tra `Origin` cùng site và `Idempotency-Key`.
+    - Listener mạng khách (Guest LAN) chỉ phục vụ `/share/{token}` và `/share/{token}/download`.
+servers:
+  - url: http://127.0.0.1:8080/custom/api
+    description: Operator Loopback Listener
+  - url: http://192.168.1.50:8081
+    description: Guest LAN Share Listener (/share/* only)
+
+components:
+  securitySchemes:
+    cookieAuth:
+      type: apiKey
+      in: cookie
+      name: pb_operator_sid
+  parameters:
+    CsrfHeader:
+      name: X-CSRF-Token
+      in: header
+      required: true
+      schema:
+        type: string
+    IdempotencyKeyHeader:
+      name: Idempotency-Key
+      in: header
+      required: true
+      description: UUID v4 của một ý định thao tác
+      schema:
+        type: string
+        format: uuid
+    SessionId:
+      name: id
+      in: path
+      required: true
+      schema: { type: string, format: uuid }
+    TemplateId:
+      name: id
+      in: path
+      required: true
+      schema: { type: string, pattern: '^[a-z0-9][a-z0-9-]{0,63}$' }
+    TemplateVersion:
+      name: version
+      in: path
+      required: true
+      schema: { type: string, pattern: '^\d{1,3}\.\d{1,3}\.\d{1,3}$' }
+  schemas:
+    ErrorResponse:
+      type: object
+      required: [error]
+      properties:
+        error:
+          type: object
+          required: [code, message, request_id]
+          properties:
+            code:
+              type: string
+              example: REVISION_CONFLICT
+            message:
+              type: string
+              example: Phiên chụp đã được cập nhật bởi thao tác khác.
+            request_id:
+              type: string
+              format: uuid
+    RevisionPayload:
+      type: object
+      required: [revision]
+      properties:
+        revision:
+          type: integer
+          minimum: 1
+    ConfigurationPayload:
+      allOf:
+        - { $ref: '#/components/schemas/RevisionPayload' }
+        - type: object
+          properties:
+            lut_id: { type: string, description: ID từ catalog presets đang được phép chọn }
+            lut_version: { type: string, example: 1.0.0 }
+            layout_id: { type: string, enum: [single, strip-three, postcard-three, grid-four] }
+            template_id: { type: string }
+            template_version: { type: string, example: 1.0.0 }
+            ui_step: { type: integer, minimum: 1, maximum: 4 }
+    SessionConfiguration:
+      type: object
+      description: Các trường bổ sung trong snapshot phiên; ui_step là bước tiếp tục đã lưu hoặc suy ra từ trạng thái job/REVIEW/FINALIZED.
+      properties:
+        layout_id: { type: string }
+        layout_version: { type: string }
+        selected_lut: { type: string }
+        lut_version: { type: string }
+        lut_intensity: { type: integer, minimum: 0, maximum: 100, description: Mức do Admin chốt và được ghim vào phiên }
+        lut_sha256: { type: string }
+        lut: { $ref: '#/components/schemas/Lut' }
+        template_id: { type: string }
+        template_version: { type: string }
+        template: { $ref: '#/components/schemas/Template' }
+        capture_count: { type: integer, minimum: 1, maximum: 4 }
+        configuration_locked: { type: boolean }
+        ui_step: { type: integer, minimum: 1, maximum: 5 }
+        template_fallback: { type: boolean, description: Có trong response cấu hình khi chuyển phong cách dự phòng }
+    Template:
+      type: object
+      properties:
+        id: { type: string }
+        name: { type: string }
+        style: { type: string }
+        version: { type: string }
+        layout_id: { type: string }
+        layout_version: { type: string }
+        status: { type: string, enum: [draft, active, disabled] }
+        hashes: { type: object, additionalProperties: { type: string } }
+        preview_url: { type: string }
+        overlay_url: { type: string }
+        background_url: { type: [string, 'null'] }
+    Lut:
+      type: object
+      properties:
+        id: { type: string }
+        version: { type: string }
+        name: { type: string }
+        status: { type: string, enum: [draft, active, disabled] }
+        revision: { type: integer, minimum: 1 }
+        size: { type: integer, description: 33 với CUBE; 0 với preset identity }
+        intensity: { type: integer, minimum: 0, maximum: 100 }
+        sha256: { type: string, description: SHA-256 file CUBE hoặc identity-original }
+        preview_sha256: { type: string }
+        sample_url: { type: string }
+        readonly: { type: boolean, description: Bốn preset đi kèm được giữ nguyên }
+    LutDraftEdit:
+      allOf:
+        - { $ref: '#/components/schemas/RevisionPayload' }
+        - type: object
+          properties:
+            name: { type: string, minLength: 1, maxLength: 100 }
+            intensity: { type: integer, minimum: 0, maximum: 100 }
+
+paths:
+  /presets:
+    get:
+      summary: Catalog LUT active và bốn filter đi kèm, có tên, phiên bản, cường độ và thumbnail động
+      security: [{ cookieAuth: [] }]
+      responses:
+        '200':
+          description: Tương thích response presets cũ; không trả đường dẫn private
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  default_lut: { type: string }
+                  default_template: { type: string }
+                  presets: { type: array, items: { $ref: '#/components/schemas/Lut' } }
+
+  /admin/luts:
+    get:
+      summary: Admin xem mọi phiên bản LUT, gồm draft/active/disabled
+      security: [{ cookieAuth: [] }]
+      responses:
+        '200': { description: Object items chứa metadata Lut }
+        '403': { description: FORBIDDEN }
+
+  /admin/luts/import:
+    post:
+      summary: Admin upload một CUBE thành draft v1.0.0, cường độ ban đầu 80%
+      description: UI batch gửi tuần tự tối đa 30 file, lỗi riêng từng file. Giới hạn 5 MiB/file, UTF-8, LUT 3D size 33, domain 0–1. Validate và preview bằng Python. Không tải từ URL/ZIP.
+      security: [{ cookieAuth: [] }]
+      parameters:
+        - { $ref: '#/components/parameters/CsrfHeader' }
+        - { $ref: '#/components/parameters/IdempotencyKeyHeader' }
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file: { type: string, format: binary }
+      responses:
+        '201': { description: Metadata Lut draft, SHA-256 và sample_url có kiểm tra quyền }
+        '403': { description: FORBIDDEN hoặc CSRF_INVALID }
+        '409': { description: LUT_ALREADY_IMPORTED (kèm lut_id/lut_version) hoặc IDEMPOTENCY_CONFLICT }
+        '422': { description: INVALID_LUT_UPLOAD hoặc INVALID_LUT }
+
+  /admin/luts/{id}/{version}/draft:
+    post:
+      summary: Admin chỉnh tên/cường độ hoặc thay file trong bản nháp và dựng lại preview
+      security: [{ cookieAuth: [] }]
+      parameters:
+        - { $ref: '#/components/parameters/TemplateId' }
+        - { $ref: '#/components/parameters/TemplateVersion' }
+        - { $ref: '#/components/parameters/CsrfHeader' }
+        - { $ref: '#/components/parameters/IdempotencyKeyHeader' }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/LutDraftEdit' }
+          multipart/form-data:
+            schema:
+              type: object
+              required: [revision, name, intensity, file]
+              properties:
+                revision: { type: integer, minimum: 1 }
+                name: { type: string, minLength: 1, maxLength: 100 }
+                intensity: { type: integer, minimum: 0, maximum: 100 }
+                file: { type: string, format: binary }
+      responses:
+        '200': { description: Metadata mới, revision tăng, preview_sha256 và sample_url mới }
+        '409': { description: LUT_IMMUTABLE, REVISION_CONFLICT, INTEGRITY_ERROR hoặc IDEMPOTENCY_CONFLICT }
+        '422': { description: INVALID_INPUT, INVALID_LUT hoặc INVALID_LUT_UPLOAD }
+
+  /admin/luts/{id}/{version}/versions:
+    post:
+      summary: Admin sao chép bản đã xuất bản thành draft kế tiếp để thay file/cường độ
+      security: [{ cookieAuth: [] }]
+      parameters:
+        - { $ref: '#/components/parameters/TemplateId' }
+        - { $ref: '#/components/parameters/TemplateVersion' }
+        - { $ref: '#/components/parameters/CsrfHeader' }
+        - { $ref: '#/components/parameters/IdempotencyKeyHeader' }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/RevisionPayload' }
+      responses:
+        '201': { description: Draft có cùng id, version patch tăng, khởi tạo từ file/tên/cường độ bản nguồn }
+        '409': { description: LUT_DRAFT_EXISTS, REVISION_CONFLICT, LUT_IMMUTABLE hoặc VERSION_LIMIT }
+
+  /admin/luts/{id}/{version}/activate:
+    post:
+      summary: Admin kích hoạt sau khi xem đúng preview, tắt version active trước đó trong cùng transaction
+      security: [{ cookieAuth: [] }]
+      parameters:
+        - { $ref: '#/components/parameters/TemplateId' }
+        - { $ref: '#/components/parameters/TemplateVersion' }
+        - { $ref: '#/components/parameters/CsrfHeader' }
+        - { $ref: '#/components/parameters/IdempotencyKeyHeader' }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              allOf:
+                - { $ref: '#/components/schemas/RevisionPayload' }
+                - type: object
+                  required: [preview_sha256]
+                  properties:
+                    preview_sha256: { type: string }
+      responses:
+        '200': { description: Lut status active; phiên ghim version cũ giữ nguyên }
+        '409': { description: PREVIEW_STALE, REVISION_CONFLICT, LUT_IMMUTABLE hoặc INTEGRITY_ERROR }
+
+  /admin/luts/{id}/{version}/disable:
+    post:
+      summary: Admin tắt LUT cho lựa chọn mới; giữ file và phiên đã ghim
+      security: [{ cookieAuth: [] }]
+      parameters:
+        - { $ref: '#/components/parameters/TemplateId' }
+        - { $ref: '#/components/parameters/TemplateVersion' }
+        - { $ref: '#/components/parameters/CsrfHeader' }
+        - { $ref: '#/components/parameters/IdempotencyKeyHeader' }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/RevisionPayload' }
+      responses:
+        '200': { description: Lut status disabled }
+        '409': { description: REVISION_CONFLICT hoặc LUT_IMMUTABLE }
+
+  /catalog/luts/{id}/{version}/preview.jpg:
+    get:
+      summary: Thumbnail/ảnh trước-sau được sinh bằng pipeline grading thực; draft chỉ Admin, disabled vẫn đọc được
+      security: [{ cookieAuth: [] }]
+      parameters:
+        - { $ref: '#/components/parameters/TemplateId' }
+        - { $ref: '#/components/parameters/TemplateVersion' }
+        - name: sha
+          in: query
+          schema: { type: string }
+      responses:
+        '200': { description: JPEG sRGB, no-store, nosniff }
+        '403': { description: FORBIDDEN }
+        '409': { description: PREVIEW_STALE hoặc INTEGRITY_ERROR }
+
+  /layouts:
+    get:
+      summary: Bốn layout có phiên bản, canvas, slots, capture_count và thumbnail
+      security: [{ cookieAuth: [] }]
+      responses:
+        '200': { description: Object items chứa các định nghĩa layout 1181 × 1748 px }
+
+  /templates:
+    get:
+      summary: Template đang active được phép chọn cho phiên mới
+      security: [{ cookieAuth: [] }]
+      parameters:
+        - name: layout_id
+          in: query
+          schema: { type: string }
+      responses:
+        '200':
+          description: Object items; phiên đã ghim vẫn dùng được bản disabled qua snapshot phiên
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items: { type: array, items: { $ref: '#/components/schemas/Template' } }
+
+  /sessions/{id}/configuration:
+    post:
+      summary: Lưu filter, layout, template và bước trước khi nhận capture đầu tiên
+      security: [{ cookieAuth: [] }]
+      parameters:
+        - { $ref: '#/components/parameters/SessionId' }
+        - { $ref: '#/components/parameters/CsrfHeader' }
+        - { $ref: '#/components/parameters/IdempotencyKeyHeader' }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ConfigurationPayload' }
+      responses:
+        '200': { description: Snapshot phiên đã cập nhật; tăng revision; replay trả response cũ }
+        '409': { description: CONFIGURATION_LOCKED, SESSION_BUSY, REVISION_CONFLICT hoặc IDEMPOTENCY_CONFLICT }
+        '422': { description: INVALID_LAYOUT, INVALID_TEMPLATE, TEMPLATE_LAYOUT_MISMATCH, INVALID_LUT hoặc INVALID_INPUT }
+
+  /sessions/{id}/restart:
+    post:
+      summary: Transaction hủy/đóng phiên cũ và tạo phiên mới, giữ toàn bộ dữ liệu cũ theo retention
+      security: [{ cookieAuth: [] }]
+      parameters:
+        - { $ref: '#/components/parameters/SessionId' }
+        - { $ref: '#/components/parameters/CsrfHeader' }
+        - { $ref: '#/components/parameters/IdempotencyKeyHeader' }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              allOf:
+                - { $ref: '#/components/schemas/RevisionPayload' }
+                - type: object
+                  required: [confirm]
+                  properties:
+                    confirm: { const: true }
+      responses:
+        '201': { description: Snapshot phiên mới; cùng idempotency key trả cùng phiên mới }
+        '409': { description: SESSION_BUSY khi capture/render đang chạy hoặc REVISION_CONFLICT }
+        '422': { description: CONFIRMATION_REQUIRED hoặc INVALID_STATE }
+
+  /admin/templates:
+    get:
+      summary: Admin liệt kê mọi version gồm draft/active/disabled
+      security: [{ cookieAuth: [] }]
+      responses:
+        '200': { description: Object items chứa metadata template }
+        '403': { description: FORBIDDEN nếu không có quyền admin }
+
+  /admin/templates/import:
+    post:
+      summary: Admin nhập ZIP immutable thành draft, chưa cho phiên mới chọn
+      description: Giới hạn 30 MiB ZIP, 60 MiB giải nén, 20 entry. Chỉ nhận template.json, overlay.png RGBA 1181×1748, preview.jpg tối đa 1000 px và background.png tùy chọn 1181×1748. Xem bản ghép trong admin bằng các tài nguyên đã xác thực trước khi kích hoạt.
+      security: [{ cookieAuth: [] }]
+      parameters:
+        - { $ref: '#/components/parameters/CsrfHeader' }
+        - { $ref: '#/components/parameters/IdempotencyKeyHeader' }
+      requestBody:
+        required: true
+        content:
+          application/zip:
+            schema: { type: string, format: binary }
+      responses:
+        '201': { description: Metadata draft và URL tài nguyên có kiểm tra quyền }
+        '403': { description: FORBIDDEN hoặc CSRF_INVALID }
+        '409': { description: TEMPLATE_VERSION_EXISTS hoặc IDEMPOTENCY_CONFLICT }
+        '422': { description: INVALID_PACKAGE hoặc INVALID_LAYOUT }
+
+  /admin/templates/{id}/{version}/activate:
+    post:
+      summary: Admin kích hoạt version sau khi xem bản ghép mẫu
+      security: [{ cookieAuth: [] }]
+      parameters:
+        - { $ref: '#/components/parameters/TemplateId' }
+        - { $ref: '#/components/parameters/TemplateVersion' }
+        - { $ref: '#/components/parameters/CsrfHeader' }
+        - { $ref: '#/components/parameters/IdempotencyKeyHeader' }
+      responses:
+        '200': { description: Metadata có status active }
+        '403': { description: FORBIDDEN }
+        '409': { description: INTEGRITY_ERROR nếu tài nguyên đã thay đổi }
+
+  /admin/templates/{id}/{version}/disable:
+    post:
+      summary: Admin tắt version cho lựa chọn mới; giữ nguyên file và phiên đã ghim
+      security: [{ cookieAuth: [] }]
+      parameters:
+        - { $ref: '#/components/parameters/TemplateId' }
+        - { $ref: '#/components/parameters/TemplateVersion' }
+        - { $ref: '#/components/parameters/CsrfHeader' }
+        - { $ref: '#/components/parameters/IdempotencyKeyHeader' }
+      responses:
+        '200': { description: Metadata có status disabled }
+        '403': { description: FORBIDDEN }
+
+  /catalog/templates/{id}/{version}/{asset}:
+    get:
+      summary: Đọc tài nguyên template qua operator listener; draft chỉ admin, disabled vẫn cho operator đăng nhập
+      security: [{ cookieAuth: [] }]
+      parameters:
+        - { $ref: '#/components/parameters/TemplateId' }
+        - { $ref: '#/components/parameters/TemplateVersion' }
+        - name: asset
+          in: path
+          required: true
+          schema: { type: string, enum: [overlay.png, background.png, preview.jpg] }
+      responses:
+        '200': { description: image/png hoặc image/jpeg; private no-store, nosniff }
+        '403': { description: FORBIDDEN }
+        '404': { description: NOT_FOUND }
+        '409': { description: INTEGRITY_ERROR }
+
+  /catalog/layouts/{id}/{version}/preview.jpg:
+    get:
+      summary: Thumbnail hình học layout theo đúng tỷ lệ giấy
+      security: [{ cookieAuth: [] }]
+      parameters:
+        - { $ref: '#/components/parameters/TemplateId' }
+        - { $ref: '#/components/parameters/TemplateVersion' }
+      responses:
+        '200': { description: image/jpeg }
+        '422': { description: INVALID_LAYOUT }
+
+  /auth/login:
+    post:
+      summary: Đăng nhập người vận hành / quản trị viên
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [username, password]
+              properties:
+                username: { type: string }
+                password: { type: string }
+      responses:
+        '200': { description: Đăng nhập thành công, thiết lập cookie HttpOnly và trả CSRF token }
+        '401': { description: AUTH_REQUIRED }
+        '429': { description: LOGIN_RATE_LIMITED (sau 5 lần sai trong 15 phút) }
+
+  /auth/me:
+    get:
+      summary: Kiểm tra phiên đăng nhập hiện tại
+      security: [{ cookieAuth: [] }]
+      responses:
+        '200': { description: Thông tin user, role và CSRF token }
+        '401': { description: AUTH_REQUIRED }
+
+  /auth/logout:
+    post:
+      summary: Đăng xuất và hủy phiên
+      security: [{ cookieAuth: [] }]
+      parameters: [{ $ref: '#/components/parameters/CsrfHeader' }]
+      responses:
+        '200': { description: Đã đăng xuất }
+
+  /sessions:
+    post:
+      summary: Tạo phiên chụp mới (NEW, revision 1, số slot theo layout mặc định)
+      security: [{ cookieAuth: [] }]
+      parameters:
+        - { $ref: '#/components/parameters/CsrfHeader' }
+        - { $ref: '#/components/parameters/IdempotencyKeyHeader' }
+      responses:
+        '201': { description: Phiên mới được tạo }
+        '409': { description: ACTIVE_SESSION_EXISTS hoặc IDEMPOTENCY_CONFLICT }
+    get:
+      summary: Liệt kê lịch sử phiên có phân trang
+      security: [{ cookieAuth: [] }]
+      parameters:
+        - name: cursor
+          in: query
+          schema: { type: string }
+        - name: limit
+          in: query
+          schema: { type: integer, minimum: 1, maximum: 50, default: 20 }
+      responses:
+        '200': { description: Danh sách phiên và next_cursor }
+
+  /sessions/active:
+    get:
+      summary: Lấy phiên đang hoạt động (nếu có)
+      security: [{ cookieAuth: [] }]
+      responses:
+        '200': { description: Active session hoặc null }
+
+  /sessions/{id}:
+    get:
+      summary: Chi tiết phiên, cấu hình đã ghim, 1–4 slot, render, final, job và print summary
+      security: [{ cookieAuth: [] }]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200': { description: Chi tiết phiên }
+        '404': { description: NOT_FOUND }
+
+  /sessions/{id}/slots/{slot}/capture:
+    post:
+      summary: Chụp slot trống; browser nhận JPEG multipart, mock/hardware nhận JSON; enqueue đầu tiên khóa cấu hình
+      security: [{ cookieAuth: [] }]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+        - name: slot
+          in: path
+          required: true
+          schema: { type: integer, enum: [1, 2, 3, 4] }
+        - { $ref: '#/components/parameters/CsrfHeader' }
+        - { $ref: '#/components/parameters/IdempotencyKeyHeader' }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/RevisionPayload' }
+          multipart/form-data:
+            schema:
+              type: object
+              required: [revision, file]
+              properties:
+                revision: { type: integer, minimum: 1 }
+                file: { type: string, format: binary, description: 'JPEG từ camera trình duyệt, tối đa 5 MiB; chỉ CAMERA_ADAPTER=browser. Nội dung được kiểm tra bởi worker.' }
+      responses:
+        '202': { description: Đã xếp tác vụ capture, trả job_id và revision mới }
+        '413': { description: IMAGE_TOO_LARGE }
+        '409': { description: REVISION_CONFLICT hoặc SESSION_BUSY }
+        '422': { description: INVALID_SLOT, INVALID_STATE, INVALID_CAMERA_MODE hoặc CAMERA_FRAME_REQUIRED }
+        '503': { description: DISK_LOW hoặc DEVICE_UNAVAILABLE }
+
+  /sessions/{id}/slots/{slot}/retake:
+    post:
+      summary: Chụp lại một slot trong capture_count; giữ các slot khác và cấu hình đã khóa
+      security: [{ cookieAuth: [] }]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+        - name: slot
+          in: path
+          required: true
+          schema: { type: integer, enum: [1, 2, 3, 4] }
+        - { $ref: '#/components/parameters/CsrfHeader' }
+        - { $ref: '#/components/parameters/IdempotencyKeyHeader' }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/RevisionPayload' }
+          multipart/form-data:
+            schema:
+              type: object
+              required: [revision, file]
+              properties:
+                revision: { type: integer, minimum: 1 }
+                file: { type: string, format: binary, description: 'JPEG tối đa 5 MiB; chỉ CAMERA_ADAPTER=browser. Lỗi kiểm tra JPEG giữ nguyên ảnh cũ.' }
+      responses:
+        '202': { description: Đã xếp tác vụ retake, trả job_id và revision mới }
+        '413': { description: IMAGE_TOO_LARGE }
+        '409': { description: REVISION_CONFLICT hoặc SESSION_BUSY }
+        '422': { description: INVALID_SLOT, INVALID_STATE, INVALID_CAMERA_MODE hoặc CAMERA_FRAME_REQUIRED }
+
+  /sessions/{id}/render:
+    post:
+      summary: Ghép ảnh theo snapshot filter, layout và template đã khóa; không thay cấu hình qua render
+      security: [{ cookieAuth: [] }]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+        - { $ref: '#/components/parameters/CsrfHeader' }
+        - { $ref: '#/components/parameters/IdempotencyKeyHeader' }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [revision]
+              properties:
+                revision: { type: integer }
+                lut_id:
+                  type: string
+                  description: ID của filter đã được ghim vào phiên
+                template_id:
+                  type: string
+                  description: Mặc định lấy từ phiên; nếu truyền phải khớp cấu hình đã khóa
+      responses:
+        '202': { description: Đã xếp tác vụ render với snapshot đầu vào }
+        '409': { description: CONFIGURATION_LOCKED, SESSION_BUSY hoặc REVISION_CONFLICT }
+        '422': { description: MISSING_PHOTOS, INVALID_LUT hoặc INVALID_STATE }
+
+  /sessions/{id}/finalize:
+    post:
+      summary: Khóa bản render hiện hành thành ảnh cuối bất biến (FINALIZED)
+      security: [{ cookieAuth: [] }]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+        - { $ref: '#/components/parameters/CsrfHeader' }
+        - { $ref: '#/components/parameters/IdempotencyKeyHeader' }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [revision, render_id]
+              properties:
+                revision: { type: integer }
+                render_id: { type: string, format: uuid }
+      responses:
+        '201': { description: Trả final_asset_id và SHA-256 }
+
+  /sessions/{id}/reopen:
+    post:
+      summary: Mở lại từ FINALIZED về CAPTURED, giữ cấu hình đã khóa và toàn bộ final/token cũ
+      security: [{ cookieAuth: [] }]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+        - { $ref: '#/components/parameters/CsrfHeader' }
+        - { $ref: '#/components/parameters/IdempotencyKeyHeader' }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/RevisionPayload' }
+      responses:
+        '200': { description: Đã chuyển về CAPTURED }
+
+  /sessions/{id}/close:
+    post:
+      summary: Đóng phiên từ FINALIZED sang CLOSED và đặt hạn lưu trữ 7 ngày
+      security: [{ cookieAuth: [] }]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+        - { $ref: '#/components/parameters/CsrfHeader' }
+        - { $ref: '#/components/parameters/IdempotencyKeyHeader' }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/RevisionPayload' }
+      responses:
+        '200': { description: Đã đóng phiên }
+
+  /sessions/{id}/cancel:
+    post:
+      summary: Hủy phiên từ NEW, CAPTURED hoặc REVIEW sang CANCELLED
+      security: [{ cookieAuth: [] }]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+        - { $ref: '#/components/parameters/CsrfHeader' }
+        - { $ref: '#/components/parameters/IdempotencyKeyHeader' }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/RevisionPayload' }
+      responses:
+        '200': { description: Đã hủy phiên }
+
+  /jobs/{id}:
+    get:
+      summary: Truy vấn trạng thái tác vụ nền (capture, retake, render, delete_session)
+      security: [{ cookieAuth: [] }]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200': { description: Trạng thái, phase, progress và result/error }
+
+  /assets/{id}:
+    get:
+      summary: Tải JPEG tài sản (original, preview, print, final) cho người vận hành
+      security: [{ cookieAuth: [] }]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+        - name: variant
+          in: query
+          schema:
+            type: string
+            enum: [original, preview, print, final]
+            default: original
+      responses:
+        '200': { description: Dữ liệu ảnh image/jpeg }
+
+  /sessions/{id}/prints:
+    post:
+      summary: Tạo yêu cầu in hoặc in lại thủ công (copies=1 trong MVP)
+      security: [{ cookieAuth: [] }]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+        - { $ref: '#/components/parameters/CsrfHeader' }
+        - { $ref: '#/components/parameters/IdempotencyKeyHeader' }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [revision, final_asset_id, copies, action]
+              properties:
+                revision: { type: integer }
+                final_asset_id: { type: string, format: uuid }
+                copies: { type: integer, enum: [1] }
+                action: { type: string, enum: [print, reprint] }
+      responses:
+        '202': { description: Trả print_request_id }
+
+  /prints/{id}:
+    get:
+      summary: Truy vấn trạng thái yêu cầu in
+      security: [{ cookieAuth: [] }]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200': { description: Trạng thái PENDING/SUBMITTING/QUEUED/PRINTING/COMPLETED/FAILED/UNKNOWN }
+
+  /prints/{id}/resolve:
+    post:
+      summary: Admin đối chiếu và giải quyết yêu cầu in ở trạng thái UNKNOWN
+      security: [{ cookieAuth: [] }]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+        - { $ref: '#/components/parameters/CsrfHeader' }
+        - { $ref: '#/components/parameters/IdempotencyKeyHeader' }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [revision, outcome, note]
+              properties:
+                revision: { type: integer }
+                outcome: { type: string, enum: [observed_completed, confirmed_not_printed] }
+                note: { type: string }
+      responses:
+        '200': { description: Đã ghi nhận kết quả đối chiếu UNKNOWN }
+
+  /sessions/{id}/shares:
+    post:
+      summary: Phát hành token và mã QR LAN nội bộ cho một ảnh cuối
+      security: [{ cookieAuth: [] }]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+        - { $ref: '#/components/parameters/CsrfHeader' }
+        - { $ref: '#/components/parameters/IdempotencyKeyHeader' }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [revision, final_asset_id]
+              properties:
+                revision: { type: integer }
+                final_asset_id: { type: string, format: uuid }
+      responses:
+        '201': { description: Trả URL LAN, QR data URI và expires_at }
+
+  /shares/{id}/revoke:
+    post:
+      summary: Thu hồi ngay lập tức một token chia sẻ
+      security: [{ cookieAuth: [] }]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+        - { $ref: '#/components/parameters/CsrfHeader' }
+        - { $ref: '#/components/parameters/IdempotencyKeyHeader' }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/RevisionPayload' }
+      responses:
+        '200': { description: Đã thu hồi token }
+        '409':
+          description: REVISION_CONFLICT hoặc SESSION_BUSY khi capture/retake/render đang chờ hoặc chạy
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorResponse' }
+
+  /sessions/{id}/delete:
+    post:
+      summary: Admin xóa thủ công phiên theo hai pha (thu hồi token ngay và xếp job xóa tệp)
+      security: [{ cookieAuth: [] }]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+        - { $ref: '#/components/parameters/CsrfHeader' }
+        - { $ref: '#/components/parameters/IdempotencyKeyHeader' }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [revision, confirm]
+              properties:
+                revision: { type: integer }
+                confirm: { type: boolean }
+      responses:
+        '202': { description: Đã đánh dấu tombstone và xếp tác vụ xóa }
+
+  /health:
+    get:
+      summary: Kiểm tra trạng thái hệ thống, mode mock/hardware, worker, camera, printer, disk
+      security: [{ cookieAuth: [] }]
+      responses:
+        '200': { description: Health report }
+

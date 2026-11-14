@@ -1,0 +1,54 @@
+{
+  "schema_version": "1.0.0",
+  "default_lut": "original",
+  "presets": [
+    {
+      "id": "original",
+      "name": "Gốc (Original)",
+      "name_en": "Original",
+      "version": "1.0.0",
+      "type": "identity",
+      "file": null,
+      "sha256": "identity-original",
+      "size": 0,
+      "license": "MIT",
+      "description": "Giữ nguyên màu sắc chuẩn sRGB từ ảnh chụp, không áp dụng biến đổi LUT."
+    },
+    {
+      "id": "korean-soft",
+      "name": "Korean Soft",
+      "name_en": "Korean Soft",
+      "version": "1.0.0",
+      "type": "cube_3d",
+      "file": "korean-soft.cube",
+      "sha256": "c146e8b1f3dace37129a136e93ca1198e1cc77342eaf701a7ad67ebd632836fe",
+      "size": 33,
+      "license": "MIT",
+      "description": "Tông sáng trong trẻo, nâng nhẹ vùng tối (+4%), giảm nhẹ độ tương phản vùng sáng và ưu tiên sắc hồng ấm dịu cho tông da."
+    },
+    {
+      "id": "film-400",
+      "name": "Film 400",
+      "name_en": "Film 400",
+      "version": "1.0.0",
+      "type": "cube_3d",
+      "file": "film-400.cube",
+      "sha256": "57a67308c10321ba201215a50c2bb4eeb6da8cf667ec44030c4fc019b6be10a5",
+      "size": 33,
+      "license": "MIT",
+      "description": "Đường cong tương phản S-curve cổ điển, vùng tối ánh xanh lục-lam nhẹ và vùng sáng vàng ấm."
+    },
+    {
+      "id": "vintage-fade",
+      "name": "Vintage Fade",
+      "name_en": "Vintage Fade",
+      "version": "1.0.0",
+      "type": "cube_3d",
+      "file": "vintage-fade.cube",
+      "sha256": "167f31585dab2ecb651e4ddc447e4488cc69e92ba016a8b6d23a74981b707b65",
+      "size": 33,
+      "license": "MIT",
+      "description": "Nền đen mờ (matte lifted blacks), giảm độ bão hòa màu (72%) và phủ sắc vàng hổ phách hoài cổ."
+    }
+  ]
+}

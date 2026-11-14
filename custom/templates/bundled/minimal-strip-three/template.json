@@ -1,0 +1,17 @@
+{
+    "id": "minimal-strip-three",
+    "name": "Tối giản",
+    "style": "minimal",
+    "version": "1.0.0",
+    "layout_id": "strip-three",
+    "layout_version": "1.0.0",
+    "overlay": "overlay.png",
+    "background": "background.png",
+    "preview": "preview.jpg",
+    "license": "Original project artwork; MIT",
+    "hashes": {
+        "overlay.png": "36bf41c3ae0a7e05f324dae25705e950924282c254646e2acd1df5c3f7f72a8d",
+        "background.png": "8f81dc984b212224fdb4700a5c001c9d31d569979c5581f8d935356402582056",
+        "preview.jpg": "d9dadced48efee390903344fefa0d1bf7bfd109ff4e4f3c87c8535313c2f60f7"
+    }
+}

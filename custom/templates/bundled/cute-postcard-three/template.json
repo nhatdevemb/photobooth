@@ -1,0 +1,17 @@
+{
+    "id": "cute-postcard-three",
+    "name": "Cute",
+    "style": "cute",
+    "version": "1.0.0",
+    "layout_id": "postcard-three",
+    "layout_version": "1.0.0",
+    "overlay": "overlay.png",
+    "background": "background.png",
+    "preview": "preview.jpg",
+    "license": "Original project artwork; MIT",
+    "hashes": {
+        "overlay.png": "8da1f5f6bcd7768b3d71d6a89aac16bbe460b4675619702978b5b5313c139b96",
+        "background.png": "4b88c17a7b1dc49d8a07459fb235885d701fb14530f967664990c8847b18af5c",
+        "preview.jpg": "7fc6b10fdf995f4b89a1f5a24f0b4fdba5b573a99943ce1722d838b98354c371"
+    }
+}

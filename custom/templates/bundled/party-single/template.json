@@ -1,0 +1,17 @@
+{
+    "id": "party-single",
+    "name": "Party",
+    "style": "party",
+    "version": "1.0.0",
+    "layout_id": "single",
+    "layout_version": "1.0.0",
+    "overlay": "overlay.png",
+    "background": "background.png",
+    "preview": "preview.jpg",
+    "license": "Original project artwork; MIT",
+    "hashes": {
+        "overlay.png": "d44b85889ce568a1dfba0f0d98480fb9929ba55e061b88066d9a84eaebbbb733",
+        "background.png": "b8e12bd7efa067b3f065a5053cfe76de0287db1878b16513dc8799043a0983ba",
+        "preview.jpg": "f71fa7d0a59b3a4508b231b5c0156150dfc8e2ee4f986956308de85dfc8bfab4"
+    }
+}

@@ -1,0 +1,17 @@
+{
+    "id": "floral-grid-four",
+    "name": "Hoa",
+    "style": "floral",
+    "version": "1.0.0",
+    "layout_id": "grid-four",
+    "layout_version": "1.0.0",
+    "overlay": "overlay.png",
+    "background": "background.png",
+    "preview": "preview.jpg",
+    "license": "Original project artwork; MIT",
+    "hashes": {
+        "overlay.png": "c97a8186ba6af72fd4efd5941acacd470ff9a8617fa7f70d02fac2e90f985597",
+        "background.png": "114bccd50e4a8ec63d2c2f9f92d22fa74f3185268828a5bc6554c516ed1d2100",
+        "preview.jpg": "267662d04ab64111c3620671e751b7dc5d19bfd419c8ffade8ee97c90a334242"
+    }
+}

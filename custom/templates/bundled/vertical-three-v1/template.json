@@ -1,0 +1,17 @@
+{
+    "id": "vertical-three-v1",
+    "name": "Tối giản",
+    "style": "minimal",
+    "version": "1.0.0",
+    "layout_id": "postcard-three",
+    "layout_version": "1.0.0",
+    "overlay": "overlay.png",
+    "background": "background.png",
+    "preview": "preview.jpg",
+    "license": "Original project artwork; MIT",
+    "hashes": {
+        "overlay.png": "36bf41c3ae0a7e05f324dae25705e950924282c254646e2acd1df5c3f7f72a8d",
+        "background.png": "8f81dc984b212224fdb4700a5c001c9d31d569979c5581f8d935356402582056",
+        "preview.jpg": "ed1ac789990ab9ea1cfe0c22b45012f76282ba913458e75f1f02eb8ba02c5aa0"
+    }
+}

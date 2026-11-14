@@ -1,0 +1,53 @@
+{
+  "upstream": {
+    "name": "PhotoboothProject/photobooth",
+    "repository_url": "https://github.com/PhotoboothProject/photobooth",
+    "baseline_tag": "v4.5.1",
+    "commit_sha": "a8841409ed8d0db485191269d6c302505b67f64f",
+    "license": "MIT",
+    "license_file": "LICENSE",
+    "submodules": {
+      "vendor/PHPMailer": "df16b615e371d81fb79e506277faea67a1be18f1",
+      "vendor/PhotoSwipe": "ac3253927eab72fd8b62310d88012fbf9927fc7e",
+      "vendor/Seriously": "513d2b8696b76fe764b3033aa6dc7c99005acccd",
+      "vendor/phpqrcode": "863ffffac4c9d22e522464e325cbcbadfbb26470"
+    }
+  },
+  "reference_points_v4_5_1": {
+    "capture": "api/takePic.php",
+    "preview": [
+      "api/previewCamera.php",
+      "api/cameracontrol.py"
+    ],
+    "collage": [
+      "lib/collage.php",
+      "lib/collageConfig.php"
+    ],
+    "effects": [
+      "api/applyEffects.php",
+      "lib/applyEffects.php",
+      "lib/filter.php"
+    ],
+    "print_upstream_do_not_use_for_finalized": "api/print.php",
+    "device_defaults": "lib/config.php"
+  },
+  "extension": {
+    "name": "Photobooth Operator Edition",
+    "version": "1.0.0-mvp",
+    "directory": "custom/",
+    "isolation_policy": [
+      "Never call upstream api/*.php via internal HTTP to chain operator workflows.",
+      "Never include upstream endpoint scripts inside custom operator controllers.",
+      "Never send finalized printable JPEGs through upstream api/print.php.",
+      "Never expose upstream /api/* or /admin/* on the guest LAN listener."
+    ],
+    "controlled_update_procedure": [
+      "1. Fetch upstream tags only (do not track dev branch).",
+      "2. Diff api/takePic.php, api/previewCamera.php, lib/config.php, and vendor submodules.",
+      "3. Run custom/bin/ci-check.sh (PHPUnit, pytest, Playwright, and upstream smoke lint).",
+      "4. Update commit_sha in custom/upstream.json only after all M0-M4 gates pass."
+    ],
+    "compatibility_patches": []
+  }
+}
+
