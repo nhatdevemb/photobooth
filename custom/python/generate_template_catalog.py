@@ -76,7 +76,7 @@ def main():
             image=Image.fromarray(apply_cube_lut_rgb(np.asarray(normalized),parse_cube_file(ROOT/'presets'/f'{preset}.cube')))
         image.save(samples/f'{preset}.jpg',quality=95,subsampling=0)
     for layout_file in sorted((ROOT/'layouts').glob('*.json')):
-        layout = json.loads(layout_file.read_text())
+        layout = json.loads(layout_file.read_text(encoding='utf-8'))
         layout_preview = Image.new('RGB',(1181,1748),(244,236,253))
         d=ImageDraw.Draw(layout_preview)
         for slot in layout['slots']:
@@ -98,7 +98,7 @@ def main():
             (directory/'sample.jpg').unlink()
             metadata=dict(id=ident,name=NAMES[style],style=style,version='1.0.0',layout_id=layout['id'],layout_version='1.0.0',overlay='overlay.png',background='background.png',preview='preview.jpg',license='Original project artwork; MIT')
             metadata['hashes']={name:hashlib.sha256((directory/name).read_bytes()).hexdigest() for name in ('overlay.png','background.png','preview.jpg')}
-            (directory/'template.json').write_text(json.dumps(metadata,ensure_ascii=False,indent=4)+'\n')
+            (directory/'template.json').write_text(json.dumps(metadata,ensure_ascii=False,indent=4)+'\n', encoding='utf-8')
     # A distinct fourth mock capture; original fixtures remain byte-identical.
     for version in range(1,5):
         image=render_synthetic_card(1200,600,4,version,(140,65,190))

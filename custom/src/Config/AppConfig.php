@@ -48,6 +48,9 @@ final class AppConfig
     public readonly string $mockPrinterScenario;
     public readonly ?int $mockDiskFreeBytes;
     public readonly string $upstreamSha;
+    public readonly string $pythonBin;
+    public readonly string $dccBaseUrl;
+    public readonly string $dccCameraId;
 
     /**
      * @param array<string, string> $overrides
@@ -149,7 +152,10 @@ final class AppConfig
             mockFaultScenario: $get('MOCK_FAULT_SCENARIO', 'none'),
             mockPrinterScenario: $get('MOCK_PRINTER_SCENARIO', 'normal'),
             mockDiskFreeBytes: $mockDisk,
-            upstreamSha: $upstreamSha
+            upstreamSha: $upstreamSha,
+            pythonBin: $get('PYTHON_BIN', PHP_OS_FAMILY === 'Windows' ? 'python.exe' : 'python3'),
+            dccBaseUrl: rtrim($get('DCC_BASE_URL', 'http://127.0.0.1:5513'), '/'),
+            dccCameraId: $get('DCC_CAMERA_ID', '')
         );
 
         $instance->validate();
@@ -176,7 +182,7 @@ final class AppConfig
         string $printerQueue,
         string $defaultLut,
         string $defaultTemplate,
-        string $defaultBeautyPreset = 'natural',
+        string $defaultBeautyPreset,
         int $maxJpegBytes,
         int $maxImagePixels,
         int $shareTtlHours,
@@ -198,7 +204,10 @@ final class AppConfig
         string $mockFaultScenario,
         string $mockPrinterScenario,
         ?int $mockDiskFreeBytes,
-        string $upstreamSha
+        string $upstreamSha,
+        string $pythonBin = 'python3',
+        string $dccBaseUrl = 'http://127.0.0.1:5513',
+        string $dccCameraId = ''
     ) {
         $this->appEnv = $appEnv;
         $this->appVersion = $appVersion;
@@ -239,16 +248,27 @@ final class AppConfig
         $this->mockPrinterScenario = $mockPrinterScenario;
         $this->mockDiskFreeBytes = $mockDiskFreeBytes;
         $this->upstreamSha = $upstreamSha;
+        $this->pythonBin = $pythonBin;
+        $this->dccBaseUrl = $dccBaseUrl;
+        $this->dccCameraId = $dccCameraId;
     }
 
     public function validate(): void
     {
-        if (!in_array($this->cameraAdapter, ['mock', 'hardware', 'browser'], true)) {
+        if (!in_array($this->cameraAdapter, ['mock', 'hardware', 'browser', 'digicamcontrol'], true)) {
             throw new ApiException(
                 'INVALID_ADAPTER_CONFIG',
-                "Cấu hình CAMERA_ADAPTER không hợp lệ: '{$this->cameraAdapter}' (chỉ nhận 'mock', 'hardware' hoặc 'browser').",
+                "Cấu hình CAMERA_ADAPTER không hợp lệ: '{$this->cameraAdapter}' (mock, hardware, browser hoặc digicamcontrol).",
                 503
             );
+        }
+
+        $dcc = parse_url($this->dccBaseUrl);
+        if (!is_array($dcc) || ($dcc['scheme'] ?? '') !== 'http'
+            || !in_array($dcc['host'] ?? '', ['127.0.0.1', '[::1]'], true)
+            || isset($dcc['user'], $dcc['pass']) || isset($dcc['user']) || isset($dcc['query'])
+            || isset($dcc['fragment']) || !in_array($dcc['path'] ?? '', ['', '/'], true)) {
+            throw new ApiException('INVALID_DCC_CONFIG', 'DCC_BASE_URL phải là HTTP loopback, ví dụ http://127.0.0.1:5513.', 503);
         }
 
         if (!in_array($this->printerAdapter, ['mock', 'hardware'], true)) {

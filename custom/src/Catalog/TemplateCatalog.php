@@ -166,10 +166,12 @@ final class TemplateCatalog
         $zipPath = $staging . '/upload.zip';
         file_put_contents($zipPath, $bytes);
         $zip = new ZipArchive();
+        $zipOpen = false;
         $destination = null;
         $published = false;
         try {
-            if ($zip->open($zipPath) !== true || $zip->numFiles > 20) {
+            $zipOpen = $zip->open($zipPath) === true;
+            if (!$zipOpen || $zip->numFiles > 20) {
                 throw new ApiException('INVALID_PACKAGE', 'ZIP không hợp lệ hoặc có quá 20 entry.', 422);
             }
             $total = 0;
@@ -201,6 +203,7 @@ final class TemplateCatalog
                 file_put_contents($staging . '/' . $name, $content);
             }
             $zip->close();
+            $zipOpen = false;
             unlink($zipPath);
             $item = $this->validatePackage($staging);
             $destination = $this->config->dataDir . '/templates/' . $item['id'] . '/' . $item['version'];
@@ -235,6 +238,7 @@ final class TemplateCatalog
             }
             throw $e;
         } finally {
+            if ($zipOpen) { $zip->close(); }
             $this->removeImportDirectory($staging);
         }
     }

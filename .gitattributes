@@ -1,0 +1,2 @@
+# Bundled LUT hashes describe exact LF bytes, including on Windows checkouts.
+custom/presets/*.cube text eol=lf

@@ -1,0 +1,46 @@
+{
+  "name": "photobooth-operator-desktop",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Photobooth Windows với Canon R10 qua digiCamControl",
+  "author": "Photobooth Operator",
+  "license": "MIT",
+  "type": "module",
+  "engines": { "node": ">=22.12.0" },
+  "main": "main.mjs",
+  "scripts": {
+    "start": "electron .",
+    "prepare:runtime": "node scripts/prepare-runtime.mjs",
+    "stage": "node scripts/stage.mjs",
+    "dist": "npm run stage && node scripts/build-windows.mjs",
+    "test": "node --test tests/settings.test.mjs tests/runtime-http.test.mjs",
+    "test:electron": "node --test tests/electron-smoke.test.mjs",
+    "test:packaged": "node scripts/test-packaged.mjs",
+    "test:soak": "node scripts/soak.mjs"
+  },
+  "devDependencies": {
+    "playwright": "1.64.1",
+    "jsqr": "1.4.0",
+    "pngjs": "7.0.0",
+    "electron": "45.3.2",
+    "electron-builder": "26.0.12"
+  },
+  "build": {
+    "appId": "local.photobooth.operator",
+    "productName": "Photobooth Operator",
+    "electronDist": "node_modules/electron/dist",
+    "npmRebuild": false,
+    "asarUnpack": ["supervisor.py"],
+    "directories": { "output": "dist" },
+    "files": ["main.mjs", "preload.cjs", "setup.html", "setup.js", "supervisor.py", "lib/**", "package.json"],
+    "extraResources": [
+      { "from": "staging/app", "to": "app" },
+      { "from": "runtime/php", "to": "runtime/php", "filter": ["**/*", "!php.ini"] },
+      { "from": "runtime/python", "to": "runtime/python", "filter": ["**/*", "!**/__pycache__/**", "!**/*.pyc"] },
+      { "from": "runtime/caddy", "to": "runtime/caddy" },
+      { "from": "runtime-lock.json", "to": "runtime-lock.json" }
+    ],
+    "win": { "target": "nsis", "artifactName": "Photobooth-Setup-${version}-x64.${ext}", "signAndEditExecutable": false },
+    "nsis": { "oneClick": false, "perMachine": false, "allowToChangeInstallationDirectory": true, "deleteAppDataOnUninstall": false }
+  }
+}

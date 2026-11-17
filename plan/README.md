@@ -3,6 +3,7 @@
 Planning baseline: 2026-11-08 (synced with `implementation-plan.md` v1.1 on 2026-11-09).
 
 Files:
+- [`windows-app.md`](windows-app.md) — Windows app plan (15/11/2026): Canon EOS R10 via digiCamControl, live view/capture/JPEG, offline installer; mock printing. Supersedes direct EDSDK integration for Windows; software prototype built and mock-tested; physical acceptance remains pending. See [`windows-test-report.md`](windows-test-report.md).
 - `implementation-plan.md` — authoritative detailed implementation plan (M0–M4 simulated MVP + H1–H3 hardware gates).
 - `requirements.md` — scope, decisions, MVP requirements, acceptance criteria.
 - `architecture.md` — components, v4.5.1 integration map, APIs, session & print state machines, storage and risks.

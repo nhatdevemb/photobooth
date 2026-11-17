@@ -327,7 +327,7 @@ final class AssetStore
                     continue;
                 }
                 $fullPath = $fileInfo->getPathname();
-                $relPath = ltrim(substr($fullPath, strlen($this->config->dataDir)), '/');
+                $relPath = ltrim(str_replace('\\', '/', substr($fullPath, strlen($this->config->dataDir))), '/');
                 if (!isset($referenced[$relPath])) {
                     $quarantineTarget = $this->config->dataDir . '/quarantine/' . str_replace('/', '_', $relPath) . '.' . time();
                     @rename($fullPath, $quarantineTarget);

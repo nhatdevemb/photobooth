@@ -1889,6 +1889,9 @@ final class SessionService
             $rRow = $rStmt->fetch();
             if (is_array($rRow)) {
                 $rid = (string) $rRow['id'];
+                $renderJob = $pdo->prepare('SELECT result FROM jobs WHERE id = :id');
+                $renderJob->execute([':id' => $rRow['job_id']]);
+                $renderResult = json_decode((string) ($renderJob->fetchColumn() ?: '{}'), true) ?: [];
                 $currentRender = [
                     'id' => $rid,
                     'lut_id' => (string) $rRow['lut_id'],
@@ -1903,6 +1906,7 @@ final class SessionService
                     'preview_url' => '/custom/api/assets/' . $rid . '?variant=preview',
                     'print_url' => '/custom/api/assets/' . $rid . '?variant=print',
                     'created_at' => (string) $rRow['created_at'],
+                    'beauty_warnings' => array_values(array_filter($renderResult['beauty_audit'] ?? [], static fn (array $item): bool => ($item['status'] ?? '') === 'error_fallback')),
                 ];
             }
         }

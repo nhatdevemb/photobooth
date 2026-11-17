@@ -73,3 +73,8 @@ custom/.phpunit.result.cache
 custom/test-results/
 custom/playwright-report/
 custom/.venv/
+custom/desktop/runtime/
+custom/desktop/dist/
+custom/desktop/staging/
+custom/desktop/node_modules/
+custom/desktop/.cache/

@@ -11,6 +11,7 @@ use Photobooth\Operator\Camera\CameraAdapterInterface;
 use Photobooth\Operator\Camera\BrowserCameraAdapter;
 use Photobooth\Operator\Camera\Gphoto2CameraAdapter;
 use Photobooth\Operator\Camera\MockCameraAdapter;
+use Photobooth\Operator\Camera\DigiCamControlCameraAdapter;
 use Photobooth\Operator\Config\AppConfig;
 use Photobooth\Operator\Image\Renderer;
 use Photobooth\Operator\Jobs\WorkerRunner;
@@ -76,6 +77,7 @@ final class Container
         $this->luts = new LutCatalog($this->config, $this->db, $this->renderer);
 
         $this->cameraAdapter = match ($this->config->cameraAdapter) {
+            'digicamcontrol' => new DigiCamControlCameraAdapter($this->config, $this->renderer),
             'hardware' => new Gphoto2CameraAdapter($this->config, $this->renderer),
             'browser' => new BrowserCameraAdapter($this->renderer),
             default => new MockCameraAdapter($this->config, $this->renderer),

@@ -313,8 +313,8 @@ def test_lut_intensity_zero_preserves_original_and_is_signed(tmp_path: Path) -> 
 
 @pytest.mark.parametrize('package', sorted((CUSTOM_DIR / 'templates' / 'bundled').glob('*/template.json')), ids=lambda p: p.parent.name)
 def test_all_shipped_templates_render_exact_geometry_and_immutable_inputs(tmp_path: Path, package: Path) -> None:
-    item = json.loads(package.read_text())
-    layout = json.loads((CUSTOM_DIR / 'layouts' / f"{item['layout_id']}.json").read_text())
+    item = json.loads(package.read_text(encoding='utf-8'))
+    layout = json.loads((CUSTOM_DIR / 'layouts' / f"{item['layout_id']}.json").read_text(encoding='utf-8'))
     count = layout['capture_count']
     source_colors = [(220, 30, 40), (30, 200, 60), (40, 60, 220), (230, 200, 30)]
     photos = []

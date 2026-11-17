@@ -55,13 +55,18 @@ final class ShareService
      */
     public function generateOfflineQrDataUri(string $url): string
     {
-        $qrLibPath = $this->config->projectRoot . '/vendor/phpqrcode/qrlib.php';
+        $qrLibPath = '';
+        foreach ([$this->config->customRoot . '/desktop/runtime/phpqrcode/lib/full/qrlib.php',
+            $this->config->projectRoot . '/vendor/phpqrcode/lib/full/qrlib.php',
+            $this->config->projectRoot . '/vendor/phpqrcode/qrlib.php'] as $candidate) {
+            if (is_file($candidate)) { $qrLibPath = $candidate; break; }
+        }
         if (is_file($qrLibPath)) {
             require_once $qrLibPath;
             if (class_exists('\QRcode')) {
                 if (function_exists('imagecreate')) {
                     ob_start();
-                    \QRcode::png($url, false, QR_ECLEVEL_M, 6, 2);
+                    \QRcode::png($url, false, QR_ECLEVEL_M, 6, 4);
                     $pngBytes = (string) ob_get_clean();
                     if ($pngBytes !== '') {
                         return 'data:image/png;base64,' . base64_encode($pngBytes);
@@ -71,7 +76,7 @@ final class ShareService
                 $matrix = \QRcode::text($url, false, QR_ECLEVEL_M);
                 if (is_array($matrix) && $matrix !== []) {
                     $size = count($matrix);
-                    $margin = 2;
+                    $margin = 4;
                     $total = $size + ($margin * 2);
                     $rects = '';
                     foreach ($matrix as $r => $rowStr) {
@@ -90,28 +95,7 @@ final class ShareService
             }
         }
 
-        // Pure offline deterministic visual QR representation if QRcode class is not loaded
-        $hash = hash('sha256', $url);
-        $cells = '';
-        for ($r = 0; $r < 21; $r++) {
-            for ($c = 0; $c < 21; $c++) {
-                $isFinder = ($r < 7 && $c < 7) || ($r < 7 && $c >= 14) || ($r >= 14 && $c < 7);
-                if ($isFinder) {
-                    $on = ($r === 0 || $r === 6 || $c === 0 || $c === 6 || $r === 14 || $r === 20 || $c === 14 || $c === 20 || ($r >= 2 && $r <= 4 && $c >= 2 && $c <= 4) || ($r >= 2 && $r <= 4 && $c >= 16 && $c <= 18) || ($r >= 16 && $r <= 18 && $c >= 2 && $c <= 4));
-                } else {
-                    $bitIdx = ($r * 21 + $c) % 256;
-                    $hexChar = hexdec($hash[(int) floor($bitIdx / 4)]);
-                    $on = (($hexChar >> ($bitIdx % 4)) & 1) === 1;
-                }
-                if ($on) {
-                    $x = 16 + $c * 8;
-                    $y = 16 + $r * 8;
-                    $cells .= "<rect x=\"{$x}\" y=\"{$y}\" width=\"8\" height=\"8\" fill=\"#000\"/>";
-                }
-            }
-        }
-        $svg = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" width="200" height="200"><rect width="200" height="200" fill="#fff"/>' . $cells . '</svg>';
-        return 'data:image/svg+xml;base64,' . base64_encode($svg);
+        throw new ApiException('QR_UNAVAILABLE', 'Thiếu thư viện QR thật. Chuẩn bị runtime hoặc cài dependency QR trước khi phát hành mã chia sẻ.', 503);
     }
 
     /**

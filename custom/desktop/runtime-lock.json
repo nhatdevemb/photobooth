@@ -1,0 +1,26 @@
+{
+  "php": {
+    "version": "8.3.36-1",
+    "url": "https://downloads.php.net/~windows/releases/php-8.3.36-1-nts-Win32-vs16-x64.zip",
+    "algorithm": "sha256",
+    "hash": "1a097d52b7a68622cdc723073b61cc70caf79c941218ff65b2d8441dbc6b10d4"
+  },
+  "python": {
+    "version": "3.12.10",
+    "url": "https://www.python.org/ftp/python/3.12.10/python-3.12.10-embed-amd64.zip",
+    "algorithm": "sha256",
+    "hash": "4acbed6dd1c744b0376e3b1cf57ce906f9dc9e95e68824584c8099a63025a3c3"
+  },
+  "caddy": {
+    "version": "v2.11.9",
+    "url": "https://github.com/caddyserver/caddy/releases/download/v2.11.9/caddy_2.11.9_windows_amd64.zip",
+    "algorithm": "sha512",
+    "hash": "98753d5d42650383d00619ac70917a217141f9e92314185bf6c1b8b439cfcfdf8393da0ebb4675c8cb3b23d29a19aabe99dc5aca64fa1bfc3a1ba22509b06871"
+  },
+  "qr": {
+    "version": "863ffffac4c9d22e522464e325cbcbadfbb26470",
+    "url": "https://codeload.github.com/PhotoboothProject/phpqrcode/zip/863ffffac4c9d22e522464e325cbcbadfbb26470",
+    "algorithm": "sha256",
+    "hash": "5d74057874d6ef7afc07711045d87734805f990712c87dfc554d1b8d291943bc"
+  }
+}

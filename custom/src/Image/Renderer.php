@@ -35,7 +35,7 @@ final class Renderer
     {
         $scriptPath = $this->config->customRoot . '/python/render_pipeline.py';
         $cmd = [
-            'python3',
+            $this->config->pythonBin,
             $scriptPath,
             '--validate-jpeg',
             $filePath,
@@ -85,7 +85,7 @@ final class Renderer
         );
 
         $scriptPath = $this->config->customRoot . '/python/render_pipeline.py';
-        $cmd = ['python3', $scriptPath, $manifestPath];
+        $cmd = [$this->config->pythonBin, $scriptPath, $manifestPath];
 
         $result = $this->runPythonCommand($cmd, $this->config->renderTimeoutSeconds, $jobId);
         if (($result['status'] ?? '') !== 'ok') {
@@ -106,7 +106,7 @@ final class Renderer
 
     public function previewLut(string $filePath, string $outputPath, int $intensity): array
     {
-        $result = $this->runPythonCommand(['python3', $this->config->customRoot . '/python/lut_preview.py', $filePath, $outputPath, (string) $intensity], $this->config->renderTimeoutSeconds);
+        $result = $this->runPythonCommand([$this->config->pythonBin, $this->config->customRoot . '/python/lut_preview.py', $filePath, $outputPath, (string) $intensity], $this->config->renderTimeoutSeconds);
         if (($result['status'] ?? '') !== 'ok') {
             throw new ApiException('INVALID_LUT', 'LUT không hợp lệ: ' . ($result['message'] ?? 'Không thể đọc hoặc dựng ảnh mẫu.'), 422);
         }

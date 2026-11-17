@@ -130,9 +130,11 @@ final class HealthService
         return [
             'status' => $overallStatus,
             'mode' => $this->config->isMockMode() ? 'mock' : 'hardware',
-            'simulation_label' => $this->config->cameraAdapter === 'browser'
+            'simulation_label' => $this->config->cameraAdapter === 'digicamcontrol'
+                ? 'CANON QUA DIGICAMCONTROL · MÁY IN ' . ($this->config->printerAdapter === 'mock' ? 'MÔ PHỎNG (MOCK)' : 'PHẦN CỨNG')
+                : ($this->config->cameraAdapter === 'browser'
                 ? 'CAMERA TRÌNH DUYỆT · MÁY IN ' . ($this->config->printerAdapter === 'mock' ? 'MÔ PHỎNG (MOCK)' : 'PHẦN CỨNG')
-                : ($this->config->isMockMode() ? 'MÔ PHỎNG (MOCK)' : 'PHẦN CỨNG THẬT'),
+                : ($this->config->isMockMode() ? 'MÔ PHỎNG (MOCK)' : 'PHẦN CỨNG THẬT')),
             'app_version' => $this->config->appVersion,
             'upstream_sha' => $this->config->upstreamSha,
             'timestamp' => Clock::nowIso(),

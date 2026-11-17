@@ -384,6 +384,25 @@ final class HttpKernel
         }
 
         // 4. GET /health
+        if ($route === '/camera' && $method === 'GET') {
+            return $this->jsonResponse(200, $this->container->cameraAdapter->health(), $requestId);
+        }
+        if (str_starts_with($route, '/camera/preview')) {
+            $camera = $this->container->cameraAdapter;
+            if (!$camera instanceof \Photobooth\Operator\Camera\DigiCamControlCameraAdapter) {
+                throw new ApiException('INVALID_CAMERA_MODE', 'Live view này cần digiCamControl.', 409);
+            }
+            if ($route === '/camera/preview/start' && $method === 'POST') {
+                return $this->jsonResponse(200, $camera->startPreview(), $requestId);
+            }
+            if ($route === '/camera/preview/stop' && $method === 'POST') {
+                $camera->stopPreview();
+                return $this->jsonResponse(200, ['status' => 'stopped'], $requestId);
+            }
+            if ($route === '/camera/preview.jpg' && $method === 'GET') {
+                return ['status' => 200, 'headers' => ['Content-Type' => 'image/jpeg', 'Cache-Control' => 'no-store', 'X-Content-Type-Options' => 'nosniff'], 'cookies' => [], 'body' => $camera->previewFrame(), 'file_path' => null];
+            }
+        }
         if ($method === 'GET' && $route === '/health') {
             return $this->jsonResponse(200, $this->container->healthService->getHealthReport(), $requestId);
         }

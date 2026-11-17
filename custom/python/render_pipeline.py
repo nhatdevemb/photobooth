@@ -30,7 +30,7 @@ from typing import Any, Dict, List, Optional, Tuple
 import numpy as np
 from PIL import Image, ImageCms, ImageOps, UnidentifiedImageError
 
-from beauty import BeautyProcessor, resolve_beauty_config
+from beauty import resolve_beauty_config
 from cube_lut import CubeLut, LutParseError, apply_cube_lut_rgb, parse_cube_file
 
 PIPELINE_VERSION = "1.3.0"
@@ -423,9 +423,15 @@ def run_render_from_manifest(manifest: Dict[str, Any]) -> Dict[str, Any]:
             overrides=raw_beauty_config if isinstance(raw_beauty_config, dict) else None,
         )
 
-    beauty_processor: Optional[BeautyProcessor] = None
+    beauty_processor = None
+    beauty_load_error = None
     if beauty_cfg.is_active():
-        beauty_processor = BeautyProcessor(beauty_cfg)
+        try:
+            from beauty import BeautyProcessor
+            beauty_processor = BeautyProcessor(beauty_cfg)
+        except (ImportError, OSError) as exc:
+            beauty_load_error = str(exc)
+            log_err(f"Beauty unavailable, keeping source image: {exc}")
     beauty_audit: List[Dict[str, Any]] = []
 
     photo_hashes: List[str] = []
@@ -459,7 +465,7 @@ def run_render_from_manifest(manifest: Dict[str, Any]) -> Dict[str, Any]:
                 beauty_audit.append({"slot": slot_num, **b_stats})
             else:
                 retouched_img = normalized_img
-                beauty_audit.append({"slot": slot_num, "status": "bypassed", "preset": beauty_cfg.preset})
+                beauty_audit.append({"slot": slot_num, "status": "error_fallback" if beauty_load_error else "bypassed", "preset": beauty_cfg.preset, "error": beauty_load_error})
 
             # Step 5: Apply 3D LUT BEFORE cropping/resizing into the collage slot
             processed_img = grade_rgb_image(retouched_img, cube_lut, lut_intensity)

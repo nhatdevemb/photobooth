@@ -727,6 +727,7 @@ final class WorkerRunner
                     'height' => (int) $renderResult['height'],
                     'duration_ms' => (int) ($renderResult['duration_ms'] ?? 0),
                     'preview_url' => '/custom/api/assets/' . $renderId . '?variant=preview',
+                    'beauty_audit' => $renderResult['beauty_audit'] ?? [],
                 ], JSON_UNESCAPED_SLASHES) ?: '{}';
 
                 $txPdo->prepare(

@@ -1,7 +1,9 @@
 /** Local-only operator booth. Server revisions, pinned configuration and jobs are authoritative. */
 import { BrowserCamera, parseCubeLut, LutCanvasRenderer } from './browser-camera.js';
+import { DccCamera } from './dcc-camera.js';
 const $ = (id) => document.getElementById(id);
 const browserMode = document.body.dataset.camera === 'browser';
+const dccMode = document.body.dataset.camera === 'digicamcontrol';
 const browserCamera = new BrowserCamera($('webcam-video'), $('webcam-status'), $('camera-badge'), $('webcam-device'), updateCropGuide, $('btn-webcam-mirror'), $('webcam-lut-canvas'));
 const lutCache = new Map();
 let thumbLutCanvas = null, thumbLutRenderer = null;
@@ -12,6 +14,7 @@ const state = {
     detail: null, print: null, resolve: null, templatePreview: null, sampleGeneration: 0,
     lutEditor: null, lutQuery: '', captureSlot: null,
 };
+const dccCamera = dccMode ? new DccCamera($('live-preview-img'), $('camera-badge'), $('dcc-status'), api, () => Boolean(state.job)) : null;
 const labels = { NEW: 'Chưa chụp', CAPTURING: 'Đang chụp', CAPTURED: 'Đã chụp', RENDERING: 'Đang ghép ảnh', REVIEW: 'Chờ duyệt', FINALIZED: 'Đã duyệt', CLOSED: 'Đã hoàn tất', CANCELLED: 'Đã hủy' };
 const stepTitles = ['Chọn filter yêu thích', 'Chọn bố cục ảnh', 'Chọn template yêu thích'];
 const descriptions = ['Filter sẽ áp dụng cho tất cả ảnh trong phiên này.', 'Chọn số lượng và vị trí ảnh trên giấy 100 × 148 mm.', 'Trang trí phù hợp với bố cục đã chọn.'];
@@ -164,6 +167,7 @@ function render()
 {
     const loggedIn = Boolean(state.user);
     if (browserMode && (!loggedIn || state.view !== 'workspace' || state.step !== 4 || !state.session)) browserCamera.stop();
+    if (dccCamera && (!loggedIn || state.view !== 'workspace' || state.step !== 4 || !state.session)) dccCamera.stop();
     $('login-view').hidden = loggedIn;
     $('auth-user-bar').hidden = !loggedIn;
     for (const view of ['workspace', 'history', 'admin', 'luts']) $(view + '-view').hidden = !loggedIn || state.view !== view;
@@ -322,6 +326,7 @@ function renderCapture()
         $('countdown-label').textContent = state.job.phase?.startsWith('countdown') ? 'Sẵn sàng tạo dáng nhé!' : 'Đang nhận ảnh…';
     }
     for (const id of ['btn-webcam-enable', 'btn-webcam-switch', 'btn-webcam-mirror', 'btn-webcam-stop', 'webcam-device']) $(id).disabled = state.busy;
+    for (const id of ['btn-dcc-enable', 'btn-dcc-stop']) $(id).disabled = state.busy;
     updateCropGuide();
     syncCaptureLut(session);
 }
@@ -539,6 +544,7 @@ function updateApproval()
     $('review-error').hidden = !state.renderError;
     $('review-error').textContent = state.renderError;
     $('render-status-text').textContent = session?.state === 'FINALIZED' ? 'Ảnh đã duyệt. In và QR dùng đúng ảnh này.' : state.renderError || (state.previewReady ? 'Kiểm tra ảnh rồi nhấn Duyệt ảnh và tạo QR.' : 'Đang chờ bản xem trước…');
+    if (session?.current_render?.beauty_warnings?.length) $('render-status-text').textContent += ' ⚠ Beauty gặp lỗi ở một số ảnh; đã giữ ảnh nguồn và tiếp tục ghép. Kiểm tra kỹ trước khi duyệt.';
 }
 
 async function issueShare(session = state.session)
@@ -1083,5 +1089,8 @@ $('btn-webcam-mirror').addEventListener('click', () => browserCamera.toggleMirro
 $('webcam-device').addEventListener('change', () => run(() => browserCamera.open($('webcam-device').value)));
 $('btn-webcam-stop').addEventListener('click', () => browserCamera.stop());
 window.addEventListener('pagehide', () => browserCamera.stop());
+document.getElementById('btn-dcc-enable').addEventListener('click', () => run(() => dccCamera?.start()));
+document.getElementById('btn-dcc-stop').addEventListener('click', () => run(() => dccCamera?.stop()));
+window.addEventListener('pagehide', () => dccCamera?.stop());
 window.addEventListener('resize', updateCropGuide);
 document.fonts.ready.then(updateCropGuide);

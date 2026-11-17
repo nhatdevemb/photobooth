@@ -180,6 +180,7 @@ final class MaintenanceService
         $auditPurged = $auditDelStmt->rowCount();
 
         $logStats = $this->logger->rotateLogs();
+        $dccPurged = $this->purgeExpiredDccIncoming();
 
         return [
             'expired_purged' => $expiredTombstoned,
@@ -187,7 +188,36 @@ final class MaintenanceService
             'held_by_unresolved_prints' => $heldCount,
             'audit_purged' => $auditPurged,
             'logs_rotated' => $logStats['deleted_files'],
+            'dcc_incoming_purged' => $dccPurged,
         ];
+    }
+
+    private function purgeExpiredDccIncoming(): int
+    {
+        $base = $this->config->dataDir . '/dcc';
+        if (!is_dir($base . '/incoming')) { return 0; }
+        $lock = @fopen($base . '/camera.lock', 'c+');
+        if ($lock === false || !flock($lock, LOCK_EX | LOCK_NB)) {
+            if (is_resource($lock)) { fclose($lock); }
+            return 0;
+        }
+        $purged = 0;
+        try {
+            $cutoff = Clock::nowUnix() - ($this->config->sessionRetentionDays * 86400);
+            foreach (glob($base . '/incoming/*', GLOB_ONLYDIR) ?: [] as $directory) {
+                $key = basename($directory);
+                if (is_link($directory) || preg_match('/^[a-f0-9]{64}$/D', $key) !== 1 || filemtime($directory) > $cutoff) { continue; }
+                $receipt = $base . '/' . $key . '.json';
+                if (is_file($receipt) && filemtime($receipt) > $cutoff) { continue; }
+                // Only the adapter's own single-level incoming folder is eligible.
+                $root = str_replace('\\', '/', (string) realpath($base . '/incoming')) . '/';
+                $resolved = str_replace('\\', '/', (string) realpath($directory));
+                if (!str_starts_with($resolved, $root)) { continue; }
+                $this->assetStore->removeDirectoryRecursive($directory);
+                if (!is_dir($directory)) { $purged++; }
+            }
+        } finally { fclose($lock); }
+        return $purged;
     }
 
     /**
@@ -239,7 +269,7 @@ final class MaintenanceService
                     continue;
                 }
                 $absFile = $fileInfo->getPathname();
-                $relFile = ltrim(substr($absFile, strlen($this->config->dataDir)), '/');
+                $relFile = ltrim(str_replace('\\', '/', substr($absFile, strlen($this->config->dataDir))), '/');
                 if (str_contains($relFile, '/pending/') || str_contains($relFile, '/.import-')) {
                     continue;
                 }
@@ -338,13 +368,21 @@ final class MaintenanceService
         if (!is_dir(dirname($targetDb))) {
             @mkdir(dirname($targetDb), 0750, true);
         }
-        foreach (['', '-wal', '-shm'] as $suffix) {
-            if (is_file($targetDb . $suffix)) {
-                @unlink($targetDb . $suffix);
-            }
+        // SQLite's backup API also replaces an existing WAL database safely on Windows,
+        // where an open PDO connection prevents unlinking the database/WAL files.
+        if (!class_exists(\SQLite3::class)) {
+            throw new ApiException('RESTORE_ERROR', 'Khôi phục cần PHP extension sqlite3.', 503);
         }
-        if (!@copy($backupDbPath, $targetDb)) {
-            throw new ApiException('RESTORE_ERROR', 'Không thể khôi phục tệp cơ sở dữ liệu SQLite.', 500);
+        $sourceSqlite = new \SQLite3($backupDbPath, SQLITE3_OPEN_READONLY);
+        $targetSqlite = new \SQLite3($targetDb, SQLITE3_OPEN_READWRITE | SQLITE3_OPEN_CREATE);
+        $targetSqlite->busyTimeout($this->config->sqliteBusyTimeoutMs);
+        try {
+            if (!$sourceSqlite->backup($targetSqlite)) {
+                throw new ApiException('RESTORE_ERROR', 'Không thể khôi phục SQLite. Dừng worker và đóng các giao dịch trước khi thử lại.', 409);
+            }
+        } finally {
+            $targetSqlite->close();
+            $sourceSqlite->close();
         }
 
         // Open fresh connection to restored DB to reconcile print requests and tokens before worker starts
