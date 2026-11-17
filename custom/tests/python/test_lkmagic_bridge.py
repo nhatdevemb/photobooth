@@ -35,6 +35,7 @@ FACE_SLIM_AND_BODY_IDS = set(range(230001, 230013)) | set(range(290001, 290010))
 
 class _FakeLkMagicHandler(BaseHTTPRequestHandler):
     fail_mode: bool = False
+    small_output: bool = False
 
     def log_message(self, format: str, *args: Any) -> None:
         pass
@@ -76,6 +77,8 @@ class _FakeLkMagicHandler(BaseHTTPRequestHandler):
             out_path = Path(body["output_path"])
             with Image.open(in_path) as img:
                 enhanced = ImageEnhance.Brightness(img.convert("RGB")).enhance(1.06)
+                if self.small_output:
+                    enhanced = enhanced.resize((40, 30))
                 out_path.parent.mkdir(parents=True, exist_ok=True)
                 enhanced.save(out_path, format="JPEG", quality=96, subsampling=0)
 
@@ -103,6 +106,7 @@ class _FakeLkMagicHandler(BaseHTTPRequestHandler):
 @pytest.fixture()
 def fake_lkmagic_server():
     _FakeLkMagicHandler.fail_mode = False
+    _FakeLkMagicHandler.small_output = False
     server = HTTPServer(("127.0.0.1", 0), _FakeLkMagicHandler)
     port = server.server_address[1]
     thread = threading.Thread(target=server.serve_forever, daemon=True)
@@ -172,6 +176,50 @@ def test_lkmagic_bridge_health_and_retouch(fake_lkmagic_server) -> None:
     assert float(out_rgb.mean()) > float(img.mean())
 
 
+def test_reduced_resolution_export_is_rejected(fake_lkmagic_server) -> None:
+    base_url, handler_cls = fake_lkmagic_server
+    handler_cls.small_output = True
+    cfg = resolve_beauty_config("natural", overrides={
+        "engine": "lkmagic", "lkmagic_url": base_url, "auto_start_lkmagic": False,
+    })
+    with pytest.raises(RuntimeError, match="LK_MAGIC_INVALID_EXPORT"):
+        retouch_via_lkmagic(np.full((120, 160, 3), 140, dtype=np.uint8), cfg)
+
+
+def test_auto_engine_does_not_require_local_models(fake_lkmagic_server, monkeypatch) -> None:
+    base_url, _ = fake_lkmagic_server
+    cfg = resolve_beauty_config("natural", overrides={
+        "engine": "auto", "lkmagic_url": base_url, "auto_start_lkmagic": False,
+    })
+    def unavailable_models(*args):
+        pytest.fail("Local models must not load when LK Magic succeeds")
+    monkeypatch.setattr(BeautyProcessor, "_ensure_models", unavailable_models)
+    with BeautyProcessor(cfg) as processor:
+        out, stats = processor.process(np.full((120, 160, 3), 140, dtype=np.uint8))
+        assert out.shape == (120, 160, 3)
+        assert stats["engine"] == "lkmagic_native"
+
+
+def test_small_native_export_uses_local_fallback(fake_lkmagic_server) -> None:
+    base_url, handler_cls = fake_lkmagic_server
+    handler_cls.small_output = True
+    cfg = resolve_beauty_config("soft", overrides={
+        "engine": "auto", "lkmagic_url": base_url, "auto_start_lkmagic": False,
+    })
+    with Image.open(PYTHON_DIR.parent / "public/assets/samples/source-portrait.jpg") as image:
+        with BeautyProcessor(cfg) as processor:
+            output, stats = processor.process(image.convert("RGB"))
+            assert output.size == image.size
+            assert stats["status"] == "success"
+            assert stats.get("engine") != "lkmagic_native"
+
+
+def test_engine_is_part_of_serialized_beauty_config() -> None:
+    local = resolve_beauty_config("natural", overrides={"engine": "mediapipe"})
+    native = resolve_beauty_config("natural", overrides={"engine": "lkmagic"})
+    assert local.to_dict()["engine"] != native.to_dict()["engine"]
+
+
 def test_beauty_processor_prefers_lkmagic_and_falls_back_on_error(fake_lkmagic_server) -> None:
     base_url, handler_cls = fake_lkmagic_server
     fixture_path = Path(__file__).resolve().parent.parent.parent / "public" / "assets" / "samples" / "source-portrait.jpg"
@@ -192,7 +240,8 @@ def test_beauty_processor_prefers_lkmagic_and_falls_back_on_error(fake_lkmagic_s
         assert out_online.size == orig_pil.size
         assert stats_online["status"] == "success"
         assert stats_online["engine"] == "lkmagic_native"
-        assert stats_online["faces_detected"] >= 1
+        assert processor._detector is None
+        assert processor._mask_gen is None
 
         # 2. When LK Magic bridge fails -> falls back to local MediaPipe seamlessly
         handler_cls.fail_mode = True

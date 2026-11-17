@@ -134,6 +134,7 @@ function install(electron, deps) {
   let pendingCanvas = null;
   let canvasHandles = null;
   const exportWaiters = new Map();
+  const completedExports = new Map();
 
   function trace(action, details = {}) {
     events.push({ at: new Date().toISOString(), action, ...details });
@@ -142,7 +143,7 @@ function install(electron, deps) {
 
   function getFFI() {
     const f = useFFI();
-    if (!f || f.globalInit !== true) {
+    if (!f || f.globalInit !== true || (typeof deps.isReady === 'function' && !deps.isReady())) {
       throw new Error('ENGINE_NOT_READY: Lõi aipic.dll chưa khởi tạo xong.');
     }
     return f;
@@ -173,8 +174,9 @@ function install(electron, deps) {
         trace('call-cb', { type, arg0: Number(args[0]), arg1: Number(args[1]) });
         try {
           if (!settled) {
+            const result = decode(...args);
             settled = true;
-            resolve(decode(...args));
+            resolve(result);
           }
         } catch (err) {
           if (!settled) {
@@ -284,6 +286,9 @@ function install(electron, deps) {
         exportWaiters.delete(taskId);
         clearTimeout(waiter.timer);
         waiter.resolve(ev);
+      } else if (['2', '3'].includes(String(ev?.status))) {
+        completedExports.set(taskId, ev);
+        if (completedExports.size > 60) completedExports.delete(completedExports.keys().next().value);
       }
     } catch (_) {}
   }
@@ -355,7 +360,7 @@ function install(electron, deps) {
     return Number(matched.id);
   }
 
-  async function renderViaNativeEngine(fileid, payload, targetPath, timeoutMs = 25000) {
+  async function renderViaNativeEngine(fileid, payload, targetPath, expectedSize, timeoutMs = 25000) {
     const f = getFFI();
     const h = ensureCanvasHandles();
 
@@ -382,7 +387,7 @@ function install(electron, deps) {
     );
 
     // Step 2: Apply AI beauty retouch parameters via aipic_retouch_image (with is_file_cache=true)
-    const raw = await runStep('retouch_image', () =>
+    await runStep('retouch_image', () =>
       f.aipic_retouch_image(
         fileid,
         JSON.stringify({ fileid, param: JSON.stringify(payload), retouch_param_type: 2 }),
@@ -399,105 +404,62 @@ function install(electron, deps) {
       )
     );
 
-    // Step 3: Export full-resolution JPEG via aipic_build_export_task into targetDir
-    try {
-      const exportDir = path.dirname(targetPath);
-      await callOnce(
-        'writeItem',
-        (cb) => f.aipic_modify_filelist_item(0, [1], JSON.stringify({ id: fileid, edit: 1 }), cb),
-        () => true,
-        5000
-      );
-      const exportObj = {
-        version: '1.0',
-        fileitems: [{ fileid }],
-        by_origin_path: 0,
-        location: '0',
-        cid: '0',
-        create_new_folder: 0,
-        keep_import_folder: 0,
-        faceitems: [],
-        operation_type: 0,
-        quality: 96,
-        export_setting: JSON.stringify({
-          export_max_size: 0,
-          quality: 96,
-          export_type: 1,
-        }),
-      };
-      const exportId = await callOnce(
-        'buildExport',
-        (cb) => f.aipic_build_export_task(0, workspaceId, exportDir, JSON.stringify(exportObj), cb),
-        (err, id) => {
-          if (Number(err) !== 0 || !(Number(id) > 0)) throw new Error(`buildExport err=${err}`);
-          return Number(id);
-        },
-        8000
-      );
-      await new Promise((resolve) => {
-        const timer = setTimeout(() => {
-          exportWaiters.delete(String(exportId));
-          resolve(null);
-        }, 12000);
-        exportWaiters.set(String(exportId), { resolve, timer });
-      });
-      const exportedFiles = fs
-        .readdirSync(exportDir)
-        .filter((n) => /\.(jpe?g|png)$/i.test(n) && n !== path.basename(targetPath));
-      if (exportedFiles.length > 0) {
-        const fullResCandidate = path.join(exportDir, exportedFiles[0]);
-        const st = fs.statSync(fullResCandidate);
-        if (st.isFile() && st.size > 20480) {
-          trace('export-fullres-ok', { size: st.size, file: exportedFiles[0] });
-          fs.copyFileSync(fullResCandidate, targetPath);
-          return targetPath;
-        }
-      }
-    } catch (expErr) {
-      trace('export-fullres-skip', { error: expErr.message });
-    }
+    // Only a confirmed full-resolution JPEG export may leave the bridge.
+    const exportDir = path.dirname(targetPath);
+    await callOnce(
+      'writeItem',
+      (cb) => f.aipic_modify_filelist_item(0, [1], JSON.stringify({ id: fileid, edit: 1 }), cb),
+      (_cookie, error) => {
+        if (Number(error) !== 0) throw new Error('EXPORT_FAILED: Cannot mark image edited, error=' + error);
+        return true;
+      },
+      5000
+    );
+    const exportObj = {
+      version: '1.0',
+      fileitems: [{ fileid }],
+      by_origin_path: 0,
+      location: '0',
+      cid: '0',
+      create_new_folder: 0,
+      keep_import_folder: 0,
+      faceitems: [],
+      operation_type: 0,
+      quality: 96,
+      export_setting: JSON.stringify({ export_max_size: 0, quality: 96, export_type: 1 }),
+    };
+    const exportId = await callOnce(
+      'buildExport',
+      (cb) => f.aipic_build_export_task(0, workspaceId, exportDir, JSON.stringify(exportObj), cb),
+      (error, id) => {
+        if (Number(error) !== 0 || !(Number(id) > 0)) throw new Error('EXPORT_FAILED: buildExport error=' + error);
+        return Number(id);
+      },
+      8000
+    );
+    const exportEvent = completedExports.get(String(exportId)) || await new Promise((resolve, reject) => {
+      const timer = setTimeout(() => {
+        exportWaiters.delete(String(exportId));
+        reject(new Error('EXPORT_TIMEOUT: Full-resolution export did not complete.'));
+      }, 12000);
+      exportWaiters.set(String(exportId), { resolve, timer });
+    });
+    completedExports.delete(String(exportId));
+    if (String(exportEvent.status) !== '2') throw new Error('EXPORT_FAILED: Native export did not succeed.');
 
-    let value = String(raw || '').trim();
-    if (value.startsWith('{')) {
-      const parsed = JSON.parse(value);
-      value = parsed.thumbnail || parsed.path || parsed.image || '';
+    for (const name of fs.readdirSync(exportDir).filter((n) => /\.jpe?g$/i.test(n) && n !== path.basename(targetPath))) {
+      const candidate = path.join(exportDir, name);
+      if (!fs.statSync(candidate).isFile()) continue;
+      const bytes = fs.readFileSync(candidate);
+      if (bytes[0] !== 0xff || bytes[1] !== 0xd8) continue;
+      const image = electron.nativeImage.createFromPath(candidate);
+      const size = image.getSize();
+      if (image.isEmpty() || size.width !== expectedSize.width || size.height !== expectedSize.height) continue;
+      fs.copyFileSync(candidate, targetPath);
+      trace('export-fullres-ok', { size: bytes.length, file: name, width: size.width, height: size.height });
+      return targetPath;
     }
-
-    let localPath = null;
-    if (value.startsWith('ai-static://file.disk.net/')) {
-      localPath = decodeURIComponent(new URL(value).pathname.slice(1));
-    } else if (value.startsWith('ai-image://') && typeof getCachePathByFileName === 'function') {
-      localPath = getCachePathByFileName(new URL(value).hostname);
-    } else if (value.startsWith('file:')) {
-      localPath = fileURLToPath(value);
-    } else if (path.isAbsolute(value)) {
-      localPath = value;
-    }
-
-    if (localPath && fs.existsSync(localPath)) {
-      const bytes = fs.readFileSync(localPath);
-      if (bytes.length > 512 && bytes[0] === 0xff && bytes[1] === 0xd8) {
-        fs.writeFileSync(targetPath, bytes);
-        return targetPath;
-      }
-      const img = electron.nativeImage.createFromPath(localPath);
-      if (!img.isEmpty()) {
-        fs.writeFileSync(targetPath, img.toJPEG(96));
-        return targetPath;
-      }
-    }
-
-    let img;
-    if (/^data:image\/(?:png|jpeg|jpg);base64,/i.test(value)) {
-      img = electron.nativeImage.createFromDataURL(value);
-    } else if (/^(?:\/9j\/|iVBOR)/.test(value)) {
-      img = electron.nativeImage.createFromBuffer(Buffer.from(value, 'base64'));
-    }
-    if (!img || img.isEmpty()) {
-      throw new Error('Không giải mã được ảnh kết quả từ aipic_retouch_image.');
-    }
-    fs.writeFileSync(targetPath, img.toJPEG(96));
-    return targetPath;
+    throw new Error('INVALID_EXPORT: No full-resolution JPEG matching the source dimensions.');
   }
 
   async function processRetouchRequest(body) {
@@ -532,8 +494,11 @@ function install(electron, deps) {
       wsId = await ensureWorkspace();
       fileid = await importStagedJpeg(stagedInput, wsId);
 
+      const inputImage = electron.nativeImage.createFromPath(stagedInput);
+      if (inputImage.isEmpty()) throw new Error('INVALID_INPUT: Cannot decode source JPEG.');
+      const expectedSize = inputImage.getSize();
       const payload = buildRetouchPayload(preset, beautyConfig);
-      const producedFile = await renderViaNativeEngine(fileid, payload, stagedOutput, timeoutMs);
+      const producedFile = await renderViaNativeEngine(fileid, payload, stagedOutput, expectedSize, timeoutMs);
 
       fs.mkdirSync(path.dirname(outputPath), { recursive: true });
       const tmpOut = `${outputPath}.lk.${jobUuid}.tmp`;
@@ -547,7 +512,7 @@ function install(electron, deps) {
         ok: true,
         status: 'success',
         engine: 'lkmagic_native',
-        method: 'native_retouch_engine',
+        method: 'export_fullres',
         preset,
         face_slim: false,
         output_path: outputPath,
@@ -616,7 +581,7 @@ function install(electron, deps) {
       const url = new URL(req.url || '/', `http://127.0.0.1:${port}`);
       if (req.method === 'GET' && url.pathname === '/api/v1/health') {
         const f = useFFI();
-        const ready = Boolean(f && f.globalInit === true);
+        const ready = Boolean(f && f.globalInit === true && (typeof deps.isReady !== 'function' || deps.isReady()));
         let version = '';
         if (ready && typeof f.aipic_get_version === 'function') {
           try { version = String(f.aipic_get_version() || ''); } catch (_) {}

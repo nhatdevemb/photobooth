@@ -53,6 +53,8 @@ final class AppConfig
     public readonly string $dccCameraId;
     public readonly string $lkmagicBridgeUrl;
     public readonly string $beautyEngine;
+    public readonly string $lkmagicExecutable;
+    public readonly bool $lkmagicAutoStart;
 
     /**
      * @param array<string, string> $overrides
@@ -159,7 +161,9 @@ final class AppConfig
             dccBaseUrl: rtrim($get('DCC_BASE_URL', 'http://127.0.0.1:5513'), '/'),
             dccCameraId: $get('DCC_CAMERA_ID', ''),
             lkmagicBridgeUrl: rtrim($get('LKMAGIC_BRIDGE_URL', 'http://127.0.0.1:5520'), '/'),
-            beautyEngine: strtolower(trim($get('BEAUTY_ENGINE', 'auto')))
+            beautyEngine: strtolower(trim($get('BEAUTY_ENGINE', 'auto'))),
+            lkmagicExecutable: $get('LKMAGIC_EXECUTABLE', ''),
+            lkmagicAutoStart: !in_array(strtolower(trim($get('LKMAGIC_AUTO_START', '1'))), ['0', 'false', 'no', 'off'], true)
         );
 
         $instance->validate();
@@ -213,7 +217,9 @@ final class AppConfig
         string $dccBaseUrl = 'http://127.0.0.1:5513',
         string $dccCameraId = '',
         string $lkmagicBridgeUrl = 'http://127.0.0.1:5520',
-        string $beautyEngine = 'auto'
+        string $beautyEngine = 'auto',
+        string $lkmagicExecutable = '',
+        bool $lkmagicAutoStart = true
     ) {
         $this->appEnv = $appEnv;
         $this->appVersion = $appVersion;
@@ -259,6 +265,8 @@ final class AppConfig
         $this->dccCameraId = $dccCameraId;
         $this->lkmagicBridgeUrl = $lkmagicBridgeUrl;
         $this->beautyEngine = $beautyEngine;
+        $this->lkmagicExecutable = $lkmagicExecutable;
+        $this->lkmagicAutoStart = $lkmagicAutoStart;
     }
 
     public function validate(): void

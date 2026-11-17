@@ -1,90 +1,80 @@
 #!/usr/bin/env python3
-"""
-Safely sync modified/new files from `LK Magic-WIN/app.asar/out/main` into `LK Magic-WIN/resources/app.asar`
-while preserving all existing unpacked native module flags and structure.
-"""
+"""Sync the complete main-process source tree without reverting other ASAR files."""
+from __future__ import annotations
+
+import argparse
 import hashlib
 import json
 import os
 import shutil
 import struct
+import uuid
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent
-SRC_DIR = ROOT / "app.asar"
-ASAR_PATH = ROOT / "resources" / "app.asar"
-BAK_PATH = ROOT / "resources" / "app.asar.bak"
 
 
 def calc_integrity(data: bytes) -> dict:
     block_size = 4 * 1024 * 1024
-    blocks = []
-    for i in range(0, len(data), block_size):
-        blocks.append(hashlib.sha256(data[i : i + block_size]).hexdigest())
-    if not blocks:
-        blocks.append(hashlib.sha256(b"").hexdigest())
+    blocks = [hashlib.sha256(data[i:i + block_size]).hexdigest() for i in range(0, len(data), block_size)]
     return {
-        "algorithm": "SHA256",
-        "hash": hashlib.sha256(data).hexdigest(),
-        "blockSize": block_size,
-        "blocks": blocks,
+        "algorithm": "SHA256", "hash": hashlib.sha256(data).hexdigest(),
+        "blockSize": block_size, "blocks": blocks or [hashlib.sha256(b"").hexdigest()],
     }
 
 
-def main() -> None:
-    if not BAK_PATH.exists():
-        shutil.copy2(ASAR_PATH, BAK_PATH)
-        print(f"Created backup: {BAK_PATH}")
-
-    raw = BAK_PATH.read_bytes()
+def sync_archive(source_dir: Path, asar_path: Path) -> tuple[Path, int]:
+    # Read the CURRENT archive; a previous backup may lack later modules or fixes.
+    raw = asar_path.read_bytes()
     _, header_size, _, json_len = struct.unpack("<4I", raw[:16])
     data_offset = 8 + header_size
-    header_json = raw[16 : 16 + json_len].decode("utf-8")
-    header = json.loads(header_json)
+    if json_len > header_size - 8 or data_offset > len(raw):
+        raise ValueError("Invalid ASAR header")
+    header = json.loads(raw[16:16 + json_len].decode("utf-8"))
     payload = bytearray(raw[data_offset:])
+    files = sorted(file for file in (source_dir / "out/main").rglob("*") if file.is_file())
+    if not files or not (source_dir / "out/main/index.js").is_file():
+        raise ValueError("Source must contain out/main/index.js")
 
-    files_to_sync = [
-        ("out", "main", "index.js"),
-        ("out", "main", "lk-photobooth-bridge", "main.cjs"),
-    ]
-
-    for rel_parts in files_to_sync:
-        src_file = SRC_DIR.joinpath(*rel_parts)
-        content = src_file.read_bytes()
-        offset = len(payload)
+    for src in files:
+        parts = src.relative_to(source_dir).parts
+        node = header
+        for part in parts[:-1]:
+            node = node.setdefault("files", {}).setdefault(part, {"files": {}})
+        leaves = node.setdefault("files", {})
+        previous = leaves.get(parts[-1], {})
+        if previous.get("unpacked") or previous.get("link"):
+            raise ValueError(f"Refusing to repack an unpacked file or link: {src}")
+        content = src.read_bytes()
+        leaves[parts[-1]] = {"size": len(content), "offset": str(len(payload)), "integrity": calc_integrity(content)}
         payload.extend(content)
 
-        node = header
-        for part in rel_parts[:-1]:
-            if "files" not in node:
-                node["files"] = {}
-            if part not in node["files"]:
-                node["files"][part] = {"files": {}}
-            node = node["files"][part]
+    encoded = json.dumps(header, separators=(",", ":")).encode("utf-8")
+    padded = encoded + b"\0" * ((-len(encoded)) % 4)
+    inner_size = 4 + len(padded)
+    prefix = struct.pack("<4I", 4, 4 + inner_size, inner_size, len(encoded)) + padded
+    # Keep a unique rollback copy of precisely the archive being replaced.
+    backup = asar_path.with_name(asar_path.name + ".pre-sync-" + uuid.uuid4().hex + ".bak")
+    shutil.copy2(asar_path, backup)
+    temporary = asar_path.with_name(asar_path.name + "." + uuid.uuid4().hex + ".tmp")
+    try:
+        with temporary.open("xb") as output:
+            output.write(prefix)
+            output.write(payload)
+        os.replace(temporary, asar_path)
+    finally:
+        temporary.unlink(missing_ok=True)
+    return backup, len(files)
 
-        leaf_name = rel_parts[-1]
-        node.setdefault("files", {})[leaf_name] = {
-            "size": len(content),
-            "offset": str(offset),
-            "integrity": calc_integrity(content),
-        }
-        print(f"Synced {'/'.join(rel_parts)} ({len(content)} bytes at offset {offset})")
 
-    new_json_bytes = json.dumps(header, separators=(",", ":")).encode("utf-8")
-    json_len_new = len(new_json_bytes)
-    # Pad to 4-byte boundary
-    pad_len = (4 - (json_len_new % 4)) % 4
-    padded_json = new_json_bytes + (b"\x00" * pad_len)
-    inner_size = 4 + len(padded_json)
-    outer_size = 4 + inner_size
-    new_prefix = struct.pack("<4I", 4, outer_size, inner_size, json_len_new) + padded_json
-
-    tmp_asar = ASAR_PATH.with_suffix(".asar.tmp")
-    with open(tmp_asar, "wb") as f:
-        f.write(new_prefix)
-        f.write(payload)
-    os.replace(tmp_asar, ASAR_PATH)
-    print(f"Successfully updated {ASAR_PATH} ({ASAR_PATH.stat().st_size} bytes)")
+def main() -> None:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--source", type=Path, default=ROOT / "app.asar")
+    parser.add_argument("--archive", type=Path, default=ROOT / "resources/app.asar")
+    args = parser.parse_args()
+    backup, count = sync_archive(args.source.resolve(), args.archive.resolve())
+    print(f"Synced {count} main-process files into {args.archive}")
+    print(f"Rollback archive: {backup}")
 
 
 if __name__ == "__main__":

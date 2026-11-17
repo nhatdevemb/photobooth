@@ -22,6 +22,7 @@ find custom/src custom/bin custom/public custom/tests -name "*.php" -print0 | xa
 echo "=== [3/7] Checking JavaScript syntax in custom/public/assets/js/ ==="
 node --check custom/public/assets/js/operator.js
 node --check custom/public/assets/js/browser-camera.js
+node --test custom/tests/node/lkmagic-bridge.test.cjs
 
 echo "=== [4/7] Running Python image pipeline tests (pytest) ==="
 (cd custom && python3 -m pytest -v tests/python/)

@@ -84041,6 +84041,10 @@ async function quitApp() {
     require('./lk-photobooth-bridge/main.cjs').install(require('electron'), {
       koffi,
       useFFI,
+      isReady: () => {
+        const login = getLoginStatus();
+        return Boolean(getAppInfo().init_finish && login.quietFinish && login.status);
+      },
       quitApp,
       getCachePathByFileName: typeof getCachePathByFileName === 'function' ? getCachePathByFileName : null,
       callbacks: {

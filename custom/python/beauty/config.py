@@ -51,6 +51,7 @@ class BeautyConfig:
             "tone": round(self.tone, 4),
             "max_faces": self.max_faces,
             "enabled": self.enabled,
+            "engine": self.engine,
         }
 
 

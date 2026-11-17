@@ -127,7 +127,15 @@ final class Renderer
             2 => ['pipe', 'w'],
         ];
 
-        $proc = @proc_open($cmd, $descriptors, $pipes);
+        // .env values are resolved by AppConfig, not exported into PHP's process.
+        // Preserve inherited runtime variables while forwarding the resolved settings.
+        $environment = getenv();
+        $environment = is_array($environment) ? $environment : [];
+        $environment['BEAUTY_ENGINE'] = $this->config->beautyEngine;
+        $environment['LKMAGIC_BRIDGE_URL'] = $this->config->lkmagicBridgeUrl;
+        $environment['LKMAGIC_EXECUTABLE'] = $this->config->lkmagicExecutable;
+        $environment['LKMAGIC_AUTO_START'] = $this->config->lkmagicAutoStart ? '1' : '0';
+        $proc = @proc_open($cmd, $descriptors, $pipes, null, $environment);
         if (!is_resource($proc)) {
             throw new ApiException('RENDER_FAILED', 'Không thể khởi chạy tiến trình xử lý ảnh Python.', 500);
         }

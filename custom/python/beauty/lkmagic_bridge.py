@@ -214,16 +214,21 @@ def retouch_via_lkmagic(
         with opener.open(req, timeout=config.lkmagic_timeout_sec + 3.0) as resp:
             resp_data = json.loads(resp.read().decode("utf-8", errors="replace"))
 
-        if not isinstance(resp_data, dict) or not resp_data.get("ok"):
+        if not isinstance(resp_data, dict):
+            raise RuntimeError("LK Magic returned an invalid response.")
+        if not resp_data.get("ok"):
             raise RuntimeError(resp_data.get("error", "LK_MAGIC_RETOUCH_FAILED"))
 
         if not out_path.is_file() or out_path.stat().st_size <= 0:
             raise RuntimeError("LK Magic did not produce output JPEG file.")
 
         with Image.open(out_path) as out_img:
+            if out_img.format != "JPEG" or out_img.size != (orig_w, orig_h):
+                raise RuntimeError(
+                    "LK_MAGIC_INVALID_EXPORT: Expected full-resolution JPEG "
+                    f"{orig_w}x{orig_h}, received {out_img.format} {out_img.width}x{out_img.height}."
+                )
             out_rgb_pil = out_img.convert("RGB")
-            if out_rgb_pil.size != (orig_w, orig_h):
-                out_rgb_pil = out_rgb_pil.resize((orig_w, orig_h), resample=Image.Resampling.LANCZOS)
             output_rgb = np.asarray(out_rgb_pil, dtype=np.uint8).copy()
 
     duration_ms = int((time.monotonic_ns() - start_ns) // 1_000_000)

@@ -80,15 +80,27 @@ class BeautyProcessor:
             # Explicit LK Magic engine mode (bypasses local MediaPipe pre-check)
             if cfg.engine == "lkmagic":
                 lkmagic_rgb, lk_stats = retouch_via_lkmagic(image_rgb, cfg)
-                lk_stats["faces_detected"] = lk_stats.get("faces_detected", 1)
                 if is_pil:
                     return (Image.fromarray(lkmagic_rgb), lk_stats)
                 return (lkmagic_rgb, lk_stats)
 
+            # Try the native engine before loading optional fallback models.
+            if cfg.engine == "auto":
+                try:
+                    lkmagic_rgb, lk_stats = retouch_via_lkmagic(image_rgb, cfg)
+                    duration_ms = int((time.monotonic_ns() - start_ns) // 1_000_000)
+                    lk_stats["duration_ms"] = duration_ms
+                    if is_pil:
+                        return (Image.fromarray(lkmagic_rgb), lk_stats)
+                    return (lkmagic_rgb, lk_stats)
+                except Exception as lk_exc:
+                    sys.stderr.write(
+                        f"[beauty_processor] LK Magic native bridge unavailable ({lk_exc}); falling back to local MediaPipe.\n"
+                    )
+
             self._ensure_models(cfg)
             orig_h, orig_w = image_rgb.shape[:2]
 
-            # Step 1: Detect faces
             faces = self._detector.detect(image_rgb)
             if not faces:
                 duration_ms = int((time.monotonic_ns() - start_ns) // 1_000_000)
@@ -99,21 +111,6 @@ class BeautyProcessor:
                     "duration_ms": duration_ms,
                 }
                 return (image_input, stats)
-
-            # Step 1b: Prefer LK Magic-WIN Native AI Engine (aipic.dll + aipic-host.exe) when in "auto" mode
-            if cfg.engine == "auto":
-                try:
-                    lkmagic_rgb, lk_stats = retouch_via_lkmagic(image_rgb, cfg)
-                    duration_ms = int((time.monotonic_ns() - start_ns) // 1_000_000)
-                    lk_stats["faces_detected"] = len(faces)
-                    lk_stats["duration_ms"] = duration_ms
-                    if is_pil:
-                        return (Image.fromarray(lkmagic_rgb), lk_stats)
-                    return (lkmagic_rgb, lk_stats)
-                except Exception as lk_exc:
-                    sys.stderr.write(
-                        f"[beauty_processor] LK Magic native bridge unavailable ({lk_exc}); falling back to local MediaPipe.\n"
-                    )
 
             # Step 2: Generate Skin Mask with feature exclusion
             skin_mask = self._mask_gen.generate(image_rgb, faces)
