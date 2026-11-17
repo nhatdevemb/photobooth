@@ -12,8 +12,12 @@ import pngjs from 'pngjs';
 
 const desktop = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const project = path.resolve(desktop, '../..');
-const runtime = path.join(desktop, 'runtime');
-const python = path.join(runtime, 'python/python.exe');
+const resolveRuntime = async () => {
+    for (const candidate of [process.env.PB_DESKTOP_RUNTIME_DIR, path.join(desktop, 'runtime'), path.join(desktop, 'dist/win-unpacked/resources/runtime')].filter(Boolean)) {
+        if (await access(path.join(candidate, 'python/Lib/site-packages/PIL/Image.py')).then(() => true).catch(() => false)) return candidate;
+    }
+    return path.join(desktop, 'runtime');
+};
 const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 const port = async () => {
     const server = tcpServer();
@@ -24,6 +28,8 @@ const port = async () => {
 };
 
 test('Windows FastCGI + worker + DCC HTTP: four layouts, retake, immutable JPEG, QR and listener isolation', { timeout: process.env.PB_SOAK_SESSIONS ? 600000 : 180000 }, async (t) => {
+    const runtime = await resolveRuntime();
+    const python = path.join(runtime, 'python/python.exe');
     if (process.platform !== 'win32' || !await access(python).then(() => true).catch(() => false)) return t.skip('Prepared Windows runtime required');
     const cache = path.join(desktop, '.cache');
     await mkdir(cache, { recursive: true });

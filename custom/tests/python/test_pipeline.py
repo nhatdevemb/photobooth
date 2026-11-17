@@ -116,7 +116,7 @@ def test_exif_orientation_and_icc_handling() -> None:
     assert exc_info.value.code == "INVALID_ICC_PROFILE"
 
 
-def test_input_validation_limits_and_corrupt_jpeg() -> None:
+def test_input_validation_limits_and_corrupt_jpeg(tmp_path: Path) -> None:
     # Corrupt truncated JPEG
     with pytest.raises(PipelineError) as exc_info:
         validate_and_load_jpeg(FIXTURES_DIR / "corrupt-truncated.jpg")
@@ -131,6 +131,17 @@ def test_input_validation_limits_and_corrupt_jpeg() -> None:
     with pytest.raises(PipelineError) as exc_info3:
         validate_and_load_jpeg(FIXTURES_DIR / "slot-1-v1.jpg", max_image_pixels=100_000)
     assert exc_info3.value.code == "IMAGE_PIXELS_EXCEEDED"
+
+    # Canon mirrorless JPEGs include an APP2 MPF segment which Pillow opens as format "MPO"
+    base_bytes = (FIXTURES_DIR / "slot-1-v1.jpg").read_bytes()
+    mpf_payload = b"MPF\x00MM\x00*\x00\x00\x00\x08\x00\x01\xb0\x00\x07\x00\x00\x00\x00\x040100\x00\x00\x00\x00"
+    app2_mpf = b"\xff\xe2" + len(mpf_payload + b"\x00\x00").to_bytes(2, "big") + mpf_payload
+    mpo_path = tmp_path / "canon-r10.jpg"
+    mpo_path.write_bytes(base_bytes[:2] + app2_mpf + base_bytes[2:])
+    mpo_img, _, mpo_raw = validate_and_load_jpeg(mpo_path)
+    assert mpo_img.format in ("JPEG", "MPO")
+    norm, _ = normalize_orientation_and_srgb(mpo_img, mpo_raw, 1)
+    assert norm.mode == "RGB"
 
 
 def test_tc07_original_lut_preserves_colors_and_originals(tmp_path: Path) -> None:

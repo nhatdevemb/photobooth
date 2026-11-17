@@ -10,7 +10,7 @@ import { validateSettings, publicSettings } from './lib/settings.mjs';
 const directory = path.dirname(fileURLToPath(import.meta.url));
 const resources = app.isPackaged ? process.resourcesPath : directory;
 const project = app.isPackaged ? path.join(resources, 'app') : path.resolve(directory, '../..');
-const runtime = path.join(resources, 'runtime');
+let runtime = path.join(resources, 'runtime');
 const data = process.env.PB_DESKTOP_DATA_DIR ? path.resolve(process.env.PB_DESKTOP_DATA_DIR) : path.join(app.getPath('appData'), '..', 'Local', 'PhotoboothOperator', 'data');
 if (process.env.PB_DESKTOP_DATA_DIR) {
     app.setPath('userData', path.join(path.dirname(data), 'electron-profile'));
@@ -28,6 +28,22 @@ else {
 }
 
 async function exists(file) { return access(file).then(() => true).catch(() => false); }
+async function resolveRuntime() {
+    const candidates = [
+        process.env.PB_DESKTOP_RUNTIME_DIR,
+        app.isPackaged ? path.join(resources, 'runtime') : null,
+        path.join(directory, 'runtime'),
+        path.join(directory, 'dist', 'win-unpacked', 'resources', 'runtime'),
+    ].filter(Boolean);
+    for (const candidate of candidates) {
+        if (await exists(path.join(candidate, 'python/Lib/site-packages/PIL/Image.py'))
+            && await exists(path.join(candidate, 'php/php.exe'))
+            && await exists(path.join(candidate, 'caddy/caddy.exe'))) {
+            return candidate;
+        }
+    }
+    return path.join(resources, 'runtime');
+}
 async function findLkMagicExecutable() {
     const candidates = [
         process.env.LKMAGIC_EXECUTABLE,
@@ -86,8 +102,9 @@ ipcMain.handle('setup:launch', async (event, input) => {
     if (supervisor) return { error: 'Dịch vụ đang chạy. Đóng hoặc khởi động lại trước.' };
     try {
         const settings = validateSettings(input);
+        runtime = await resolveRuntime();
         const python = path.join(runtime, 'python', 'python.exe');
-        for (const file of [python, path.join(runtime, 'php', 'php.exe'), path.join(runtime, 'php', 'php-cgi.exe'), path.join(runtime, 'caddy', 'caddy.exe'), path.join(project, 'custom', 'vendor', 'autoload.php')]) {
+        for (const file of [python, path.join(runtime, 'php', 'php.exe'), path.join(runtime, 'php', 'php-cgi.exe'), path.join(runtime, 'caddy', 'caddy.exe'), path.join(runtime, 'python/Lib/site-packages/PIL/Image.py'), path.join(project, 'custom', 'vendor', 'autoload.php')]) {
             if (!await exists(file)) throw new Error(`Thiếu thành phần: ${path.basename(file)}. Chạy bước prepare runtime và stage trước.`);
         }
         if (settings.cameraMode === 'digicamcontrol' && settings.dccExecutable) {

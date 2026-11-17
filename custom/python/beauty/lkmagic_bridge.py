@@ -223,7 +223,7 @@ def retouch_via_lkmagic(
             raise RuntimeError("LK Magic did not produce output JPEG file.")
 
         with Image.open(out_path) as out_img:
-            if out_img.format != "JPEG" or out_img.size != (orig_w, orig_h):
+            if out_img.format not in ("JPEG", "MPO") or out_img.size != (orig_w, orig_h):
                 raise RuntimeError(
                     "LK_MAGIC_INVALID_EXPORT: Expected full-resolution JPEG "
                     f"{orig_w}x{orig_h}, received {out_img.format} {out_img.width}x{out_img.height}."

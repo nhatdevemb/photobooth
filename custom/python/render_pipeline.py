@@ -152,7 +152,9 @@ def validate_and_load_jpeg(
         Image.MAX_IMAGE_PIXELS = max_image_pixels
         try:
             img = Image.open(io.BytesIO(raw_bytes))
-            if img.format != "JPEG":
+            # Canon mirrorless cameras (e.g., EOS R10) embed an MPF preview inside .jpg files,
+            # which Pillow opens as MPO (a multi-picture JPEG container); accept both JPEG and MPO.
+            if img.format not in ("JPEG", "MPO"):
                 raise PipelineError("INVALID_JPEG", f"Image format is {img.format}, expected JPEG")
             width, height = img.size
             if width <= 0 or height <= 0 or (width * height) > max_image_pixels:
