@@ -61,8 +61,12 @@ final class DigiCamControlTest extends TestCase
             parse_str((string) parse_url($url, PHP_URL_QUERY), $q);
             if (($q['slc'] ?? '') === 'list') { return '12345'; }
             if (($q['slc'] ?? '') === 'capture') { $triggers++; throw new ApiException('DCC_UNAVAILABLE', 'timeout after shutter', 503); }
-            if (($q['slc'] ?? '') === 'set') { $settings[$q['param1']] = $q['param2']; return 'OK'; }
-            return $q['param1'] === 'session' ? 'Photobooth' : ($settings[$q['param1']] ?? '');
+            if (($q['slc'] ?? '') === 'set') {
+                if (!in_array($q['param1'] ?? '', ['camera', 'session', 'session.folder', 'session.filenametemplate'], true)) { return 'Unknow parameter'; }
+                $settings[$q['param1']] = $q['param2'];
+                return 'OK';
+            }
+            return $q['param1'] === 'session' ? 'Photobooth' : ($settings[$q['param1']] ?? 'Unknow parameter');
         });
         for ($i = 0; $i < 2; $i++) {
             try { $adapter->capture($this->directory . '/pending', 1, 1, time() + 5); self::fail('Should fail'); }
@@ -77,12 +81,16 @@ final class DigiCamControlTest extends TestCase
         $adapter = $this->adapter(function (string $url) use (&$settings): string {
             parse_str((string) parse_url($url, PHP_URL_QUERY), $q);
             if ($q['slc'] === 'list') { return '12345'; }
-            if ($q['slc'] === 'set') { $settings[$q['param1']] = $q['param2']; return 'OK'; }
-            if ($q['slc'] === 'capture') {
-                file_put_contents($settings['camera.session.folder'] . '/old.jpg', 'stale');
+            if ($q['slc'] === 'set') {
+                if (!in_array($q['param1'] ?? '', ['camera', 'session', 'session.folder', 'session.filenametemplate'], true)) { return 'Unknow parameter'; }
+                $settings[$q['param1']] = $q['param2'];
                 return 'OK';
             }
-            return $q['param1'] === 'session' ? 'Photobooth' : ($settings[$q['param1']] ?? '');
+            if ($q['slc'] === 'capture') {
+                file_put_contents($settings['session.folder'] . '/old.jpg', 'stale');
+                return 'OK';
+            }
+            return $q['param1'] === 'session' ? 'Photobooth' : ($settings[$q['param1']] ?? 'Unknow parameter');
         });
         $this->expectException(ApiException::class);
         $this->expectExceptionMessage('ảnh ngoài luồng');
@@ -101,15 +109,19 @@ final class DigiCamControlTest extends TestCase
         $adapter = $this->adapter(function (string $url) use (&$settings, &$last, &$triggers, $jpeg): string {
             parse_str((string) parse_url($url, PHP_URL_QUERY), $q);
             if ($q['slc'] === 'list') { return '12345'; }
-            if ($q['slc'] === 'set') { $settings[$q['param1']] = $q['param2']; return 'OK'; }
+            if ($q['slc'] === 'set') {
+                if (!in_array($q['param1'] ?? '', ['camera', 'session', 'session.folder', 'session.filenametemplate'], true)) { return 'Unknow parameter'; }
+                $settings[$q['param1']] = $q['param2'];
+                return 'OK';
+            }
             if ($q['slc'] === 'capture') {
                 $triggers++;
-                $last = $settings['camera.session.filenametemplate'] . '_0001.jpg';
-                file_put_contents($settings['camera.session.folder'] . '/' . $last, $jpeg);
+                $last = $settings['session.filenametemplate'] . '.jpg';
+                file_put_contents($settings['session.folder'] . '/' . $last, $jpeg);
                 return 'OK';
             }
             if ($q['param1'] === 'lastcaptured') { return $last; }
-            return $q['param1'] === 'session' ? 'Photobooth' : ($settings[$q['param1']] ?? '');
+            return $q['param1'] === 'session' ? 'Photobooth' : ($settings[$q['param1']] ?? 'Unknow parameter');
         });
         $first = $adapter->capture($this->directory . '/pending', 1, 1, time() + 10);
         $second = $adapter->capture($this->directory . '/pending', 1, 1, time() + 10);

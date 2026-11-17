@@ -38,12 +38,15 @@ test('Windows FastCGI + worker + DCC HTTP: four layouts, retake, immutable JPEG,
             let body = 'OK';
             if (url.pathname === '/liveview.jpg') { response.setHeader('Content-Type', 'image/jpeg'); response.end(fixture); return; }
             if (q.slc === 'list') body = '1234567890';
-            else if (q.slc === 'set') settings[q.param1] = q.param2;
-            else if (q.slc === 'get') body = q.param1 === 'session' ? 'Photobooth' : q.param1 === 'camera' ? '1234567890' : q.param1 === 'lastcaptured' ? last : settings[q.param1] || '';
+            else if (q.slc === 'set') {
+                if (!['camera', 'session', 'session.folder', 'session.filenametemplate'].includes(q.param1)) body = 'Unknow parameter';
+                else settings[q.param1] = q.param2;
+            }
+            else if (q.slc === 'get') body = q.param1 === 'session' ? 'Photobooth' : q.param1 === 'camera' ? '1234567890' : q.param1 === 'lastcaptured' ? last : settings[q.param1] || 'Unknow parameter';
             else if (q.slc === 'capture') {
                 triggers++;
-                last = settings['camera.session.filenametemplate'] + '_0001.jpg';
-                await writeFile(path.join(settings['camera.session.folder'], last), fixture);
+                last = settings['session.filenametemplate'] + '.jpg';
+                await writeFile(path.join(settings['session.folder'], last), fixture);
             }
             response.end(body);
         } catch (error) { response.statusCode = 500; response.end(error.message); }

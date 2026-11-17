@@ -92,17 +92,18 @@ final class DigiCamControlCameraAdapter implements CameraAdapterInterface
             }
             $incoming = (string) realpath($incoming);
             $stem = 'pb-' . substr($key, 0, 24);
-            // Attach the selected DCC session explicitly; older DCC builds cannot read
-            // camera.session properties while the camera inherits the default session.
+            // Verify an active session is selected, select the target camera, and bind the
+            // session output folder & filename template using DCC's official SLC keys.
             $session = $this->client->slc('get', 'session', '', $camera);
             if ($session === '' || $session === 'OK') { throw new ApiException('DCC_SESSION_MISMATCH', 'Chưa chọn session digiCamControl.', 409); }
-            $this->client->command('set', 'camera.session', $session, $camera);
-            $this->client->command('set', 'camera.session.folder', $incoming, $camera);
-            $this->client->command('set', 'camera.session.filenametemplate', $stem, $camera);
+            $this->client->command('set', 'camera', $camera, $camera);
+            $this->client->command('set', 'session', $session, $camera);
+            $this->client->command('set', 'session.folder', $incoming, $camera);
+            $this->client->command('set', 'session.filenametemplate', $stem, $camera);
             // Verify both settings; successful HTTP alone does not prove DCC accepted them.
-            $actualFolder = str_replace('\\', '/', $this->client->slc('get', 'camera.session.folder', '', $camera));
+            $actualFolder = str_replace('\\', '/', $this->client->slc('get', 'session.folder', '', $camera));
             if (strcasecmp(rtrim($actualFolder, '/'), rtrim(str_replace('\\', '/', $incoming), '/')) !== 0
-                || $this->client->slc('get', 'camera.session.filenametemplate', '', $camera) !== $stem) {
+                || $this->client->slc('get', 'session.filenametemplate', '', $camera) !== $stem) {
                 throw new ApiException('DCC_SESSION_MISMATCH', 'DCC không giữ đúng thư mục/tên ảnh dành cho job. Kiểm tra session trước khi chụp.', 409);
             }
             $receipt = ['state' => 'SUBMITTING', 'camera' => $camera, 'slot' => $slot, 'version' => $version];
