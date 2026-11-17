@@ -1,0 +1,780 @@
+{
+	"eyebrow_adjust_refer_config": [
+		{
+			"eyebrow_name": "liuyemei",
+			"eyebrow_refer_width": 720,
+			"eyebrow_refer_height": 1280,
+			"eyebrow_refer_point_list": [
+				{
+					"refer_point_index": 33,
+					"refer_point_x": 154.687500,
+					"refer_point_y":468.676910
+				},
+				{
+					"refer_point_index": 34,
+					"refer_point_x": 185.062515,
+					"refer_point_y":442.795593
+				},
+				{
+					"refer_point_index": 35,
+					"refer_point_x": 222.187500,
+					"refer_point_y":436.043945
+				},
+				{
+					"refer_point_index": 36,
+					"refer_point_x": 262.125000,
+					"refer_point_y":438.294495
+				},
+				{
+					"refer_point_index": 37,
+					"refer_point_x": 297.000000,
+					"refer_point_y":447.296692
+				},
+				{
+					"refer_point_index": 38,
+					"refer_point_x": 295.875000,
+					"refer_point_y":468.676910
+				},
+				{
+					"refer_point_index": 39,
+					"refer_point_x": 259.875000,
+					"refer_point_y":459.674713
+				},
+				{
+					"refer_point_index": 40,
+					"refer_point_x": 222.187500,
+					"refer_point_y":456.298889
+				},
+				{
+					"refer_point_index": 41,
+					"refer_point_x": 186.750000,
+					"refer_point_y":459.112091
+				},
+				{
+					"refer_point_index": 42,
+					"refer_point_x": 420.750031,
+					"refer_point_y":446.171417
+				},
+				{
+					"refer_point_index": 43,
+					"refer_point_x": 456.749969,
+					"refer_point_y":437.169220
+				},
+				{
+					"refer_point_index": 44,
+					"refer_point_x": 497.250000,
+					"refer_point_y":435.481323
+				},
+				{
+					"refer_point_index": 45,
+					"refer_point_x": 532.687500,
+					"refer_point_y":441.107727
+				},
+				{
+					"refer_point_index": 46,
+					"refer_point_x": 565.312500,
+					"refer_point_y":465.301086
+				},
+				{
+					"refer_point_index": 47,
+					"refer_point_x": 530.437500,
+					"refer_point_y":457.424164
+				},
+				{
+					"refer_point_index": 48,
+					"refer_point_x": 496.124969,
+					"refer_point_y":455.736267
+				},
+				{
+					"refer_point_index": 49,
+					"refer_point_x": 457.875000,
+					"refer_point_y":459.674713
+				},
+				{
+					"refer_point_index": 50,
+					"refer_point_x": 425.250000,
+					"refer_point_y":465.863708
+				}										
+			]
+		},
+		{
+			"eyebrow_name": "oushitiaomei",
+			"eyebrow_refer_width": 720,
+			"eyebrow_refer_height": 1280,
+			"eyebrow_refer_point_list": [
+				{
+					"refer_point_index": 33,
+					"refer_point_x": 160.312500,
+					"refer_point_y":463.613220
+				},
+				{
+					"refer_point_index": 34,
+					"refer_point_x": 191.812485,
+					"refer_point_y":436.606598
+				},
+				{
+					"refer_point_index": 35,
+					"refer_point_x": 236.812485,
+					"refer_point_y":433.793396
+				},
+				{
+					"refer_point_index": 36,
+					"refer_point_x": 276.750000,
+					"refer_point_y":442.795593
+				},
+				{
+					"refer_point_index": 37,
+					"refer_point_x": 312.187500,
+					"refer_point_y":455.736267
+				},
+				{
+					"refer_point_index": 38,
+					"refer_point_x": 307.687500,
+					"refer_point_y":478.804382
+				},
+				{
+					"refer_point_index": 39,
+					"refer_point_x": 271.125000,
+					"refer_point_y":464.175781
+				},
+				{
+					"refer_point_index": 40,
+					"refer_point_x": 235.687515,
+					"refer_point_y":454.048340
+				},
+				{
+					"refer_point_index": 41,
+					"refer_point_x": 196.875000,
+					"refer_point_y":451.797791
+				},
+				{
+					"refer_point_index": 42,
+					"refer_point_x": 409.500031,
+					"refer_point_y":456.298889
+				},
+				{
+					"refer_point_index": 43,
+					"refer_point_x": 444.375000,
+					"refer_point_y":441.670288
+				},
+				{
+					"refer_point_index": 44,
+					"refer_point_x": 484.874969,
+					"refer_point_y":433.793396
+				},
+				{
+					"refer_point_index": 45,
+					"refer_point_x": 525.937500,
+					"refer_point_y":437.169220
+				},
+				{
+					"refer_point_index": 46,
+					"refer_point_x": 556.312500,
+					"refer_point_y":461.925293
+				},
+				{
+					"refer_point_index": 47,
+					"refer_point_x": 524.250000,
+					"refer_point_y":454.048340
+				},
+				{
+					"refer_point_index": 48,
+					"refer_point_x": 485.437531,
+					"refer_point_y":453.485718
+				},
+				{
+					"refer_point_index": 49,
+					"refer_point_x": 447.750000,
+					"refer_point_y":463.613220
+				},
+				{
+					"refer_point_index": 50,
+					"refer_point_x": 415.687500,
+					"refer_point_y":475.428528
+				}														
+			]
+		},
+		{
+			"eyebrow_name": "qiuniangmei",
+			"eyebrow_refer_width": 720,
+			"eyebrow_refer_height": 1280,
+			"eyebrow_refer_point_list": [
+				{
+					"refer_point_index": 33,
+					"refer_point_x": 158.625000,
+					"refer_point_y":464.738464
+				},
+				{
+					"refer_point_index": 34,
+					"refer_point_x": 190.125000,
+					"refer_point_y":441.107727
+				},
+				{
+					"refer_point_index": 35,
+					"refer_point_x": 230.625000,
+					"refer_point_y":436.043945
+				},
+				{
+					"refer_point_index": 36,
+					"refer_point_x": 270.000000,
+					"refer_point_y":443.920868
+				},
+				{
+					"refer_point_index": 37,
+					"refer_point_x": 306.000000,
+					"refer_point_y":456.298889
+				},
+				{
+					"refer_point_index": 38,
+					"refer_point_x": 301.500000,
+					"refer_point_y":477.679108
+				},
+				{
+					"refer_point_index": 39,
+					"refer_point_x": 266.625000,
+					"refer_point_y":465.301086
+				},
+				{
+					"refer_point_index": 40,
+					"refer_point_x": 230.062515,
+					"refer_point_y":455.173615
+				},
+				{
+					"refer_point_index": 41,
+					"refer_point_x": 195.187500,
+					"refer_point_y":454.610962
+				},
+				{
+					"refer_point_index": 42,
+					"refer_point_x": 415.125031,
+					"refer_point_y":454.610962
+				},
+				{
+					"refer_point_index": 43,
+					"refer_point_x": 448.312469,
+					"refer_point_y":442.232971
+				},
+				{
+					"refer_point_index": 44,
+					"refer_point_x": 487.125000,
+					"refer_point_y":436.043945
+				},
+				{
+					"refer_point_index": 45,
+					"refer_point_x": 527.625000,
+					"refer_point_y":439.982422
+				},
+				{
+					"refer_point_index": 46,
+					"refer_point_x": 556.875000,
+					"refer_point_y":463.050537
+				},
+				{
+					"refer_point_index": 47,
+					"refer_point_x": 525.937500,
+					"refer_point_y":457.986816
+				},
+				{
+					"refer_point_index": 48,
+					"refer_point_x": 487.687469,
+					"refer_point_y":454.610962
+				},
+				{
+					"refer_point_index": 49,
+					"refer_point_x": 453.937469,
+					"refer_point_y":462.487915
+				},
+				{
+					"refer_point_index": 50,
+					"refer_point_x": 420.187469,
+					"refer_point_y":474.303284
+				}				
+			]
+		},
+		{
+			"eyebrow_name": "shuibomei",
+			"eyebrow_refer_width": 720,
+			"eyebrow_refer_height": 1280,
+			"eyebrow_refer_point_list": [
+				{
+					"refer_point_index": 33,
+					"refer_point_x": 155.812500,
+					"refer_point_y":466.989014
+				},
+				{
+					"refer_point_index": 34,
+					"refer_point_x": 187.875015,
+					"refer_point_y":440.545044
+				},
+				{
+					"refer_point_index": 35,
+					"refer_point_x": 229.500000,
+					"refer_point_y":434.356049
+				},
+				{
+					"refer_point_index": 36,
+					"refer_point_x": 268.875000,
+					"refer_point_y":441.107727
+				},
+				{
+					"refer_point_index": 37,
+					"refer_point_x": 305.437500,
+					"refer_point_y":454.048340
+				},
+				{
+					"refer_point_index": 38,
+					"refer_point_x": 301.500000,
+					"refer_point_y":475.991211
+				},
+				{
+					"refer_point_index": 39,
+					"refer_point_x": 266.625000,
+					"refer_point_y":465.863708
+				},
+				{
+					"refer_point_index": 40,
+					"refer_point_x": 228.937500,
+					"refer_point_y":456.861542
+				},
+				{
+					"refer_point_index": 41,
+					"refer_point_x": 190.125000,
+					"refer_point_y":456.861542
+				},
+				{
+					"refer_point_index": 42,
+					"refer_point_x": 414.000000,
+					"refer_point_y":452.923035
+				},
+				{
+					"refer_point_index": 43,
+					"refer_point_x": 447.750000,
+					"refer_point_y":440.545044
+				},
+				{
+					"refer_point_index": 44,
+					"refer_point_x": 487.687469,
+					"refer_point_y":435.481323
+				},
+				{
+					"refer_point_index": 45,
+					"refer_point_x": 528.187500,
+					"refer_point_y":440.545044
+				},
+				{
+					"refer_point_index": 46,
+					"refer_point_x": 559.687500,
+					"refer_point_y":466.426361
+				},
+				{
+					"refer_point_index": 47,
+					"refer_point_x": 525.375000,
+					"refer_point_y":458.549438
+				},
+				{
+					"refer_point_index": 48,
+					"refer_point_x": 487.687469,
+					"refer_point_y":456.861542
+				},
+				{
+					"refer_point_index": 49,
+					"refer_point_x": 451.124969,
+					"refer_point_y":463.050537
+				},
+				{
+					"refer_point_index": 50,
+					"refer_point_x": 418.500000,
+					"refer_point_y":475.428528
+				}				
+			]
+		},
+		{
+			"eyebrow_name": "xiaoshanmei",
+			"eyebrow_refer_width": 720,
+			"eyebrow_refer_height": 1280,
+			"eyebrow_refer_point_list": [
+				{
+					"refer_point_index": 33,
+					"refer_point_x": 156.937500,
+					"refer_point_y":466.989014
+				},
+				{
+					"refer_point_index": 34,
+					"refer_point_x": 188.437500,
+					"refer_point_y":438.857147
+				},
+				{
+					"refer_point_index": 35,
+					"refer_point_x": 228.374985,
+					"refer_point_y":432.668121
+				},
+				{
+					"refer_point_index": 36,
+					"refer_point_x": 267.187500,
+					"refer_point_y":439.419800
+				},
+				{
+					"refer_point_index": 37,
+					"refer_point_x": 302.062500,
+					"refer_point_y":452.360474
+				},
+				{
+					"refer_point_index": 38,
+					"refer_point_x": 298.125000,
+					"refer_point_y":475.428528
+				},
+				{
+					"refer_point_index": 39,
+					"refer_point_x": 262.687500,
+					"refer_point_y":462.487915
+				},
+				{
+					"refer_point_index": 40,
+					"refer_point_x": 228.374985,
+					"refer_point_y":455.173615
+				},
+				{
+					"refer_point_index": 41,
+					"refer_point_x": 191.250000,
+					"refer_point_y":455.736267
+				},
+				{
+					"refer_point_index": 42,
+					"refer_point_x": 421.312500,
+					"refer_point_y":451.235168
+				},
+				{
+					"refer_point_index": 43,
+					"refer_point_x": 455.625000,
+					"refer_point_y":437.731873
+				},
+				{
+					"refer_point_index": 44,
+					"refer_point_x": 494.437500,
+					"refer_point_y":433.230774
+				},
+				{
+					"refer_point_index": 45,
+					"refer_point_x": 530.437500,
+					"refer_point_y":439.419800
+				},
+				{
+					"refer_point_index": 46,
+					"refer_point_x": 559.687500,
+					"refer_point_y":466.426361
+				},
+				{
+					"refer_point_index": 47,
+					"refer_point_x": 527.625000,
+					"refer_point_y":457.424164
+				},
+				{
+					"refer_point_index": 48,
+					"refer_point_x": 491.625000,
+					"refer_point_y":455.173615
+				},
+				{
+					"refer_point_index": 49,
+					"refer_point_x": 458.437500,
+					"refer_point_y":460.799988
+				},
+				{
+					"refer_point_index": 50,
+					"refer_point_x": 427.500000,
+					"refer_point_y":471.490112
+				}
+			]
+		},
+		{
+			"eyebrow_name": "xinyuemei",
+			"eyebrow_refer_width": 720,
+			"eyebrow_refer_height": 1280,
+			"eyebrow_refer_point_list": [
+				{
+					"refer_point_index": 33,
+					"refer_point_x": 151.312500,
+					"refer_point_y":460.799988
+				},
+				{
+					"refer_point_index": 34,
+					"refer_point_x": 186.750000,
+					"refer_point_y":433.793396
+				},
+				{
+					"refer_point_index": 35,
+					"refer_point_x": 227.812500,
+					"refer_point_y":432.668121
+				},
+				{
+					"refer_point_index": 36,
+					"refer_point_x": 267.187500,
+					"refer_point_y":443.358215
+				},
+				{
+					"refer_point_index": 37,
+					"refer_point_x": 304.875000,
+					"refer_point_y":459.674713
+				},
+				{
+					"refer_point_index": 38,
+					"refer_point_x": 298.687500,
+					"refer_point_y":479.929657
+				},
+				{
+					"refer_point_index": 39,
+					"refer_point_x": 264.375000,
+					"refer_point_y":465.863708
+				},
+				{
+					"refer_point_index": 40,
+					"refer_point_x": 226.687500,
+					"refer_point_y":454.610962
+				},
+				{
+					"refer_point_index": 41,
+					"refer_point_x": 188.437500,
+					"refer_point_y":450.672546
+				},
+				{
+					"refer_point_index": 42,
+					"refer_point_x": 410.062500,
+					"refer_point_y":456.861542
+				},
+				{
+					"refer_point_index": 43,
+					"refer_point_x": 443.812500,
+					"refer_point_y":442.795593
+				},
+				{
+					"refer_point_index": 44,
+					"refer_point_x": 483.750000,
+					"refer_point_y":433.793396
+				},
+				{
+					"refer_point_index": 45,
+					"refer_point_x": 524.250000,
+					"refer_point_y":434.356049
+				},
+				{
+					"refer_point_index": 46,
+					"refer_point_x": 555.750000,
+					"refer_point_y":460.237366
+				},
+				{
+					"refer_point_index": 47,
+					"refer_point_x": 523.687500,
+					"refer_point_y":453.485718
+				},
+				{
+					"refer_point_index": 48,
+					"refer_point_x": 484.874969,
+					"refer_point_y":454.610962
+				},
+				{
+					"refer_point_index": 49,
+					"refer_point_x": 448.312469,
+					"refer_point_y":465.301086
+				},
+				{
+					"refer_point_index": 50,
+					"refer_point_x": 415.687500,
+					"refer_point_y":478.804382
+				}				
+			]
+		},
+		{
+			"eyebrow_name": "yizimei",
+			"eyebrow_refer_width": 720,
+			"eyebrow_refer_height": 1280,
+			"eyebrow_refer_point_list": [
+				{
+					"refer_point_index": 33,
+					"refer_point_x": 154.687500,
+					"refer_point_y":467.551636
+				},
+				{
+					"refer_point_index": 34,
+					"refer_point_x": 185.625000,
+					"refer_point_y":440.545044
+				},
+				{
+					"refer_point_index": 35,
+					"refer_point_x": 226.125000,
+					"refer_point_y":433.793396
+				},
+				{
+					"refer_point_index": 36,
+					"refer_point_x": 265.500000,
+					"refer_point_y":437.169220
+				},
+				{
+					"refer_point_index": 37,
+					"refer_point_x": 302.062500,
+					"refer_point_y":446.171417
+				},
+				{
+					"refer_point_index": 38,
+					"refer_point_x": 298.687500,
+					"refer_point_y":468.676910
+				},
+				{
+					"refer_point_index": 39,
+					"refer_point_x": 263.812500,
+					"refer_point_y":460.799988
+				},
+				{
+					"refer_point_index": 40,
+					"refer_point_x": 225.562485,
+					"refer_point_y":456.298889
+				},
+				{
+					"refer_point_index": 41,
+					"refer_point_x": 188.437500,
+					"refer_point_y":458.549438
+				},
+				{
+					"refer_point_index": 42,
+					"refer_point_x": 411.749969,
+					"refer_point_y":444.483521
+				},
+				{
+					"refer_point_index": 43,
+					"refer_point_x": 449.437500,
+					"refer_point_y":434.356049
+				},
+				{
+					"refer_point_index": 44,
+					"refer_point_x": 489.375000,
+					"refer_point_y":432.105469
+				},
+				{
+					"refer_point_index": 45,
+					"refer_point_x": 528.187500,
+					"refer_point_y":439.419800
+				},
+				{
+					"refer_point_index": 46,
+					"refer_point_x": 558.000000,
+					"refer_point_y":465.301086
+				},
+				{
+					"refer_point_index": 47,
+					"refer_point_x": 524.812500,
+					"refer_point_y":458.549438
+				},
+				{
+					"refer_point_index": 48,
+					"refer_point_x": 488.812500,
+					"refer_point_y":455.173615
+				},
+				{
+					"refer_point_index": 49,
+					"refer_point_x": 450.562500,
+					"refer_point_y":459.674713
+				},
+				{
+					"refer_point_index": 50,
+					"refer_point_x": 416.250000,
+					"refer_point_y":468.114288
+				}				
+			]
+		},
+		{
+			"eyebrow_name": "yudiaomei",
+			"eyebrow_refer_width": 720,
+			"eyebrow_refer_height": 1280,
+			"eyebrow_refer_point_list": [
+				{
+					"refer_point_index": 33,
+					"refer_point_x": 154.125000,
+					"refer_point_y":473.178040
+				},
+				{
+					"refer_point_index": 34,
+					"refer_point_x": 184.500000,
+					"refer_point_y":445.608795
+				},
+				{
+					"refer_point_index": 35,
+					"refer_point_x": 226.125000,
+					"refer_point_y":435.481323
+				},
+				{
+					"refer_point_index": 36,
+					"refer_point_x": 266.625000,
+					"refer_point_y":436.606598
+				},
+				{
+					"refer_point_index": 37,
+					"refer_point_x": 304.312500,
+					"refer_point_y":446.734070
+				},
+				{
+					"refer_point_index": 38,
+					"refer_point_x": 300.375000,
+					"refer_point_y":469.239563
+				},
+				{
+					"refer_point_index": 39,
+					"refer_point_x": 264.937500,
+					"refer_point_y":460.799988
+				},
+				{
+					"refer_point_index": 40,
+					"refer_point_x": 226.125000,
+					"refer_point_y":459.674713
+				},
+				{
+					"refer_point_index": 41,
+					"refer_point_x": 187.875015,
+					"refer_point_y":462.487915
+				},
+				{
+					"refer_point_index": 42,
+					"refer_point_x": 411.749969,
+					"refer_point_y":447.859344
+				},
+				{
+					"refer_point_index": 43,
+					"refer_point_x": 448.875031,
+					"refer_point_y":437.169220
+				},
+				{
+					"refer_point_index": 44,
+					"refer_point_x": 490.499969,
+					"refer_point_y":436.043945
+				},
+				{
+					"refer_point_index": 45,
+					"refer_point_x": 530.437500,
+					"refer_point_y":443.920868
+				},
+				{
+					"refer_point_index": 46,
+					"refer_point_x": 561.375000,
+					"refer_point_y":470.364838
+				},
+				{
+					"refer_point_index": 47,
+					"refer_point_x": 527.625000,
+					"refer_point_y":461.925293
+				},
+				{
+					"refer_point_index": 48,
+					"refer_point_x": 489.375000,
+					"refer_point_y":459.112091
+				},
+				{
+					"refer_point_index": 49,
+					"refer_point_x": 451.124969,
+					"refer_point_y":462.487915
+				},
+				{
+					"refer_point_index": 50,
+					"refer_point_x": 415.687500,
+					"refer_point_y":470.927460
+				}				
+			]
+		}
+	]
+}
