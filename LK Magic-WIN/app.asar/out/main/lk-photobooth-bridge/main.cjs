@@ -232,6 +232,7 @@ function install(electron, deps) {
     const reg = (type, fn) => koffi.register(fn, koffi.pointer(callbacks[type]));
     canvasHandles = {
       thumbnail: reg('thumbnail', (id, error, data) => {
+        trace('raw-thumb-cb', { id: Number(id), error: Number(error), len: typeof data === 'string' ? data.length : 0 });
         if (!pendingCanvas || Number(id) !== pendingCanvas.fileid) return;
         if (Number(error) !== 0 && Number(error) !== 810002) {
           return failPendingCanvas(new Error(`Canvas thumbnail lỗi ${error}`));
@@ -244,8 +245,11 @@ function install(electron, deps) {
       }),
       histogram: reg('histogram', () => {}),
       writeInfo: reg('writeInfo', () => {}),
-      switchParams: reg('switchParams', () => {}),
+      switchParams: reg('switchParams', (id, error) => {
+        trace('raw-switch-cb', { id: Number(id), error: Number(error) });
+      }),
       universal: reg('universal', (error) => {
+        trace('raw-univ-cb', { error: Number(error) });
         if (pendingCanvas && Number(error) !== 0) {
           failPendingCanvas(new Error(`Canvas universal lỗi ${error}`));
         }
@@ -255,6 +259,7 @@ function install(electron, deps) {
   }
 
   function onRetouchLoadingEvent(rawJson) {
+    trace('raw-loading-ev', { raw: String(rawJson).slice(0, 120) });
     try {
       const data = typeof rawJson === 'string' ? JSON.parse(rawJson) : rawJson;
       if (!pendingCanvas || Number(data.fileid) !== pendingCanvas.fileid) return;
@@ -635,6 +640,109 @@ function install(electron, deps) {
         return sendJson(res, 200, result);
       }
 
+      if (req.method === 'POST' && url.pathname === '/api/v1/bake-batch') {
+        const body = await readJsonBody(req);
+        const run = queue.then(async () => {
+          busy = true;
+          try {
+            const rawInputPath = path.resolve(String(body.input_path || ''));
+            const stagedHald = path.join(stageRoot, 'hald_stage_' + Date.now() + '.jpg');
+            fs.copyFileSync(rawInputPath, stagedHald);
+            const filters = Array.isArray(body.filters) ? body.filters : [];
+            const f = getFFI();
+            const h = ensureCanvasHandles();
+            const wsId = await ensureWorkspace();
+            const fileid = await importStagedJpeg(stagedHald, wsId);
+
+            const runStep = (stepName, invoke) =>
+              new Promise((resolve, reject) => {
+                trace('bake-step', { stepName, fileid });
+                const timeoutTimer = setTimeout(() => {
+                  failPendingCanvas(new Error(`TIMEOUT_${stepName}`));
+                }, 35000);
+                pendingCanvas = { stepName, fileid, image: null, done: false, resolve, reject, timeoutTimer, settleTimer: null };
+                try {
+                  const rc = invoke();
+                  if (rc !== 0) failPendingCanvas(new Error(`${stepName} rc=${rc}`));
+                } catch (err) {
+                  failPendingCanvas(err);
+                }
+              });
+
+            await runStep('switch_image', () =>
+              f.aipic_retouch_switch_image([1], fileid, 4, h.histogram, h.thumbnail, h.switchParams)
+            );
+
+            const results = [];
+            for (const item of filters) {
+              const filterId = Number(item.filter_id);
+              const outPng = path.resolve(String(item.output_path));
+              const val = Number(item.value ?? 1.0);
+              const payload = {
+                sex_retoucher_beauty_params: [],
+                sex_retoucher_color_params: {
+                  params: filterId > 0 ? [{ id: filterId, algorithm: { value: val } }] : [],
+                  partial_params: [],
+                },
+              };
+              const raw = await runStep(`bake_${filterId}`, () =>
+                f.aipic_retouch_image(
+                  fileid,
+                  JSON.stringify({ fileid, param: JSON.stringify(payload), retouch_param_type: 2 }),
+                  1,
+                  false,
+                  false,
+                  true,
+                  false,
+                  h.thumbnail,
+                  h.histogram,
+                  h.writeInfo,
+                  h.universal,
+                  0
+                )
+              );
+              let value = String(raw || '').trim();
+              if (value.startsWith('{')) {
+                const parsed = JSON.parse(value);
+                value = parsed.thumbnail || parsed.path || parsed.image || '';
+              }
+              let localPath = null;
+              if (value.startsWith('ai-static://file.disk.net/')) {
+                localPath = decodeURIComponent(new URL(value).pathname.slice(1));
+              } else if (value.startsWith('ai-image://') && typeof getCachePathByFileName === 'function') {
+                localPath = getCachePathByFileName(new URL(value).hostname);
+              } else if (value.startsWith('file:')) {
+                localPath = fileURLToPath(value);
+              } else if (path.isAbsolute(value)) {
+                localPath = value;
+              }
+              let img;
+              if (localPath && fs.existsSync(localPath)) {
+                img = electron.nativeImage.createFromPath(localPath);
+              } else if (/^data:image\/(?:png|jpeg|jpg);base64,/i.test(value)) {
+                img = electron.nativeImage.createFromDataURL(value);
+              } else if (/^(?:\/9j\/|iVBOR)/.test(value)) {
+                img = electron.nativeImage.createFromBuffer(Buffer.from(value, 'base64'));
+              }
+              if (!img || img.isEmpty()) throw new Error(`Decode failed for ${filterId} (raw=${String(value).slice(0, 80)})`);
+              fs.mkdirSync(path.dirname(outPng), { recursive: true });
+              fs.writeFileSync(outPng, img.toPNG());
+              results.push({ filter_id: filterId, size: img.getSize(), output_path: outPng });
+            }
+            try { fs.unlinkSync(stagedHald); } catch (_) {}
+            return { ok: true, count: results.length, results };
+          } catch (err) {
+            lastError = err.message || String(err);
+            throw err;
+          } finally {
+            busy = false;
+          }
+        });
+        queue = run.catch(() => {});
+        const result = await run;
+        return sendJson(res, 200, result);
+      }
+
       if (req.method === 'POST' && url.pathname === '/api/v1/shutdown') {
         sendJson(res, 200, { ok: true, shutting_down: true });
         setTimeout(async () => {
@@ -664,30 +772,32 @@ function install(electron, deps) {
     console.log(`[LK Photobooth Bridge] Listening on http://127.0.0.1:${port}`);
   });
 
-  // Pre-warm AI models in background once globalInit is ready so the first customer photo is fast
-  const warmupSample = path.resolve(__dirname, '../../../../resources/render/color_ai_example/icon/chunbaishiyan/chunbaishiyan01.jpg');
-  const warmupInterval = setInterval(() => {
-    const f = useFFI();
-    if (!f || f.globalInit !== true) return;
-    clearInterval(warmupInterval);
-    if (totalProcessed === 0 && !busy && fs.existsSync(warmupSample)) {
-      const warmupOut = path.join(stageRoot, 'warmup_out.jpg');
-      enqueueRetouch({
-        input_path: warmupSample,
-        output_path: warmupOut,
-        preset: 'natural',
-        timeout_ms: 40000,
-      })
-        .then(() => {
-          trace('warmup-complete');
-          try { fs.unlinkSync(warmupOut); } catch (_) {}
+  // Pre-warm AI models in background only when explicitly requested
+  if (process.env.LK_PHOTOBOOTH_WARMUP === '1') {
+    const warmupSample = path.resolve(__dirname, '../../../../resources/render/color_ai_example/icon/chunbaishiyan/chunbaishiyan01.jpg');
+    const warmupInterval = setInterval(() => {
+      const f = useFFI();
+      if (!f || f.globalInit !== true) return;
+      clearInterval(warmupInterval);
+      if (totalProcessed === 0 && !busy && fs.existsSync(warmupSample)) {
+        const warmupOut = path.join(stageRoot, 'warmup_out.jpg');
+        enqueueRetouch({
+          input_path: warmupSample,
+          output_path: warmupOut,
+          preset: 'natural',
+          timeout_ms: 40000,
         })
-        .catch((err) => {
-          trace('warmup-skip', { error: err.message });
-        });
-    }
-  }, 1500);
-  if (typeof warmupInterval.unref === 'function') warmupInterval.unref();
+          .then(() => {
+            trace('warmup-complete');
+            try { fs.unlinkSync(warmupOut); } catch (_) {}
+          })
+          .catch((err) => {
+            trace('warmup-skip', { error: err.message });
+          });
+      }
+    }, 1500);
+    if (typeof warmupInterval.unref === 'function') warmupInterval.unref();
+  }
 
   const api = {
     server,

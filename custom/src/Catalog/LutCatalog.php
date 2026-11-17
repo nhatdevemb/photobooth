@@ -35,7 +35,7 @@ final class LutCatalog
         foreach ($this->config->getPresetsMap() as $preset) {
             $preset['name'] = $names[$preset['id']] ?? $preset['name'];
             $preset['status'] = 'active';
-            $preset['intensity'] = 100;
+            $preset['intensity'] = (int) ($preset['intensity'] ?? 100);
             $preset['revision'] = 1;
             $preset['readonly'] = true;
             $preset['sample_url'] = '/custom/assets/samples/' . $preset['id'] . '.jpg';

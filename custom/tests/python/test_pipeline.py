@@ -180,9 +180,22 @@ def test_tc08_and_tc09_presets_distinct_and_deterministic(tmp_path: Path) -> Non
     presets_manifest = json.loads((PRESETS_DIR / "manifest.json").read_text(encoding="utf-8"))
     output_hashes = {}
     arrays_by_preset = {}
+    core_ids = {"original", "korean-soft", "film-400", "vintage-fade"}
 
     for preset in presets_manifest["presets"]:
         pid = preset["id"]
+        if preset.get("file"):
+            cube_file = PRESETS_DIR / preset["file"]
+            assert cube_file.is_file(), f"Missing .cube file for preset {pid}"
+            assert sha256_file(cube_file) == preset["sha256"], f"SHA-256 mismatch for preset {pid}"
+            lut = parse_cube_file(cube_file, expected_size=33)
+            assert lut.size == 33
+        sample_file = CUSTOM_DIR / "public" / "assets" / "samples" / f"{pid}.jpg"
+        assert sample_file.is_file(), f"Missing sample preview for preset {pid}"
+
+        if pid not in core_ids:
+            continue
+
         out_print = tmp_path / f"print-{pid}.jpg"
         out_prev = tmp_path / f"prev-{pid}.jpg"
         manifest = {
@@ -213,7 +226,7 @@ def test_tc08_and_tc09_presets_distinct_and_deterministic(tmp_path: Path) -> Non
         assert res2["sha256"] == res1["sha256"]
         assert res2["input_signature"] == res1["input_signature"]
 
-    # TC-08: All 4 presets produce distinct hashes and visibly distinct pixel arrays
+    # TC-08: All 4 core presets produce distinct hashes and visibly distinct pixel arrays
     assert len(set(output_hashes.values())) == 4
     pids = list(arrays_by_preset.keys())
     for i in range(len(pids)):

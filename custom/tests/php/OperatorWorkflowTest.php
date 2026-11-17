@@ -422,7 +422,9 @@ final class OperatorWorkflowTest extends TestCase
         self::assertSame(80, $draft['json']['intensity']);
         self::assertSame($draft['json'], $this->apiRequest('POST', '/custom/api/admin/luts/import', $upload, $this->adminCookie, $this->adminCsrf, $key, ['Content-Type'=>'multipart/form-data'])['json']);
         $path = '/custom/api/admin/luts/' . $draft['json']['id'] . '/1.0.0';
-        self::assertCount(4, $this->apiRequest('GET', '/custom/api/presets')['json']['presets']);
+        $basePresetCount = count($this->container->config->getPresetsMap());
+        self::assertGreaterThanOrEqual(4, $basePresetCount);
+        self::assertCount($basePresetCount, $this->apiRequest('GET', '/custom/api/presets')['json']['presets']);
         $preview = $this->apiRequest('GET', parse_url($draft['json']['sample_url'], PHP_URL_PATH), null, $this->adminCookie, $this->adminCsrf);
         self::assertSame(200, $preview['status']);
         self::assertFileExists($preview['file_path']);
@@ -432,7 +434,7 @@ final class OperatorWorkflowTest extends TestCase
         $active = $this->apiRequest('POST', $path . '/activate', ['revision'=>$edit['json']['revision'], 'preview_sha256'=>$edit['json']['preview_sha256']], $this->adminCookie, $this->adminCsrf);
         self::assertSame(200, $active['status'], $active['raw_body']);
         self::assertSame('active', $active['json']['status']);
-        self::assertCount(5, $this->apiRequest('GET', '/custom/api/presets')['json']['presets']);
+        self::assertCount($basePresetCount + 1, $this->apiRequest('GET', '/custom/api/presets')['json']['presets']);
     }
 
     public function testImportedLutVersionIsPinnedAcrossActivationRetakeAndRestore(): void
