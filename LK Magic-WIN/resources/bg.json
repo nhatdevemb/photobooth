@@ -1,0 +1,242 @@
+{
+    "param": [
+        {
+            "name": "透明",
+            "traditional_name": "透明",
+            "icon": "https://staticsns.cdn.bcebos.com/amis/2025-8/1755241637703/transparent_183.png",
+            "scene": "/makeupFilter/bgFusion/qipange/qipange.png",
+            "ename": "touming"
+        },
+        {
+            "name": "登记红",
+            "traditional_name": "登記紅",
+            "icon": "https://staticsns.cdn.bcebos.com/amis/2024-5/1715861828353/dengjihong.png",
+            "scene": "makeupFilter/bgFusion/dengjihong/dengjihong.png",
+            "ename": "dengjihong"
+        },
+        {
+            "name": "司法蓝",
+            "traditional_name": "司法藍",
+            "icon": "https://staticsns.cdn.bcebos.com/amis/2024-5/1715861056800/sifalan.png",
+            "scene": "makeupFilter/bgFusion/sifalan/sifalan.png",
+            "ename": "sifalan"
+        },
+        {
+            "name": "白色",
+            "traditional_name": "白色",
+            "icon": "https://staticsns.cdn.bcebos.com/amis/2024-5/1715861083633/baise.png",
+            "scene": "makeupFilter/bgFusion/baise/baise.png",
+            "ename": "baise"
+        },
+        {
+            "name": "正红",
+            "traditional_name": "正紅",
+            "icon": "https://staticsns.cdn.bcebos.com/amis/2024-5/1715861101130/zhenghong.png",
+            "scene": "makeupFilter/bgFusion/zhenghong/zhenghong.png",
+            "ename": "zhenghong"
+        },
+        {
+            "name": "经典蓝",
+            "traditional_name": "經典藍",
+            "icon": "https://staticsns.cdn.bcebos.com/amis/2024-5/1715861120944/jingdianlan.png",
+            "scene": "makeupFilter/bgFusion/jingdianlan/jingdianlan.png",
+            "ename": "jingdianlan"
+        },
+        {
+            "name": "石榴红",
+            "traditional_name": "石榴紅",
+            "icon": "https://staticsns.cdn.bcebos.com/amis/2024-5/1715861207566/shiliuhong.png",
+            "scene": "makeupFilter/bgFusion/shiliuhong/shiliuhong.png",
+            "ename": "shiliuhong"
+        },
+        {
+            "name": "经典红",
+            "traditional_name": "經典紅",
+            "icon": "https://staticsns.cdn.bcebos.com/amis/2024-5/1715861139025/jingdianhong.png",
+            "scene": "makeupFilter/bgFusion/jingdianhong/jingdianhong.png",
+            "ename": "jingdianhong"
+        },
+        {
+            "name": "豆沙红",
+            "traditional_name": "豆沙紅",
+            "icon": "https://staticsns.cdn.bcebos.com/amis/2024-5/1715861192087/doushahong.png",
+            "scene": "makeupFilter/bgFusion/doushahong/doushahong.png",
+            "ename": "doushahong"
+        },
+        {
+            "name": "渐变蓝",
+            "traditional_name": "漸變藍",
+            "icon": "https://staticsns.cdn.bcebos.com/amis/2024-5/1715861159221/jianbianlan.png",
+            "scene": "makeupFilter/bgFusion/jianbianlan/jianbianlan.jpg",
+            "ename": "jianbianlan"
+        },
+        {
+            "name": "浅蓝色",
+            "traditional_name": "淺藍色",
+            "icon": "https://staticsns.cdn.bcebos.com/amis/2024-5/1715861176071/qianlanse.png",
+            "scene": "makeupFilter/bgFusion/qianlanse/qianlanse.png",
+            "ename": "qianlanse"
+        },
+        {
+            "name": "毕业蓝",
+            "traditional_name": "畢業藍",
+            "icon": "https://staticsns.cdn.bcebos.com/amis/2024-5/1715861222682/biyelan.png",
+            "scene": "makeupFilter/bgFusion/biyelan/biyelan.png",
+            "ename": "biyelan"
+        },
+        {
+            "name": "深蓝",
+            "traditional_name": "深藍",
+            "icon": "https://staticsns.cdn.bcebos.com/amis/2024-5/1715861244800/shenlan.png",
+            "scene": "makeupFilter/bgFusion/shenlan/shenlan.png",
+            "ename": "shenlan"
+        },
+        {
+            "name": "蓝白渐变",
+            "traditional_name": "藍白漸變",
+            "icon": "https://staticsns.cdn.bcebos.com/amis/2024-5/1715861273147/lanbaijianbian.png",
+            "scene": "makeupFilter/bgFusion/lanbaijianbian/lansejianbian.png",
+            "ename": "lanbaijianbian"
+        },
+        {
+            "name": "海马蓝",
+            "traditional_name": "海馬藍",
+            "icon": "https://staticsns.cdn.bcebos.com/amis/2024-5/1716439334100/%E6%B5%B7%E9%A9%AC%E8%93%9D.PNG",
+            "scene": "makeupFilter/bgFusion/haimalan/haimalan.png",
+            "ename": "haimalan"
+        },
+        {
+            "name": "钴蓝",
+            "traditional_name": "鈷藍",
+            "icon": "https://staticsns.cdn.bcebos.com/amis/2024-5/1716439226073/%E9%92%B4%E8%93%9D.PNG",
+            "scene": "makeupFilter/bgFusion/gulan/gulan.png",
+            "ename": "gulan"
+        },
+        {
+            "name": "钻石蓝",
+            "traditional_name": "鑽石藍",
+            "icon": "https://staticsns.cdn.bcebos.com/amis/2024-5/1716444901962/%E9%92%BB%E7%9F%B3%E8%93%9D.PNG",
+            "scene": "makeupFilter/bgFusion/zuanshilan/zuanshilan.png",
+            "ename": "zuanshilan"
+        },
+        {
+            "name": "高级灰",
+            "traditional_name": "高級灰",
+            "icon": "https://staticsns.cdn.bcebos.com/amis/2024-5/1715861291086/gaojihui.png",
+            "scene": "makeupFilter/bgFusion/gaojihui/gaojihui.png",
+            "ename": "gaojihui"
+        },
+        {
+            "name": "浅灰色",
+            "traditional_name": "淺灰色",
+            "icon": "https://staticsns.cdn.bcebos.com/amis/2024-5/1715861443702/qianhuise.png",
+            "scene": "makeupFilter/bgFusion/qianhuise/qianhuise.png",
+            "ename": "qianhuise"
+        },
+        {
+            "name": "简灰",
+            "traditional_name": "簡灰",
+            "icon": "https://staticsns.cdn.bcebos.com/amis/2024-5/1715861305761/jianhui.png",
+            "scene": "makeupFilter/bgFusion/jianhui/jianhui.png",
+            "ename": "jianhui"
+        },
+        {
+            "name": "果绿",
+            "traditional_name": "果綠",
+            "icon": "https://staticsns.cdn.bcebos.com/amis/2024-5/1715861336722/guolv.png",
+            "scene": "makeupFilter/bgFusion/guolv/guolv.png",
+            "ename": "guolv"
+        },
+        {
+            "name": "鹅黄色",
+            "traditional_name": "鵝黃色",
+            "icon": "https://staticsns.cdn.bcebos.com/amis/2024-5/1715861352085/ehuangse.png",
+            "scene": "makeupFilter/bgFusion/ehuangse/ehuangse.png",
+            "ename": "ehuangse"
+        },
+        {
+            "name": "粉蓝色",
+            "traditional_name": "粉藍色",
+            "icon": "https://staticsns.cdn.bcebos.com/amis/2024-5/1715861368235/fenlanse.jpg",
+            "scene": "makeupFilter/bgFusion/fenlanse/fenlanse.png",
+            "ename": "fenlanse"
+        },
+        {
+            "name": "粉色",
+            "traditional_name": "粉色",
+            "icon": "https://staticsns.cdn.bcebos.com/amis/2024-5/1715861397256/fense.png",
+            "scene": "makeupFilter/bgFusion/fense/fense.png",
+            "ename": "fense"
+        },
+        {
+            "name": "橄榄绿",
+            "traditional_name": "橄欖綠",
+            "icon": "https://staticsns.cdn.bcebos.com/amis/2024-5/1715861412211/ganlanlv.png",
+            "scene": "makeupFilter/bgFusion/ganlanlv/ganlanlv.png",
+            "ename": "ganlanlv"
+        },
+        {
+            "name": "蜜瓜橙",
+            "traditional_name": "蜜瓜橙",
+            "icon": "https://staticsns.cdn.bcebos.com/amis/2024-5/1715861427816/miguacheng.png",
+            "scene": "makeupFilter/bgFusion/miguacheng/miguacheng.png",
+            "ename": "miguacheng"
+        },
+        {
+            "name": "奶茶",
+            "traditional_name": "奶茶",
+            "icon": "https://staticsns.cdn.bcebos.com/amis/2024-5/1715861323372/naicha.png",
+            "scene": "makeupFilter/bgFusion/naicha/naicha.png",
+            "ename": "naicha"
+        },
+        {
+            "name": "桃粉色",
+            "traditional_name": "桃粉色",
+            "icon": "https://staticsns.cdn.bcebos.com/amis/2024-5/1715861519396/taofense.png",
+            "scene": "makeupFilter/bgFusion/taofense/taofense.png",
+            "ename": "yingtaofen"
+        },
+        {
+            "name": "浅紫色",
+            "traditional_name": "淺紫色",
+            "icon": "https://staticsns.cdn.bcebos.com/amis/2024-5/1715861458191/qianzise.png",
+            "scene": "makeupFilter/bgFusion/qianzise/qianzise.jpg",
+            "ename": "qianzise"
+        },
+        {
+            "name": "深灰色",
+            "traditional_name": "深灰色",
+            "icon": "https://staticsns.cdn.bcebos.com/amis/2024-5/1715861471626/shenhuise.png",
+            "scene": "makeupFilter/bgFusion/shenhuise/shenhuise.png",
+            "ename": "shenhuise"
+        },
+        {
+            "name": "水蓝色",
+            "traditional_name": "水藍色",
+            "icon": "https://staticsns.cdn.bcebos.com/amis/2024-5/1715861487094/shuilanse.png",
+            "scene": "makeupFilter/bgFusion/shuilanse/shuilanse.png",
+            "ename": "shuilanse"
+        },
+        {
+            "name": "松绿色",
+            "traditional_name": "松綠色",
+            "icon": "https://staticsns.cdn.bcebos.com/amis/2024-5/1715861502865/songlvse.png",
+            "scene": "makeupFilter/bgFusion/songlvse/songlvse.png",
+            "ename": "songlvse"
+        },
+        {
+            "name": "午夜黑",
+            "traditional_name": "午夜黑",
+            "icon": "https://staticsns.cdn.bcebos.com/amis/2024-5/1715861534856/wuyehei.png",
+            "scene": "makeupFilter/bgFusion/wuyehei/wuyehei.png",
+            "ename": "naicha"
+        },
+        {
+            "name": "香槟色",
+            "traditional_name": "香檳色",
+            "icon": "https://staticsns.cdn.bcebos.com/amis/2024-5/1715861550343/xiangbinse.png",
+            "scene": "makeupFilter/bgFusion/xiangbinse/xiangbinse.png",
+            "ename": "xiangbinse"
+        }
+    ]
+}

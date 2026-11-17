@@ -1,0 +1,3544 @@
+[
+	{
+		"name": "色彩",
+		"type": "classify",
+		"classifyid": 1,
+		"ename": "adjust",
+		"svg_active": "adjust_active",
+		"sub": [
+			{
+				"name": "滤镜",
+				"type": "classify",
+				"classifyid": 5,
+				"moduleType": "group",
+				"sub": [
+					{
+						"name": "滤镜",
+						"type": "classify",
+						"classifyid": 51,
+						"moduleType": "rowGroup",
+						"rowNum": 7,
+						"sub": [
+							{
+								"name": "无",
+								"type": "algorithm",
+								"algorithmid": -1,
+								"ename": "filter_none",
+								"icon": "https://staticsns.cdn.bcebos.com/amis/2024-4/1714013312420/none.png",
+								"param": [
+									{
+										"type": "slider",
+										"min": 0,
+										"max": 100,
+										"default": 80,
+										"ename": "value",
+										"step": 1,
+										"scope": 0.01
+									}
+								],
+								"operator_type": 0,
+								"effective_time": 0,
+								"retouch_type": "color"
+							},
+							{
+								"name": "氧气",
+								"type": "algorithm",
+								"algorithmid": 110019,
+								"ename": "Oxygen",
+								"icon": "https://staticsns.cdn.bcebos.com/amis/2024-9/1727276276332/%E6%B0%A7%E6%B0%94.png",
+								"param": [
+									{
+										"type": "slider",
+										"min": 0,
+										"max": 100,
+										"default": 80,
+										"ename": "value",
+										"step": 1,
+										"scope": 0.01
+									}
+								],
+								"operator_type": 0,
+								"effective_time": 0,
+								"retouch_type": "color"
+							},
+							{
+								"name": "青空",
+								"type": "algorithm",
+								"algorithmid": 110020,
+								"ename": "CuteHue",
+								"icon": "https://staticsns.cdn.bcebos.com/amis/2024-9/1727259096396/%E9%9D%92%E7%A9%BA.jpg",
+								"param": [
+									{
+										"type": "slider",
+										"min": 0,
+										"max": 100,
+										"default": 80,
+										"ename": "value",
+										"step": 1,
+										"scope": 0.01
+									}
+								],
+								"operator_type": 0,
+								"effective_time": 0,
+								"retouch_type": "color"
+							},
+							{
+								"name": "柔美",
+								"type": "algorithm",
+								"algorithmid": 110021,
+								"ename": "Soft",
+								"icon": "https://staticsns.cdn.bcebos.com/amis/2024-9/1727276275867/%E6%9F%94%E7%BE%8E.png",
+								"param": [
+									{
+										"type": "slider",
+										"min": 0,
+										"max": 100,
+										"default": 80,
+										"ename": "value",
+										"step": 1,
+										"scope": 0.01
+									}
+								],
+								"operator_type": 0,
+								"effective_time": 0,
+								"retouch_type": "color"
+							},
+							{
+								"name": "轻奢",
+								"type": "algorithm",
+								"algorithmid": 110022,
+								"ename": "Elite",
+								"icon": "https://staticsns.cdn.bcebos.com/amis/2024-9/1727276275718/%E8%BD%bb%E5%A5%A2.png",
+								"param": [
+									{
+										"type": "slider",
+										"min": 0,
+										"max": 100,
+										"default": 80,
+										"ename": "value",
+										"step": 1,
+										"scope": 0.01
+									}
+								],
+								"operator_type": 0,
+								"effective_time": 0,
+								"retouch_type": "color"
+							},
+							{
+								"name": "园林",
+								"type": "algorithm",
+								"algorithmid": 110023,
+								"ename": "Bamboo",
+								"icon": "https://staticsns.cdn.bcebos.com/amis/2024-9/1727276276568/%E5%9B%AD%E6%9E%97.png",
+								"param": [
+									{
+										"type": "slider",
+										"min": 0,
+										"max": 100,
+										"default": 80,
+										"ename": "value",
+										"step": 1,
+										"scope": 0.01
+									}
+								],
+								"operator_type": 0,
+								"effective_time": 0,
+								"retouch_type": "color"
+							},
+							{
+								"name": "韩系",
+								"type": "algorithm",
+								"algorithmid": 110024,
+								"ename": "Porcelain",
+								"icon": "https://staticsns.cdn.bcebos.com/amis/2024-9/1727254931871/%E9%9F%A9%E7%B3%BB.jpg",
+								"param": [
+									{
+										"type": "slider",
+										"min": 0,
+										"max": 100,
+										"default": 80,
+										"ename": "value",
+										"step": 1,
+										"scope": 0.01
+									}
+								],
+								"operator_type": 0,
+								"effective_time": 0,
+								"retouch_type": "color"
+							},
+							{
+								"name": "古典",
+								"type": "algorithm",
+								"algorithmid": 110025,
+								"ename": "Antique",
+								"icon": "https://staticsns.cdn.bcebos.com/amis/2024-9/1727276274373/%E5%8F%A4%E5%85%B8.png",
+								"param": [
+									{
+										"type": "slider",
+										"min": 0,
+										"max": 100,
+										"default": 80,
+										"ename": "value",
+										"step": 1,
+										"scope": 0.01
+									}
+								],
+								"operator_type": 0,
+								"effective_time": 0,
+								"retouch_type": "color"
+							},
+							{
+								"name": "胶片",
+								"type": "algorithm",
+								"algorithmid": 110026,
+								"ename": "Filmic",
+								"icon": "https://staticsns.cdn.bcebos.com/amis/2024-9/1727276274849/%E8%83%B6%E7%89%87.png",
+								"param": [
+									{
+										"type": "slider",
+										"min": 0,
+										"max": 100,
+										"default": 80,
+										"ename": "value",
+										"step": 1,
+										"scope": 0.01
+									}
+								],
+								"operator_type": 0,
+								"effective_time": 0,
+								"retouch_type": "color"
+							},
+							{
+								"name": "森系",
+								"type": "algorithm",
+								"algorithmid": 110027,
+								"ename": "Sylvan",
+								"icon": "https://staticsns.cdn.bcebos.com/amis/2024-9/1727276276114/%E6%A3%AE%E7%B3%BB.png",
+								"param": [
+									{
+										"type": "slider",
+										"min": 0,
+										"max": 100,
+										"default": 80,
+										"ename": "value",
+										"step": 1,
+										"scope": 0.01
+									}
+								],
+								"operator_type": 0,
+								"effective_time": 0,
+								"retouch_type": "color"
+							},
+							{
+								"name": "梦幻",
+								"type": "algorithm",
+								"algorithmid": 110028,
+								"ename": "Fairy",
+								"icon": "https://staticsns.cdn.bcebos.com/amis/2024-9/1727276275179/%E6%A2%A6%E5%B9%BB.png",
+								"param": [
+									{
+										"type": "slider",
+										"min": 0,
+										"max": 100,
+										"default": 80,
+										"ename": "value",
+										"step": 1,
+										"scope": 0.01
+									}
+								],
+								"operator_type": 0,
+								"effective_time": 0,
+								"retouch_type": "color"
+							},
+							{
+								"name": "影视",
+								"type": "algorithm",
+								"algorithmid": 110029,
+								"ename": "Cinematic",
+								"icon": "https://staticsns.cdn.bcebos.com/amis/2024-9/1727254933087/%E5%BD%B1%E8%A7%86.jpg",
+								"param": [
+									{
+										"type": "slider",
+										"min": 0,
+										"max": 100,
+										"default": 80,
+										"ename": "value",
+										"step": 1,
+										"scope": 0.01
+									}
+								],
+								"operator_type": 0,
+								"effective_time": 0,
+								"retouch_type": "color"
+							},
+							{
+								"name": "怀旧",
+								"type": "algorithm",
+								"algorithmid": 110030,
+								"ename": "Retro",
+								"icon": "https://staticsns.cdn.bcebos.com/amis/2024-9/1727276274741/%E6%80%80%E6%97%A7.png",
+								"param": [
+									{
+										"type": "slider",
+										"min": 0,
+										"max": 100,
+										"default": 80,
+										"ename": "value",
+										"step": 1,
+										"scope": 0.01
+									}
+								],
+								"operator_type": 0,
+								"effective_time": 0,
+								"retouch_type": "color"
+							},
+							{
+								"name": "中式",
+								"type": "algorithm",
+								"algorithmid": 110031,
+								"ename": "Zenith",
+								"icon": "https://staticsns.cdn.bcebos.com/amis/2024-9/1727276521820/%E4%B8%AD%E5%BC%8F.png",
+								"param": [
+									{
+										"type": "slider",
+										"min": 0,
+										"max": 100,
+										"default": 80,
+										"ename": "value",
+										"step": 1,
+										"scope": 0.01
+									}
+								],
+								"operator_type": 0,
+								"effective_time": 0,
+								"retouch_type": "color"
+							},
+							{
+								"name": "杂志",
+								"type": "algorithm",
+								"algorithmid": 110032,
+								"ename": "Sunburn",
+								"icon": "https://staticsns.cdn.bcebos.com/amis/2024-9/1727254933943/%E6%9D%82%E5%BF%97.jpg",
+								"param": [
+									{
+										"type": "slider",
+										"min": 0,
+										"max": 100,
+										"default": 80,
+										"ename": "value",
+										"step": 1,
+										"scope": 0.01
+									}
+								],
+								"operator_type": 0,
+								"effective_time": 0,
+								"retouch_type": "color"
+							},
+							{
+								"name": "硬调",
+								"type": "algorithm",
+								"algorithmid": 110033,
+								"ename": "Brown",
+								"icon": "https://staticsns.cdn.bcebos.com/amis/2024-9/1727254933328/%E7%A1%AC%E8%B0%83.jpg",
+								"param": [
+									{
+										"type": "slider",
+										"min": 0,
+										"max": 100,
+										"default": 80,
+										"ename": "value",
+										"step": 1,
+										"scope": 0.01
+									}
+								],
+								"operator_type": 0,
+								"effective_time": 0,
+								"retouch_type": "color"
+							},
+							{
+								"name": "清透",
+								"type": "algorithm",
+								"algorithmid": 110034,
+								"ename": "Pure",
+								"icon": "https://staticsns.cdn.bcebos.com/amis/2024-9/1727254932826/%E6%B8%85%E9%80%8F.jpg",
+								"param": [
+									{
+										"type": "slider",
+										"min": 0,
+										"max": 100,
+										"default": 80,
+										"ename": "value",
+										"step": 1,
+										"scope": 0.01
+									}
+								],
+								"operator_type": 0,
+								"effective_time": 0,
+								"retouch_type": "color"
+							},
+							{
+								"name": "清亮",
+								"type": "algorithm",
+								"algorithmid": 110035,
+								"ename": "Bright",
+								"icon": "https://staticsns.cdn.bcebos.com/amis/2024-9/1727254932521/%E6%B8%85%E4%BA%AE.jpg",
+								"param": [
+									{
+										"type": "slider",
+										"min": 0,
+										"max": 100,
+										"default": 80,
+										"ename": "value",
+										"step": 1,
+										"scope": 0.01
+									}
+								],
+								"operator_type": 0,
+								"effective_time": 0,
+								"retouch_type": "color"
+							},
+							{
+								"name": "硬朗",
+								"type": "algorithm",
+								"algorithmid": 110036,
+								"ename": "HighKey",
+								"icon": "https://staticsns.cdn.bcebos.com/amis/2024-9/1727254933726/%E7%A1%AC%E6%9C%97.jpg",
+								"param": [
+									{
+										"type": "slider",
+										"min": 0,
+										"max": 100,
+										"default": 80,
+										"ename": "value",
+										"step": 1,
+										"scope": 0.01
+									}
+								],
+								"operator_type": 0,
+								"effective_time": 0,
+								"retouch_type": "color"
+							},
+							{
+								"name": "做旧",
+								"type": "algorithm",
+								"algorithmid": 110037,
+								"ename": "Vintage",
+								"icon": "https://staticsns.cdn.bcebos.com/amis/2024-9/1727255323140/%E5%81%9A%E6%97%A7.jpg",
+								"param": [
+									{
+										"type": "slider",
+										"min": 0,
+										"max": 100,
+										"default": 80,
+										"ename": "value",
+										"step": 1,
+										"scope": 0.01
+									}
+								],
+								"operator_type": 0,
+								"effective_time": 0,
+								"retouch_type": "color"
+							},
+							{
+								"name": "灰调",
+								"type": "algorithm",
+								"algorithmid": 110038,
+								"ename": "Ashen",
+								"icon": "https://staticsns.cdn.bcebos.com/amis/2024-9/1727254932091/%E7%81%B0%E8%B0%83.jpg",
+								"param": [
+									{
+										"type": "slider",
+										"min": 0,
+										"max": 100,
+										"default": 80,
+										"ename": "value",
+										"step": 1,
+										"scope": 0.01
+									}
+								],
+								"operator_type": 0,
+								"effective_time": 0,
+								"retouch_type": "color"
+							},
+							{
+								"name": "硬调2",
+								"type": "algorithm",
+								"algorithmid": 110039,
+								"ename": "HighKey2",
+								"icon": "https://staticsns.cdn.bcebos.com/amis/2024-9/1727254933485/%E7%A1%AC%E8%B0%832.jpg",
+								"param": [
+									{
+										"type": "slider",
+										"min": 0,
+										"max": 100,
+										"default": 80,
+										"ename": "value",
+										"step": 1,
+										"scope": 0.01
+									}
+								],
+								"operator_type": 0,
+								"effective_time": 0,
+								"retouch_type": "color"
+							},
+							{
+								"name": "摩登",
+								"type": "algorithm",
+								"algorithmid": 110040,
+								"ename": "Modern",
+								"icon": "https://staticsns.cdn.bcebos.com/amis/2024-9/1727254932294/%E6%91%A9%E7%99%BB.jpg",
+								"param": [
+									{
+										"type": "slider",
+										"min": 0,
+										"max": 100,
+										"default": 80,
+										"ename": "value",
+										"step": 1,
+										"scope": 0.01
+									}
+								],
+								"operator_type": 0,
+								"effective_time": 0,
+								"retouch_type": "color"
+							},
+							{
+								"name": "回忆",
+								"type": "algorithm",
+								"algorithmid": 110001,
+								"ename": "memory",
+								"icon": "https://staticsns.cdn.bcebos.com/amis/2023-12/1701404566484/memory.png",
+								"param": [
+									{
+										"type": "slider",
+										"min": 0,
+										"max": 100,
+										"default": 80,
+										"ename": "value",
+										"step": 1,
+										"scope": 0.01
+									}
+								],
+								"operator_type": 0,
+								"effective_time": 0,
+								"retouch_type": "color"
+							},
+							{
+								"name": "红唇",
+								"type": "algorithm",
+								"algorithmid": 110006,
+								"ename": "redlips",
+								"icon": "https://staticsns.cdn.bcebos.com/amis/2023-12/1701404567338/redlips.png",
+								"param": [
+									{
+										"type": "slider",
+										"min": 0,
+										"max": 100,
+										"default": 80,
+										"ename": "value",
+										"step": 1,
+										"scope": 0.01
+									}
+								],
+								"operator_type": 0,
+								"effective_time": 0,
+								"retouch_type": "color"
+							},
+							{
+								"name": "海礁",
+								"type": "algorithm",
+								"algorithmid": 110013,
+								"ename": "sea_reef",
+								"icon": "https://staticsns.cdn.bcebos.com/amis/2023-12/1701404567646/sea_reef.png",
+								"param": [
+									{
+										"type": "slider",
+										"min": 0,
+										"max": 100,
+										"default": 80,
+										"ename": "value",
+										"step": 1,
+										"scope": 0.01
+									}
+								],
+								"operator_type": 0,
+								"effective_time": 0,
+								"retouch_type": "color"
+							},
+							{
+								"name": "暗凋",
+								"type": "algorithm",
+								"algorithmid": 110007,
+								"ename": "darktones",
+								"icon": "https://staticsns.cdn.bcebos.com/amis/2023-12/1701404565531/darktones.png",
+								"param": [
+									{
+										"type": "slider",
+										"min": 0,
+										"max": 100,
+										"default": 80,
+										"ename": "value",
+										"step": 1,
+										"scope": 0.01
+									}
+								],
+								"operator_type": 0,
+								"effective_time": 0,
+								"retouch_type": "color"
+							},
+							{
+								"name": "微光",
+								"type": "algorithm",
+								"algorithmid": 110005,
+								"ename": "shimmering",
+								"icon": "https://staticsns.cdn.bcebos.com/amis/2023-12/1701404567878/shimmering.png",
+								"param": [
+									{
+										"type": "slider",
+										"min": 0,
+										"max": 100,
+										"default": 80,
+										"ename": "value",
+										"step": 1,
+										"scope": 0.01
+									}
+								],
+								"operator_type": 0,
+								"effective_time": 0,
+								"retouch_type": "color"
+							},
+							{
+								"name": "爱橘",
+								"type": "algorithm",
+								"algorithmid": 110015,
+								"ename": "orange_soda",
+								"icon": "https://staticsns.cdn.bcebos.com/amis/2023-12/1701404567139/orange_soda.png",
+								"param": [
+									{
+										"type": "slider",
+										"min": 0,
+										"max": 100,
+										"default": 80,
+										"ename": "value",
+										"step": 1,
+										"scope": 0.01
+									}
+								],
+								"operator_type": 0,
+								"effective_time": 0,
+								"retouch_type": "color"
+							},
+							{
+								"name": "超白",
+								"type": "algorithm",
+								"algorithmid": 110012,
+								"ename": "super_white",
+								"icon": "https://staticsns.cdn.bcebos.com/amis/2023-12/1701404568610/super_white.png",
+								"param": [
+									{
+										"type": "slider",
+										"min": 0,
+										"max": 100,
+										"default": 80,
+										"ename": "value",
+										"step": 1,
+										"scope": 0.01
+									}
+								],
+								"operator_type": 0,
+								"effective_time": 0,
+								"retouch_type": "color"
+							},
+							{
+								"name": "自然",
+								"type": "algorithm",
+								"algorithmid": 110008,
+								"ename": "nature",
+								"icon": "https://staticsns.cdn.bcebos.com/amis/2023-12/1701404566793/nature.png",
+								"param": [
+									{
+										"type": "slider",
+										"min": 0,
+										"max": 100,
+										"default": 80,
+										"ename": "value",
+										"step": 1,
+										"scope": 0.01
+									}
+								],
+								"operator_type": 0,
+								"effective_time": 0,
+								"retouch_type": "color"
+							},
+							{
+								"name": "白皙",
+								"type": "algorithm",
+								"algorithmid": 110009,
+								"ename": "fairness",
+								"icon": "https://staticsns.cdn.bcebos.com/amis/2023-12/1701404566191/fairness.png",
+								"param": [
+									{
+										"type": "slider",
+										"min": 0,
+										"max": 100,
+										"default": 80,
+										"ename": "value",
+										"step": 1,
+										"scope": 0.01
+									}
+								],
+								"operator_type": 0,
+								"effective_time": 0,
+								"retouch_type": "color"
+							},
+							{
+								"name": "白茶",
+								"type": "algorithm",
+								"algorithmid": 110010,
+								"ename": "white_tea",
+								"icon": "https://staticsns.cdn.bcebos.com/amis/2023-12/1701404568979/white_tea.png",
+								"param": [
+									{
+										"type": "slider",
+										"min": 0,
+										"max": 100,
+										"default": 80,
+										"ename": "value",
+										"step": 1,
+										"scope": 0.01
+									}
+								],
+								"operator_type": 0,
+								"effective_time": 0,
+								"retouch_type": "color"
+							},
+							{
+								"name": "草莓",
+								"type": "algorithm",
+								"algorithmid": 110011,
+								"ename": "strawberry",
+								"icon": "https://staticsns.cdn.bcebos.com/amis/2023-12/1701408948861/strawberry.png",
+								"param": [
+									{
+										"type": "slider",
+										"min": 0,
+										"max": 100,
+										"default": 80,
+										"ename": "value",
+										"step": 1,
+										"scope": 0.01
+									}
+								],
+								"operator_type": 0,
+								"effective_time": 0,
+								"retouch_type": "color"
+							},
+							{
+								"name": "都市",
+								"type": "algorithm",
+								"algorithmid": 110004,
+								"ename": "city",
+								"icon": "https://staticsns.cdn.bcebos.com/amis/2023-12/1701408947337/city.png",
+								"param": [
+									{
+										"type": "slider",
+										"min": 0,
+										"max": 100,
+										"default": 80,
+										"ename": "value",
+										"step": 1,
+										"scope": 0.01
+									}
+								],
+								"operator_type": 0,
+								"effective_time": 0,
+								"retouch_type": "color"
+							},
+							{
+								"name": "红润",
+								"type": "algorithm",
+								"algorithmid": 110003,
+								"ename": "ruddy",
+								"icon": "https://staticsns.cdn.bcebos.com/amis/2023-12/1701408948522/ruddy.png",
+								"param": [
+									{
+										"type": "slider",
+										"min": 0,
+										"max": 100,
+										"default": 80,
+										"ename": "value",
+										"step": 1,
+										"scope": 0.01
+									}
+								],
+								"operator_type": 0,
+								"effective_time": 0,
+								"retouch_type": "color"
+							},
+							{
+								"name": "胡桃",
+								"type": "algorithm",
+								"algorithmid": 110014,
+								"ename": "walnut",
+								"icon": "https://staticsns.cdn.bcebos.com/amis/2023-12/1701408949243/walnut.png",
+								"param": [
+									{
+										"type": "slider",
+										"min": 0,
+										"max": 100,
+										"default": 80,
+										"ename": "value",
+										"step": 1,
+										"scope": 0.01
+									}
+								],
+								"operator_type": 0,
+								"effective_time": 0,
+								"retouch_type": "color"
+							},
+							{
+								"name": "日光",
+								"type": "algorithm",
+								"algorithmid": 110016,
+								"ename": "daylight",
+								"icon": "https://staticsns.cdn.bcebos.com/amis/2023-12/1701408947684/daylight.png",
+								"param": [
+									{
+										"type": "slider",
+										"min": 0,
+										"max": 100,
+										"default": 80,
+										"ename": "value",
+										"step": 1,
+										"scope": 0.01
+									}
+								],
+								"operator_type": 0,
+								"effective_time": 0,
+								"retouch_type": "color"
+							},
+							{
+								"name": "蔚蓝",
+								"type": "algorithm",
+								"algorithmid": 110017,
+								"ename": "blue",
+								"icon": "https://staticsns.cdn.bcebos.com/amis/2023-12/1701408946753/blue.png",
+								"param": [
+									{
+										"type": "slider",
+										"min": 0,
+										"max": 100,
+										"default": 80,
+										"ename": "value",
+										"step": 1,
+										"scope": 0.01
+									}
+								],
+								"operator_type": 0,
+								"effective_time": 0,
+								"retouch_type": "color"
+							},
+							{
+								"name": "夜景",
+								"type": "algorithm",
+								"algorithmid": 110018,
+								"ename": "night_scene",
+								"icon": "https://staticsns.cdn.bcebos.com/amis/2023-12/1701408948292/night_scene.png",
+								"param": [
+									{
+										"type": "slider",
+										"min": 0,
+										"max": 100,
+										"default": 80,
+										"ename": "value",
+										"step": 1,
+										"scope": 0.01
+									}
+								],
+								"operator_type": 0,
+								"effective_time": 0,
+								"retouch_type": "color"
+							},
+							{
+								"name": "少女",
+								"type": "algorithm",
+								"algorithmid": 110002,
+								"ename": "maiden",
+								"icon": "https://staticsns.cdn.bcebos.com/amis/2023-12/1701408947909/maiden.png",
+								"param": [
+									{
+										"type": "slider",
+										"min": 0,
+										"max": 100,
+										"default": 80,
+										"ename": "value",
+										"step": 1,
+										"scope": 0.01
+									}
+								],
+								"operator_type": 0,
+								"effective_time": 0,
+								"retouch_type": "color"
+							}
+						]
+					}
+				]
+			},
+			{
+				"name": "白平衡",
+				"type": "classify",
+				"classifyid": 6,
+				"moduleType": "group",
+				"sub": [
+					{
+						"name": "色温",
+						"type": "algorithm",
+						"algorithmid": 130002,
+						"ename": "color_temperature",
+						"param": [
+							{
+								"type": "slider",
+								"min": -100,
+								"max": 100,
+								"default": 0,
+								"step": 1,
+								"scope": 1,
+								"ename": "value",
+								"sliderBg": "linear-gradient(270deg, #C5A70B 0%, #FFFFFF 49.04%, #002ABE 99.11%, #1333A2 99.11%)"
+							}
+						],
+						"operator_type": 2,
+						"effective_time": 2,
+						"retouch_type": "color"
+					},
+					{
+						"name": "色调",
+						"type": "algorithm",
+						"algorithmid": 130003,
+						"ename": "hue",
+						"param": [
+							{
+								"type": "slider",
+								"min": -100,
+								"max": 100,
+								"default": 0,
+								"step": 1,
+								"scope": 1,
+								"ename": "value",
+								"sliderBg": "linear-gradient(270deg, #A217B2 0%, #FFFFFF 46.34%, #26880E 98.52%)"
+							}
+						],
+						"operator_type": 2,
+						"effective_time": 2,
+						"retouch_type": "color"
+					}
+				]
+			},
+			{
+				"name": "基本调整",
+				"type": "classify",
+				"classifyid": 7,
+				"moduleType": "group",
+				"sub": [
+					{
+						"name": "曝光",
+						"type": "algorithm",
+						"algorithmid": 130005,
+						"ename": "exposure",
+						"param": [
+							{
+								"type": "slider",
+								"min": -5.0,
+								"max": 5.0,
+								"default": 0,
+								"step": 0.01,
+								"scope": 1,
+								"ename": "value",
+								"sliderBg": "linear-gradient(90deg, #717171 1.78%, #FFFFFF 100%)"
+							}
+						],
+						"operator_type": 2,
+						"effective_time": 0,
+						"retouch_type": "color"
+					},
+					{
+						"name": "对比度",
+						"type": "algorithm",
+						"algorithmid": 130010,
+						"ename": "contrast",
+						"param": [
+							{
+								"type": "slider",
+								"min": -50,
+								"max": 100,
+								"default": 0,
+								"step": 1,
+								"scope": 1,
+								"ename": "value",
+								"sliderBg": "linear-gradient(90deg, #717171 1.78%, #FFFFFF 100%)"
+							}
+						],
+						"operator_type": 2,
+						"effective_time": 0,
+						"retouch_type": "color"
+					},
+					{
+						"name": "亮度",
+						"type": "algorithm",
+						"algorithmid": 130011,
+						"ename": "brightness",
+						"param": [
+							{
+								"type": "slider",
+								"min": -150,
+								"max": 150,
+								"default": 0,
+								"step": 1,
+								"scope": 1,
+								"ename": "value",
+								"sliderBg": "linear-gradient(90deg, #717171 1.78%, #FFFFFF 100%)"
+							}
+						],
+						"operator_type": 2,
+						"effective_time": 0,
+						"retouch_type": "color"
+					},
+					{
+						"name": "自然饱和度",
+						"type": "algorithm",
+						"algorithmid": 130013,
+						"ename": "natural_saturation",
+						"param": [
+							{
+								"type": "slider",
+								"min": -100,
+								"max": 100,
+								"default": 0,
+								"step": 1,
+								"scope": 1,
+								"ename": "value",
+								"sliderBg": "linear-gradient(90deg, #CCCCCC 2.37%, #888D89 23.22%, #829282 49.66%, #D1C888 73.56%, #AB5A50 100%)"
+							}
+						],
+						"operator_type": 2,
+						"effective_time": 0,
+						"retouch_type": "color"
+					},
+					{
+						"name": "饱和度",
+						"type": "algorithm",
+						"algorithmid": 130014,
+						"ename": "saturation",
+						"param": [
+							{
+								"type": "slider",
+								"min": -100,
+								"max": 100,
+								"default": 0,
+								"step": 1,
+								"scope": 1,
+								"ename": "value",
+								"sliderBg": "linear-gradient(90deg, #CCCCCC 2.37%, #888D89 23.22%, #829282 49.66%, #D1C888 73.56%, #AB5A50 100%)"
+							}
+						],
+						"operator_type": 2,
+						"effective_time": 0,
+						"retouch_type": "color"
+					}
+				]
+			},
+			{
+				"name": "高动态范围",
+				"type": "classify",
+				"classifyid": 8,
+				"moduleType": "group",
+				"sub": [
+					{
+						"name": "高光",
+						"type": "algorithm",
+						"algorithmid": 130006,
+						"ename": "highlight",
+						"param": [
+							{
+								"type": "slider",
+								"min": -100,
+								"max": 100,
+								"default": 0,
+								"step": 1,
+								"scope": 1,
+								"ename": "value",
+								"sliderBg": "linear-gradient(90deg, #717171 1.78%, #FFFFFF 100%)"
+							}
+						],
+						"operator_type": 2,
+						"effective_time": 0,
+						"retouch_type": "color"
+					},
+					{
+						"name": "阴影",
+						"type": "algorithm",
+						"algorithmid": 130008,
+						"ename": "shadow",
+						"param": [
+							{
+								"type": "slider",
+								"min": -100,
+								"max": 100,
+								"default": 0,
+								"step": 1,
+								"scope": 1,
+								"ename": "value",
+								"sliderBg": "linear-gradient(90deg, #717171 1.78%, #FFFFFF 100%)"
+							}
+						],
+						"operator_type": 2,
+						"effective_time": 0,
+						"retouch_type": "color"
+					},
+					{
+						"name": "白色",
+						"type": "algorithm",
+						"algorithmid": 130007,
+						"ename": "white",
+						"param": [
+							{
+								"type": "slider",
+								"min": -100,
+								"max": 100,
+								"default": 0,
+								"step": 1,
+								"scope": 1,
+								"ename": "value",
+								"sliderBg": "linear-gradient(90deg, #717171 1.78%, #FFFFFF 100%)"
+							}
+						],
+						"operator_type": 2,
+						"effective_time": 0,
+						"retouch_type": "color"
+					},
+					{
+						"name": "黑色",
+						"type": "algorithm",
+						"algorithmid": 130009,
+						"ename": "black",
+						"param": [
+							{
+								"type": "slider",
+								"min": -100,
+								"max": 100,
+								"default": 0,
+								"step": 1,
+								"scope": 1,
+								"ename": "value",
+								"sliderBg": "linear-gradient(90deg, #717171 1.78%, #FFFFFF 100%)"
+							}
+						],
+						"operator_type": 2,
+						"effective_time": 0,
+						"retouch_type": "color"
+					}
+				]
+			},
+			{
+				"name": "细节",
+				"type": "classify",
+				"classifyid": 10,
+				"moduleType": "group",
+				"sub": [
+					{
+						"name": "锐化",
+						"type": "algorithm",
+						"algorithmid": 130012,
+						"ename": "sharpening",
+						"param": [
+							{
+								"name": "数量",
+								"type": "slider",
+								"min": 0,
+								"max": 100,
+								"default": 0,
+								"ename": "amount",
+								"step": 1,
+								"scope": 0.05
+							},
+							{
+								"name": "半径",
+								"type": "slider",
+								"min": 0,
+								"max": 100,
+								"default": 0,
+								"ename": "radius",
+								"step": 1,
+								"scope": 0.1
+							}
+						],
+						"operator_type": 2,
+						"effective_time": 0,
+						"retouch_type": "color"
+					}
+				]
+			},
+			{
+				"name": "镜头调整",
+				"type": "classify",
+				"classifyid": 11,
+				"moduleType": "group",
+				"sub": [
+					{
+						"name": "暗角",
+						"type": "algorithm",
+						"algorithmid": 140001,
+						"ename": "dark_corner",
+						"param": [
+							{
+								"type": "slider",
+								"min": -100,
+								"max": 100,
+								"default": 0,
+								"step": 1,
+								"scope": 1,
+								"ename": "value"
+							}
+						],
+						"operator_type": 2,
+						"effective_time": 0,
+						"retouch_type": "color",
+						"badge": "New"
+					}
+				]
+			}
+		]
+	},
+	{
+		"name": "人像",
+		"type": "classify",
+		"classifyid": 2,
+		"ename": "beauty",
+		"svg_active": "beauty_active",
+		"algTip": "包括性别年龄维度的美化参数和单人调整的美化参数",
+		"algTipPreset": "仅按性别年龄维度保存调整项信息，不支持保存单人调整的美化参数",
+		"choosed": true,
+		"sub": [
+			{
+				"name": "祛除瑕疵",
+				"type": "classify",
+				"classifyid": 13,
+				"moduleType": "group",
+				"sub": [
+					{
+						"name": "祛瑕疵-脸部",
+						"type": "algorithm",
+						"algorithmid": 220003,
+						"ename": "remove_acne_and_freckles_from_the_face",
+						"param": [
+							{
+								"type": "slider",
+								"min": 0,
+								"max": 100,
+								"default": 0,
+								"step": 1,
+								"scope": 1,
+								"ename": "value"
+							}
+						],
+						"operator_type": 1,
+						"effective_time": 0,
+						"retouch_type": "beauty"
+					},
+					{
+						"name": "祛瑕疵-身体",
+						"type": "algorithm",
+						"algorithmid": 220004,
+						"ename": "remove_acne_and_freckles_from_the_body",
+						"param": [
+							{
+								"type": "slider",
+								"min": 0,
+								"max": 100,
+								"default": 0,
+								"step": 1,
+								"scope": 1,
+								"ename": "value"
+							}
+						],
+						"operator_type": 1,
+						"effective_time": 0,
+						"retouch_type": "beauty"
+					},
+					{
+						"name": "祛颈纹",
+						"type": "algorithm",
+						"algorithmid": 220010,
+						"ename": "remove_neck_lines",
+						"param": [
+							{
+								"type": "slider",
+								"min": 0,
+								"max": 100,
+								"default": 0,
+								"step": 1,
+								"scope": 1,
+								"ename": "value"
+							}
+						],
+						"operator_type": 1,
+						"effective_time": 0,
+						"retouch_type": "beauty"
+					},
+					{
+						"name": "祛双下巴",
+						"type": "algorithm",
+						"algorithmid": 220011,
+						"ename": "remove_both_chin_and_face",
+						"param": [
+							{
+								"type": "slider",
+								"min": 0,
+								"max": 100,
+								"default": 0,
+								"step": 1,
+								"scope": 1,
+								"ename": "value"
+							}
+						],
+						"operator_type": 1,
+						"effective_time": 0,
+						"retouch_type": "beauty"
+					},
+					{
+						"name": "祛唇纹",
+						"type": "algorithm",
+						"algorithmid": 220022,
+						"ename": "remove_lip_lines",
+						"param": [
+							{
+								"type": "slider",
+								"min": 0,
+								"max": 100,
+								"default": 0,
+								"step": 1,
+								"scope": 1,
+								"ename": "value"
+							}
+						],
+						"operator_type": 1,
+						"effective_time": 0,
+						"retouch_type": "beauty",
+						"badge": "Beta"
+					},
+					{
+						"name": "祛法令纹",
+						"type": "algorithm",
+						"algorithmid": 220009,
+						"ename": "removal_of_law_lines",
+						"param": [
+							{
+								"type": "slider",
+								"min": 0,
+								"max": 100,
+								"default": 0,
+								"step": 1,
+								"scope": 1,
+								"ename": "value"
+							}
+						],
+						"operator_type": 1,
+						"effective_time": 0,
+						"retouch_type": "beauty"
+					},
+					{
+						"name": "祛黑眼圈",
+						"type": "algorithm",
+						"algorithmid": 220008,
+						"ename": "remove_dark_circles_under_the_eyes",
+						"param": [
+							{
+								"type": "slider",
+								"min": 0,
+								"max": 100,
+								"default": 0,
+								"step": 1,
+								"scope": 1,
+								"ename": "value"
+							}
+						],
+						"operator_type": 1,
+						"effective_time": 0,
+						"retouch_type": "beauty"
+					},
+					{
+						"name": "祛眼周纹",
+						"type": "algorithm",
+						"algorithmid": 220007,
+						"ename": "pregnancy__around_the_eyes",
+						"param": [
+							{
+								"type": "slider",
+								"min": 0,
+								"max": 100,
+								"default": 0,
+								"step": 1,
+								"scope": 1,
+								"ename": "value"
+							}
+						],
+						"operator_type": 1,
+						"effective_time": 0,
+						"retouch_type": "beauty"
+					},
+					{
+						"name": "祛抬头纹",
+						"type": "algorithm",
+						"algorithmid": 220006,
+						"ename": "remove_facial_wrinkles",
+						"param": [
+							{
+								"type": "slider",
+								"min": 0,
+								"max": 100,
+								"default": 0,
+								"step": 1,
+								"scope": 1,
+								"ename": "value"
+							}
+						],
+						"operator_type": 1,
+						"effective_time": 0,
+						"retouch_type": "beauty"
+					},
+					{
+						"name": "祛油光-脸部",
+						"type": "algorithm",
+						"algorithmid": 220014,
+						"ename": "remove_oil_from_the_face",
+						"param": [
+							{
+								"type": "slider",
+								"min": 0,
+								"max": 100,
+								"default": 0,
+								"step": 1,
+								"scope": 1,
+								"ename": "value"
+							}
+						],
+						"operator_type": 1,
+						"effective_time": 0,
+						"retouch_type": "beauty"
+					},
+					{
+						"name": "祛痣-脸部",
+						"type": "algorithm",
+						"algorithmid": 220005,
+						"ename": "facial_nevus_removal",
+						"moduleType": "switch",
+						"param": [
+							{
+								"type": "switch",
+								"min": 0,
+								"max": 100,
+								"default": 0,
+								"step": 1,
+								"scope": 1,
+								"ename": "value"
+							}
+						],
+						"operator_type": 1,
+						"effective_time": 0,
+						"retouch_type": "beauty"
+					},
+					{
+						"name": "祛副乳",
+						"type": "algorithm",
+						"algorithmid": 220028,
+						"badge": "Beta",
+						"ename": "removing_accessory_milk",
+						"param": [
+							{
+								"type": "slider",
+								"min": 0,
+								"max": 100,
+								"default": 0,
+								"step": 1,
+								"scope": 1,
+								"ename": "value"
+							}
+						],
+						"operator_type": 1,
+						"effective_time": 0,
+						"retouch_type": "beauty"
+					},
+					{
+						"name": "祛妊娠线",
+						"type": "algorithm",
+						"algorithmid": 220021,
+						"ename": "remove_stretch_mark",
+						"ageIncludes": [
+							2
+						],
+						"sexIncludes": [
+							2
+						],
+						"param": [
+							{
+								"type": "slider",
+								"min": 0,
+								"max": 100,
+								"default": 0,
+								"step": 1,
+								"scope": 1,
+								"ename": "value"
+							}
+						],
+						"operator_type": 1,
+						"effective_time": 0,
+						"retouch_type": "beauty"
+					}
+				]
+			},
+			{
+				"name": "皮肤调整",
+				"type": "classify",
+				"classifyid": 14,
+				"moduleType": "group",
+				"sub": [
+					{
+						"name": "中性灰磨皮脸部",
+						"type": "algorithm",
+						"algorithmid": 220012,
+						"ename": "facial_neutral_grey_scrub",
+						"param": [
+							{
+								"type": "slider",
+								"min": 0,
+								"max": 100,
+								"default": 0,
+								"step": 1,
+								"scope": 1,
+								"ename": "value"
+							}
+						],
+						"operator_type": 1,
+						"effective_time": 0,
+						"retouch_type": "beauty"
+					},
+					{
+						"name": "高低频磨皮脸部",
+						"type": "algorithm",
+						"algorithmid": 220001,
+						"ename": "facial_high_and_low_frequency_dermabrasion",
+						"param": [
+							{
+								"type": "slider",
+								"min": 0,
+								"max": 100,
+								"default": 0,
+								"step": 1,
+								"scope": 1,
+								"ename": "value"
+							}
+						],
+						"operator_type": 1,
+						"effective_time": 0,
+						"retouch_type": "beauty"
+					},
+					{
+						"name": "面部高光立体",
+						"type": "algorithm",
+						"algorithmid": 220025,
+						"ename": "face_shadow_stereo",
+						"param": [
+							{
+								"type": "slider",
+								"min": 0,
+								"max": 100,
+								"default": 0,
+								"step": 1,
+								"scope": 1,
+								"ename": "value"
+							}
+						],
+						"operator_type": 1,
+						"effective_time": 0,
+						"retouch_type": "beauty",
+						"badge": "New"
+					},
+					{
+						"name": "面部阴影立体",
+						"type": "algorithm",
+						"algorithmid": 220026,
+						"ename": "face_shadow_stereo",
+						"param": [
+							{
+								"type": "slider",
+								"min": 0,
+								"max": 100,
+								"default": 0,
+								"step": 1,
+								"scope": 1,
+								"ename": "value"
+							}
+						],
+						"operator_type": 1,
+						"effective_time": 0,
+						"retouch_type": "beauty",
+						"badge": "New"
+					},
+					{
+						"name": "高低频磨皮身体",
+						"type": "algorithm",
+						"algorithmid": 220002,
+						"ename": "body_high_and_low_frequency_dermabrasion",
+						"param": [
+							{
+								"type": "slider",
+								"min": 0,
+								"max": 100,
+								"default": 0,
+								"step": 1,
+								"scope": 0.01,
+								"ename": "value"
+							}
+						],
+						"operator_type": 0,
+						"effective_time": 0,
+						"retouch_type": "beauty"
+					},
+					{
+						"name": "皮肤清晰度",
+						"type": "algorithm",
+						"algorithmid": 220027,
+						"ename": "skin_resolution",
+						"param": [
+							{
+								"type": "slider",
+								"min": 0,
+								"max": 100,
+								"default": 0,
+								"step": 1,
+								"scope": 0.01,
+								"ename": "value"
+							}
+						],
+						"operator_type": 0,
+						"effective_time": 0,
+						"retouch_type": "beauty",
+						"badge": "New"
+					},
+					{
+						"name": "皮肤美白",
+						"type": "algorithm",
+						"algorithmid": 220017,
+						"ename": "skin_white",
+						"param": [
+							{
+								"type": "slider",
+								"min": 0,
+								"max": 100,
+								"default": 0,
+								"step": 1,
+								"scope": 0.01,
+								"ename": "value"
+							}
+						],
+						"operator_type": 0,
+						"effective_time": 0,
+						"retouch_type": "beauty"
+					},
+					{
+						"name": "皮肤透亮",
+						"type": "algorithm",
+						"algorithmid": 220016,
+						"ename": "clear_skin",
+						"param": [
+							{
+								"type": "slider",
+								"min": 0,
+								"max": 100,
+								"default": 0,
+								"step": 1,
+								"scope": 0.01,
+								"ename": "value"
+							}
+						],
+						"operator_type": 0,
+						"effective_time": 0,
+						"retouch_type": "beauty"
+					},
+					{
+						"name": "皮肤红润",
+						"type": "algorithm",
+						"algorithmid": 220015,
+						"ename": "rosy_skin",
+						"param": [
+							{
+								"type": "slider",
+								"min": 0,
+								"max": 100,
+								"default": 0,
+								"step": 1,
+								"scope": 0.01,
+								"ename": "value"
+							}
+						],
+						"operator_type": 0,
+						"effective_time": 0,
+						"retouch_type": "beauty"
+					},
+					{
+						"name": "肤色统一脸部",
+						"type": "algorithm",
+						"algorithmid": 220013,
+						"ename": "uniform_skin_color_face",
+						"param": [
+							{
+								"type": "slider",
+								"min": 0,
+								"max": 100,
+								"default": 0,
+								"step": 1,
+								"scope": 1,
+								"ename": "value"
+							}
+						],
+						"operator_type": 1,
+						"effective_time": 0,
+						"retouch_type": "beauty"
+					},
+					{
+						"name": "肤色统一身体",
+						"type": "algorithm",
+						"algorithmid": 220018,
+						"ename": "uniform_skin_color_body",
+						"param": [
+							{
+								"type": "slider",
+								"min": 0,
+								"max": 100,
+								"default": 0,
+								"step": 1,
+								"scope": 1,
+								"ename": "value"
+							}
+						],
+						"operator_type": 1,
+						"effective_time": 0,
+						"retouch_type": "beauty"
+					},
+					{
+						"name": "多人肤色统一",
+						"type": "algorithm",
+						"algorithmid": 220024,
+						"ename": "multi_person_skin_align",
+						"param": [
+							{
+								"type": "slider",
+								"min": 0,
+								"max": 100,
+								"default": 0,
+								"step": 1,
+								"scope": 1,
+								"ename": "value"
+							}
+						],
+						"operator_type": 1,
+						"effective_time": 0,
+						"retouch_type": "color",
+						"badge": "Beta",
+						"tips": "仅支持多人肤色同时统一"
+					},
+					{
+						"name": "肤色选择",
+						"type": "algorithm",
+						"algorithmid": 220019,
+						"ename": "skin_tone_adjustment",
+						"rowNum": 7,
+						"moduleType": "rowGroup",
+						"group": [
+							{
+								"name": "无",
+								"scene": "",
+								"icon": "https://staticsns.cdn.bcebos.com/amis/2024-4/1714013312420/none.png",
+								"ename": "skin_tone_adjustment_none"
+							},
+							{
+								"name": "冷白",
+								"scene": "/filter/skin/lengbai.png",
+								"icon": "https://staticsns.cdn.bcebos.com/amis/2023-12/1701749192281/cool_white.png",
+								"ename": "skin_tone_adjustment_cool_white",
+								"param": [
+									{
+										"type": "slider",
+										"min": 0,
+										"max": 100,
+										"default": 60,
+										"step": 1,
+										"scope": 0.01,
+										"ename": "value"
+									}
+								]
+							},
+							{
+								"name": "奶白",
+								"scene": "/filter/skin/naibai.png",
+								"icon": "https://staticsns.cdn.bcebos.com/amis/2023-12/1701765276544/breasts_white.png",
+								"ename": "skin_tone_adjustment_breasts_white",
+								"param": [
+									{
+										"type": "slider",
+										"min": 0,
+										"max": 100,
+										"default": 60,
+										"step": 1,
+										"scope": 0.01,
+										"ename": "value"
+									}
+								]
+							},
+							{
+								"name": "粉白",
+								"scene": "/filter/skin/fenbai.png",
+								"icon": "https://staticsns.cdn.bcebos.com/amis/2023-12/1701749191971/pink_white.png",
+								"ename": "skin_tone_adjustment_pink_white",
+								"param": [
+									{
+										"type": "slider",
+										"min": 0,
+										"max": 100,
+										"default": 60,
+										"step": 1,
+										"scope": 0.01,
+										"ename": "value"
+									}
+								]
+							},
+							{
+								"name": "暖白",
+								"scene": "/filter/skin/nuanbai.png",
+								"icon": "https://staticsns.cdn.bcebos.com/amis/2023-12/1701749191597/warm_white.png",
+								"ename": "skin_tone_adjustment_warm_white",
+								"param": [
+									{
+										"type": "slider",
+										"min": 0,
+										"max": 100,
+										"default": 60,
+										"step": 1,
+										"scope": 0.01,
+										"ename": "value"
+									}
+								]
+							},
+							{
+								"name": "焦糖",
+								"scene": "/filter/skin/hongrun.png",
+								"icon": "https://staticsns.cdn.bcebos.com/amis/2023-12/1701749191265/light_brown.png",
+								"ename": "skin_tone_adjustment_light_brown",
+								"param": [
+									{
+										"type": "slider",
+										"min": 0,
+										"max": 100,
+										"default": 60,
+										"step": 1,
+										"scope": 0.01,
+										"ename": "value"
+									}
+								]
+							},
+							{
+								"name": "麦黑",
+								"scene": "/filter/skin/maihei.png",
+								"icon": "https://staticsns.cdn.bcebos.com/amis/2023-12/1701749192588/pretty_black.png",
+								"ename": "skin_tone_adjustment_pretty_black",
+								"param": [
+									{
+										"type": "slider",
+										"min": 0,
+										"max": 100,
+										"default": 60,
+										"step": 1,
+										"scope": 0.01,
+										"ename": "value"
+									}
+								]
+							}
+						],
+						"operator_type": 0,
+						"effective_time": 0,
+						"retouch_type": "beauty"
+					},
+					{
+						"name": "肤色偏好",
+						"type": "algorithm",
+						"algorithmid": 220020,
+						"ename": "skin_color_preferance",
+						"param": [
+							{
+								"type": "slider",
+								"min": -100,
+								"max": 100,
+								"default": 0,
+								"step": 1,
+								"scope": 0.01,
+								"ename": "value",
+								"sliderBg": "linear-gradient(90deg, #9EE2F6 0%, #FFF3E4 51.56%, #FFAC92 100%)"
+							}
+						],
+						"operator_type": 2,
+						"effective_time": 2,
+						"retouch_type": "beauty"
+					}
+				]
+			},
+			{
+				"name": "身体美型",
+				"type": "classify",
+				"classifyid": 34,
+				"moduleType": "group",
+				"sub": [
+					{
+						"name": "AI塑形",
+						"type": "algorithm",
+						"algorithmid": 290001,
+						"ename": "AI_thin",
+						"param": [
+							{
+								"type": "slider",
+								"min": 0,
+								"max": 100,
+								"default": 0,
+								"ename": "value",
+								"step": 1,
+								"scope": 0.01
+							}
+						],
+						"operator_type": 2,
+						"effective_time": 0,
+						"retouch_type": "beauty"
+					},
+					{
+						"name": "瘦身",
+						"type": "algorithm",
+						"algorithmid": 290002,
+						"ename": "body_thin",
+						"param": [
+							{
+								"type": "slider",
+								"min": 0,
+								"max": 100,
+								"default": 0,
+								"ename": "value",
+								"step": 1,
+								"scope": 0.01
+							}
+						],
+						"operator_type": 2,
+						"effective_time": 0,
+						"retouch_type": "beauty"
+					},
+					{
+						"name": "增高",
+						"type": "algorithm",
+						"algorithmid": 290003,
+						"ename": "heighten",
+						"tips": "仅支持所有人同时增高",
+						"param": [
+							{
+								"type": "slider",
+								"min": 0,
+								"max": 100,
+								"default": 0,
+								"ename": "value",
+								"step": 1,
+								"scope": 0.01
+							}
+						],
+						"operator_type": 2,
+						"effective_time": 0,
+						"retouch_type": "color"
+					},
+					{
+						"name": "小头",
+						"type": "algorithm",
+						"algorithmid": 290009,
+						"ename": "small_head",
+						"badge": "New",
+						"param": [
+							{
+								"type": "slider",
+								"min": -100,
+								"max": 100,
+								"default": 0,
+								"ename": "value",
+								"step": 1,
+								"scope": 0.01
+							}
+						],
+						"operator_type": 2,
+						"effective_time": 0,
+						"retouch_type": "beauty"
+					},
+					{
+						"name": "瘦脖子",
+						"type": "algorithm",
+						"algorithmid": 290004,
+						"ename": "neck_thin",
+						"param": [
+							{
+								"type": "slider",
+								"min": 0,
+								"max": 100,
+								"default": 0,
+								"ename": "value",
+								"step": 1,
+								"scope": 0.01
+							}
+						],
+						"operator_type": 2,
+						"effective_time": 0,
+						"retouch_type": "beauty"
+					},
+					{
+						"name": "瘦手臂",
+						"type": "algorithm",
+						"algorithmid": 290005,
+						"ename": "arm_thin",
+						"param": [
+							{
+								"type": "slider",
+								"min": 0,
+								"max": 100,
+								"default": 0,
+								"ename": "value",
+								"step": 1,
+								"scope": 0.01
+							}
+						],
+						"operator_type": 2,
+						"effective_time": 0,
+						"retouch_type": "beauty"
+					},
+					{
+						"name": "瘦腰",
+						"type": "algorithm",
+						"algorithmid": 290006,
+						"ename": "waist_thin",
+						"param": [
+							{
+								"type": "slider",
+								"min": 0,
+								"max": 100,
+								"default": 0,
+								"ename": "value",
+								"step": 1,
+								"scope": 0.01
+							}
+						],
+						"operator_type": 2,
+						"effective_time": 0,
+						"retouch_type": "beauty"
+					},
+					{
+						"name": "瘦腿",
+						"type": "algorithm",
+						"algorithmid": 290007,
+						"ename": "leg_thin",
+						"param": [
+							{
+								"type": "slider",
+								"min": 0,
+								"max": 100,
+								"default": 0,
+								"ename": "value",
+								"step": 1,
+								"scope": 0.01
+							}
+						],
+						"operator_type": 2,
+						"effective_time": 0,
+						"retouch_type": "beauty"
+					},
+					{
+						"name": "长腿",
+						"type": "algorithm",
+						"algorithmid": 290008,
+						"ename": "leg_long",
+						"tips": "仅支持所有人同时长腿",
+						"param": [
+							{
+								"type": "slider",
+								"min": 0,
+								"max": 100,
+								"default": 0,
+								"ename": "value",
+								"step": 1,
+								"scope": 0.01
+							}
+						],
+						"operator_type": 2,
+						"effective_time": 0,
+						"retouch_type": "color"
+					}
+				]
+			},
+			{
+				"name": "面部重塑",
+				"type": "classify",
+				"classifyid": 20,
+				"moduleType": "tab",
+				"sub": [
+					{
+						"name": "脸型",
+						"type": "classify",
+						"classifyid": 15,
+						"moduleType": "tabItem",
+						"sub": [
+							{
+								"name": "小脸",
+								"type": "algorithm",
+								"algorithmid": 230001,
+								"ename": "retraction",
+								"param": [
+									{
+										"type": "slider",
+										"min": -100,
+										"max": 100,
+										"default": 0,
+										"step": 1,
+										"scope": 0.01,
+										"ename": "value"
+									}
+								],
+								"operator_type": 0,
+								"effective_time": 2,
+								"retouch_type": "beauty"
+							},
+							{
+								"name": "瘦脸",
+								"type": "algorithm",
+								"algorithmid": 230002,
+								"ename": "thin_face",
+								"param": [
+									{
+										"type": "slider",
+										"min": -100,
+										"max": 100,
+										"default": 0,
+										"step": 1,
+										"scope": 0.01,
+										"ename": "value"
+									}
+								],
+								"operator_type": 0,
+								"effective_time": 2,
+								"retouch_type": "beauty"
+							},
+							{
+								"name": "V脸",
+								"type": "algorithm",
+								"algorithmid": 230007,
+								"ename": "small_face",
+								"param": [
+									{
+										"type": "slider",
+										"min": -100,
+										"max": 100,
+										"default": 0,
+										"step": 1,
+										"scope": 0.01,
+										"ename": "value"
+									}
+								],
+								"operator_type": 0,
+								"effective_time": 2,
+								"retouch_type": "beauty"
+							},
+							{
+								"name": "下颌",
+								"type": "classify",
+								"classifyid": 22,
+								"moduleType": "linkage",
+								"sub": [
+									{
+										"name": "左下颌",
+										"label": "左",
+										"type": "algorithm",
+										"algorithmid": 230008,
+										"ename": "left_micrognathia",
+										"param": [
+											{
+												"type": "leftslider",
+												"min": -100,
+												"max": 100,
+												"default": 0,
+												"step": 1,
+												"scope": 0.01,
+												"ename": "value"
+											}
+										],
+										"operator_type": 0,
+										"effective_time": 2,
+										"retouch_type": "beauty"
+									},
+									{
+										"name": "右下颌",
+										"label": "右",
+										"type": "algorithm",
+										"algorithmid": 230009,
+										"ename": "right_micrognathia",
+										"param": [
+											{
+												"type": "rightslider",
+												"min": -100,
+												"max": 100,
+												"default": 0,
+												"step": 1,
+												"scope": 0.01,
+												"ename": "value"
+											}
+										],
+										"operator_type": 0,
+										"effective_time": 2,
+										"retouch_type": "beauty"
+									}
+								]
+							},
+							{
+								"name": "颧骨",
+								"type": "classify",
+								"classifyid": 21,
+								"moduleType": "linkage",
+								"sub": [
+									{
+										"name": "左颧骨",
+										"label": "左",
+										"type": "algorithm",
+										"algorithmid": 230010,
+										"ename": "left_zygomatic_bone",
+										"param": [
+											{
+												"type": "leftslider",
+												"min": -100,
+												"max": 100,
+												"default": 0,
+												"step": 1,
+												"scope": 0.01,
+												"ename": "value"
+											}
+										],
+										"operator_type": 0,
+										"effective_time": 2,
+										"retouch_type": "beauty"
+									},
+									{
+										"name": "右颧骨",
+										"label": "右",
+										"type": "algorithm",
+										"algorithmid": 230011,
+										"ename": "right_zygomatic_bone",
+										"param": [
+											{
+												"type": "rightslider",
+												"min": -100,
+												"max": 100,
+												"default": 0,
+												"step": 1,
+												"scope": 0.01,
+												"ename": "value"
+											}
+										],
+										"operator_type": 0,
+										"effective_time": 2,
+										"retouch_type": "beauty"
+									}
+								]
+							},
+							{
+								"name": "脸宽",
+								"type": "algorithm",
+								"algorithmid": 230012,
+								"ename": "face_width",
+								"param": [
+									{
+										"type": "slider",
+										"min": -100,
+										"max": 100,
+										"default": 0,
+										"step": 1,
+										"scope": 0.01,
+										"ename": "value"
+									}
+								],
+								"operator_type": 0,
+								"effective_time": 2,
+								"retouch_type": "beauty"
+							},
+							{
+								"name": "额头",
+								"type": "algorithm",
+								"algorithmid": 230005,
+								"ename": "forehead",
+								"param": [
+									{
+										"type": "slider",
+										"min": -100,
+										"max": 100,
+										"default": 0,
+										"step": 1,
+										"scope": 0.01,
+										"ename": "value"
+									}
+								],
+								"operator_type": 0,
+								"effective_time": 2,
+								"retouch_type": "beauty"
+							},
+							{
+								"name": "下巴长短",
+								"type": "algorithm",
+								"algorithmid": 230006,
+								"ename": "chin",
+								"param": [
+									{
+										"type": "slider",
+										"min": -100,
+										"max": 100,
+										"default": 0,
+										"step": 1,
+										"scope": 0.01,
+										"ename": "value"
+									}
+								],
+								"operator_type": 0,
+								"effective_time": 2,
+								"retouch_type": "beauty"
+							}
+						]
+					},
+					{
+						"name": "眉毛",
+						"type": "classify",
+						"classifyid": 17,
+						"sub": [
+							{
+								"name": "粗细",
+								"type": "algorithm",
+								"algorithmid": 250003,
+								"ename": "eyebrow_thickness",
+								"param": [
+									{
+										"type": "slider",
+										"min": -100,
+										"max": 100,
+										"default": 0,
+										"step": 1,
+										"scope": 0.01,
+										"ename": "value"
+									}
+								],
+								"operator_type": 0,
+								"effective_time": 2,
+								"retouch_type": "beauty"
+							},
+							{
+								"name": "眉距",
+								"type": "algorithm",
+								"algorithmid": 250001,
+								"ename": "eyebrow_spacing",
+								"param": [
+									{
+										"type": "slider",
+										"min": -100,
+										"max": 100,
+										"default": 0,
+										"step": 1,
+										"scope": 0.01,
+										"ename": "value"
+									}
+								],
+								"operator_type": 0,
+								"effective_time": 2,
+								"retouch_type": "beauty"
+							},
+							{
+								"name": "位置",
+								"type": "algorithm",
+								"algorithmid": 250002,
+								"ename": "position",
+								"param": [
+									{
+										"type": "slider",
+										"min": -100,
+										"max": 100,
+										"default": 0,
+										"step": 1,
+										"scope": 0.01,
+										"ename": "value"
+									}
+								],
+								"operator_type": 0,
+								"effective_time": 2,
+								"retouch_type": "beauty"
+							}
+						]
+					},
+					{
+						"name": "眼睛",
+						"type": "classify",
+						"classifyid": 16,
+						"sub": [
+							{
+								"name": "大小",
+								"type": "classify",
+								"classifyid": 23,
+								"moduleType": "linkage",
+								"sub": [
+									{
+										"name": "左眼",
+										"label": "左",
+										"type": "algorithm",
+										"algorithmid": 240017,
+										"ename": "left_eyes_size",
+										"param": [
+											{
+												"type": "leftslider",
+												"min": -100,
+												"max": 100,
+												"default": 0,
+												"step": 1,
+												"scope": 0.01,
+												"ename": "value"
+											}
+										],
+										"operator_type": 0,
+										"effective_time": 2,
+										"retouch_type": "beauty"
+									},
+									{
+										"name": "右眼",
+										"label": "右",
+										"type": "algorithm",
+										"algorithmid": 240018,
+										"ename": "right_eyes_size",
+										"param": [
+											{
+												"type": "rightslider",
+												"min": -100,
+												"max": 100,
+												"default": 0,
+												"step": 1,
+												"scope": 0.01,
+												"ename": "value"
+											}
+										],
+										"operator_type": 0,
+										"effective_time": 2,
+										"retouch_type": "beauty"
+									}
+								]
+							},
+							{
+								"name": "眼高",
+								"type": "classify",
+								"classifyid": 24,
+								"moduleType": "linkage",
+								"sub": [
+									{
+										"name": "左眼高",
+										"label": "左",
+										"type": "algorithm",
+										"algorithmid": 240007,
+										"ename": "left_eyes_height",
+										"param": [
+											{
+												"type": "leftslider",
+												"min": -100,
+												"max": 100,
+												"default": 0,
+												"step": 1,
+												"scope": 0.01,
+												"ename": "value"
+											}
+										],
+										"operator_type": 0,
+										"effective_time": 2,
+										"retouch_type": "beauty"
+									},
+									{
+										"name": "右眼高",
+										"label": "右",
+										"type": "algorithm",
+										"algorithmid": 240008,
+										"ename": "right_eyes_height",
+										"param": [
+											{
+												"type": "rightslider",
+												"min": -100,
+												"max": 100,
+												"default": 0,
+												"step": 1,
+												"scope": 0.01,
+												"ename": "value"
+											}
+										],
+										"operator_type": 0,
+										"effective_time": 2,
+										"retouch_type": "beauty"
+									}
+								]
+							},
+							{
+								"name": "眼宽",
+								"type": "classify",
+								"classifyid": 25,
+								"moduleType": "linkage",
+								"sub": [
+									{
+										"name": "左眼宽",
+										"label": "左",
+										"type": "algorithm",
+										"algorithmid": 240010,
+										"ename": "left_eyes_width",
+										"param": [
+											{
+												"type": "leftslider",
+												"min": -100,
+												"max": 100,
+												"default": 0,
+												"step": 1,
+												"scope": 0.01,
+												"ename": "value"
+											}
+										],
+										"operator_type": 0,
+										"effective_time": 2,
+										"retouch_type": "beauty"
+									},
+									{
+										"name": "右眼宽",
+										"label": "右",
+										"type": "algorithm",
+										"algorithmid": 240011,
+										"ename": "right_eyes_width",
+										"param": [
+											{
+												"type": "rightslider",
+												"min": -100,
+												"max": 100,
+												"default": 0,
+												"step": 1,
+												"scope": 0.01,
+												"ename": "value"
+											}
+										],
+										"operator_type": 0,
+										"effective_time": 2,
+										"retouch_type": "beauty"
+									}
+								]
+							},
+							{
+								"name": "眼距",
+								"type": "algorithm",
+								"algorithmid": 240003,
+								"ename": "eyes_distance",
+								"param": [
+									{
+										"type": "slider",
+										"min": -100,
+										"max": 100,
+										"default": 0,
+										"step": 1,
+										"scope": 0.01,
+										"ename": "value"
+									}
+								],
+								"operator_type": 0,
+								"effective_time": 2,
+								"retouch_type": "beauty"
+							},
+							{
+								"name": "倾斜",
+								"type": "classify",
+								"classifyid": 26,
+								"moduleType": "linkage",
+								"sub": [
+									{
+										"name": "左倾斜",
+										"label": "左",
+										"type": "algorithm",
+										"algorithmid": 240012,
+										"ename": "left_tilt",
+										"param": [
+											{
+												"type": "leftslider",
+												"min": -100,
+												"max": 100,
+												"default": 0,
+												"step": 1,
+												"scope": 0.01,
+												"ename": "value"
+											}
+										],
+										"operator_type": 0,
+										"effective_time": 2,
+										"retouch_type": "beauty"
+									},
+									{
+										"name": "右倾斜",
+										"label": "右",
+										"type": "algorithm",
+										"algorithmid": 240013,
+										"ename": "right_tilt",
+										"param": [
+											{
+												"type": "rightslider",
+												"min": -100,
+												"max": 100,
+												"default": 0,
+												"step": 1,
+												"scope": 0.01,
+												"ename": "value"
+											}
+										],
+										"operator_type": 0,
+										"effective_time": 2,
+										"retouch_type": "beauty"
+									}
+								]
+							},
+							{
+								"name": "位置",
+								"type": "classify",
+								"classifyid": 27,
+								"moduleType": "linkage",
+								"sub": [
+									{
+										"name": "左眼位置",
+										"label": "左",
+										"type": "algorithm",
+										"algorithmid": 240015,
+										"ename": "left_eyes_position",
+										"param": [
+											{
+												"type": "leftslider",
+												"min": -100,
+												"max": 100,
+												"default": 0,
+												"step": 1,
+												"scope": 0.01,
+												"ename": "value"
+											}
+										],
+										"operator_type": 0,
+										"effective_time": 2,
+										"retouch_type": "beauty"
+									},
+									{
+										"name": "右眼位置",
+										"label": "右",
+										"type": "algorithm",
+										"algorithmid": 240016,
+										"ename": "right_eyes_position",
+										"param": [
+											{
+												"type": "rightslider",
+												"min": -100,
+												"max": 100,
+												"default": 0,
+												"step": 1,
+												"scope": 0.01,
+												"ename": "value"
+											}
+										],
+										"operator_type": 0,
+										"effective_time": 2,
+										"retouch_type": "beauty"
+									}
+								]
+							},
+							{
+								"name": "对称",
+								"type": "algorithm",
+								"algorithmid": 240005,
+								"ename": "symmetry",
+								"moduleType": "switch",
+								"param": [
+									{
+										"type": "switch",
+										"min": 0,
+										"max": 1,
+										"default": 0,
+										"step": 1,
+										"scope": 1,
+										"ename": "value"
+									}
+								],
+								"operator_type": 0,
+								"effective_time": 2,
+								"retouch_type": "beauty"
+							}
+						]
+					},
+					{
+						"name": "鼻子",
+						"type": "classify",
+						"classifyid": 18,
+						"sub": [
+							{
+								"name": "大小",
+								"type": "algorithm",
+								"algorithmid": 260007,
+								"ename": "nose_size",
+								"param": [
+									{
+										"type": "slider",
+										"min": -100,
+										"max": 100,
+										"default": 0,
+										"step": 1,
+										"scope": 0.01,
+										"ename": "value"
+									}
+								],
+								"operator_type": 0,
+								"effective_time": 2,
+								"retouch_type": "beauty"
+							},
+							{
+								"name": "鼻高",
+								"type": "algorithm",
+								"algorithmid": 260004,
+								"ename": "nose_height",
+								"param": [
+									{
+										"type": "slider",
+										"min": -100,
+										"max": 100,
+										"default": 0,
+										"step": 1,
+										"scope": 0.01,
+										"ename": "value"
+									}
+								],
+								"operator_type": 0,
+								"effective_time": 2,
+								"retouch_type": "beauty"
+							},
+							{
+								"name": "鼻梁",
+								"type": "algorithm",
+								"algorithmid": 260005,
+								"ename": "nose_bridge",
+								"param": [
+									{
+										"type": "slider",
+										"min": -100,
+										"max": 100,
+										"default": 0,
+										"step": 1,
+										"scope": 0.01,
+										"ename": "value"
+									}
+								],
+								"operator_type": 0,
+								"effective_time": 2,
+								"retouch_type": "beauty"
+							},
+							{
+								"name": "鼻翼",
+								"type": "algorithm",
+								"algorithmid": 260006,
+								"ename": "nose_wing",
+								"param": [
+									{
+										"type": "slider",
+										"min": -100,
+										"max": 100,
+										"default": 0,
+										"step": 1,
+										"scope": 0.01,
+										"ename": "value"
+									}
+								],
+								"operator_type": 0,
+								"effective_time": 2,
+								"retouch_type": "beauty"
+							},
+							{
+								"name": "鼻尖",
+								"type": "algorithm",
+								"algorithmid": 260003,
+								"ename": "nose_tip",
+								"param": [
+									{
+										"type": "slider",
+										"min": -100,
+										"max": 100,
+										"default": 0,
+										"step": 1,
+										"scope": 0.01,
+										"ename": "value"
+									}
+								],
+								"operator_type": 0,
+								"effective_time": 2,
+								"retouch_type": "beauty"
+							}
+						]
+					},
+					{
+						"name": "嘴巴",
+						"type": "classify",
+						"classifyid": 19,
+						"sub": [
+							{
+								"name": "大小",
+								"type": "algorithm",
+								"algorithmid": 270002,
+								"ename": "mouth_size",
+								"param": [
+									{
+										"type": "slider",
+										"min": -100,
+										"max": 100,
+										"default": 0,
+										"step": 1,
+										"scope": 0.01,
+										"ename": "value"
+									}
+								],
+								"operator_type": 0,
+								"effective_time": 2,
+								"retouch_type": "beauty"
+							},
+							{
+								"name": "嘴宽",
+								"type": "algorithm",
+								"algorithmid": 270001,
+								"ename": "mouth_width",
+								"param": [
+									{
+										"type": "slider",
+										"min": -100,
+										"max": 100,
+										"default": 0,
+										"step": 1,
+										"scope": 0.01,
+										"ename": "value"
+									}
+								],
+								"operator_type": 0,
+								"effective_time": 2,
+								"retouch_type": "beauty"
+							},
+							{
+								"name": "位置",
+								"type": "algorithm",
+								"algorithmid": 270003,
+								"ename": "mouth_location",
+								"param": [
+									{
+										"type": "slider",
+										"min": -100,
+										"max": 100,
+										"default": 0,
+										"step": 1,
+										"scope": 0.01,
+										"ename": "value"
+									}
+								],
+								"operator_type": 0,
+								"effective_time": 2,
+								"retouch_type": "beauty"
+							},
+							{
+								"name": "丰上唇",
+								"type": "algorithm",
+								"algorithmid": 270004,
+								"ename": "mouth_lips_up",
+								"param": [
+									{
+										"type": "slider",
+										"min": -100,
+										"max": 100,
+										"default": 0,
+										"step": 1,
+										"scope": 0.01,
+										"ename": "value"
+									}
+								],
+								"operator_type": 0,
+								"effective_time": 2,
+								"retouch_type": "beauty"
+							},
+							{
+								"name": "丰下唇",
+								"type": "algorithm",
+								"algorithmid": 270005,
+								"ename": "mouth_lips_bottom",
+								"param": [
+									{
+										"type": "slider",
+										"min": -100,
+										"max": 100,
+										"default": 0,
+										"step": 1,
+										"scope": 0.01,
+										"ename": "value"
+									}
+								],
+								"operator_type": 0,
+								"effective_time": 2,
+								"retouch_type": "beauty"
+							}
+						]
+					}
+				]
+			},
+			{
+				"name": "牙齿美化",
+				"type": "classify",
+				"classifyid": 35,
+				"moduleType": "group",
+				"sub": [
+					{
+						"name": "牙齿美白",
+						"type": "algorithm",
+						"algorithmid": 201001,
+						"ename": "teeth_whitening",
+						"param": [
+							{
+								"type": "slider",
+								"min": 0,
+								"max": 100,
+								"default": 0,
+								"step": 1,
+								"scope": 1,
+								"ename": "value"
+							}
+						],
+						"operator_type": 1,
+						"effective_time": 0,
+						"retouch_type": "beauty"
+					},
+					{
+						"name": "牙齿修复",
+						"type": "algorithm",
+						"algorithmid": 201002,
+						"ename": "teeth_restoration",
+						"moduleType": "switch",
+						"param": [
+							{
+								"type": "switch",
+								"min": 0,
+								"max": 100,
+								"default": 0,
+								"step": 1,
+								"scope": 1,
+								"ename": "value"
+							}
+						],
+						"operator_type": 1,
+						"effective_time": 0,
+						"retouch_type": "beauty"
+					}
+				]
+			},
+			{
+				"name": "眼睛增强",
+				"type": "classify",
+				"classifyid": 36,
+				"moduleType": "group",
+				"sub": [
+					{
+						"name": "亮眼",
+						"type": "algorithm",
+						"algorithmid": 240001,
+						"ename": "eyes_brightening",
+						"param": [
+							{
+								"type": "slider",
+								"min": 0,
+								"max": 100,
+								"default": 0,
+								"step": 1,
+								"scope": 0.01,
+								"ename": "value"
+							}
+						],
+						"operator_type": 0,
+						"effective_time": 2,
+						"retouch_type": "beauty"
+					}
+				]
+			},
+			{
+				"name": "头发调整",
+				"type": "classify",
+				"classifyid": 37,
+				"moduleType": "group",
+				"sub": [
+					{
+						"name": "发缝填充",
+						"type": "algorithm",
+						"algorithmid": 202001,
+						"ename": "hair_seam_filling",
+						"param": [
+							{
+								"type": "slider",
+								"min": 0,
+								"max": 100,
+								"default": 0,
+								"step": 1,
+								"scope": 1,
+								"ename": "value"
+							}
+						],
+						"operator_type": 0,
+						"effective_time": 2,
+						"retouch_type": "beauty"
+					},
+					{
+						"name": "颅顶调整",
+						"type": "algorithm",
+						"algorithmid": 202002,
+						"ename": "cranial_adjustment",
+						"badge": "New",
+						"param": [
+							{
+								"type": "slider",
+								"min": -100,
+								"max": 100,
+								"default": 0,
+								"step": 1,
+								"scope": 0.01,
+								"ename": "value"
+							}
+						],
+						"operator_type": 0,
+						"effective_time": 2,
+						"retouch_type": "beauty"
+					},
+					{
+						"name": "祛碎发",
+						"type": "algorithm",
+						"algorithmid": 202003,
+						"ename": "remove_frizz",
+						"badge": "Beta",
+						"tips": "仅支持所有人同时祛碎发",
+						"param": [
+							{
+								"type": "slider",
+								"min": 0,
+								"max": 100,
+								"default": 0,
+								"step": 1,
+								"scope": 1,
+								"ename": "value"
+							}
+						],
+						"operator_type": 0,
+						"effective_time": 2,
+						"retouch_type": "color"
+					}
+				]
+			},
+			{
+				"name": "妆容调整",
+				"type": "classify",
+				"classifyid": 30,
+				"moduleType": "group",
+				"sub": [
+					{
+						"name": "高光立体",
+						"type": "algorithm",
+						"algorithmid": 220025,
+						"ename": "highlight_stereo",
+						"param": [
+							{
+								"type": "slider",
+								"min": 0,
+								"max": 100,
+								"default": 0,
+								"step": 1,
+								"scope": 1,
+								"ename": "value"
+							}
+						],
+						"operator_type": 1,
+						"effective_time": 0,
+						"retouch_type": "beauty",
+						"badge": "New"
+					},
+					{
+						"name": "阴影立体",
+						"type": "algorithm",
+						"algorithmid": 220026,
+						"ename": "shadow_stereo",
+						"param": [
+							{
+								"type": "slider",
+								"min": 0,
+								"max": 100,
+								"default": 0,
+								"step": 1,
+								"scope": 1,
+								"ename": "value"
+							}
+						],
+						"operator_type": 1,
+						"effective_time": 0,
+						"retouch_type": "beauty",
+						"badge": "New"
+					},
+					{
+						"name": "妆容",
+						"type": "classify",
+						"classifyid": 33,
+						"moduleType": "tabGroup",
+						"sub": [
+							{
+								"name": "眼妆",
+								"type": "algorithm",
+								"algorithmid": 280001,
+								"ename": "eyebrow",
+								"rowNum": 6,
+								"moduleType": "rowGroup",
+								"group": [
+									{
+										"name": "无",
+										"scene": "",
+										"icon": "https://staticsns.cdn.bcebos.com/amis/2024-4/1714013312420/none.png",
+										"ename": "eyebrow_none"
+									},
+									{
+										"name": "赤茶香槟",
+										"scene": "/makeupFilter/eyeshadow/eyeshadow_customized/texture/chichaxiangbin.png",
+										"icon": "https://staticsns.cdn.bcebos.com/amis/2023-10/1698378449270/chichaxiangbin.png",
+										"ename": "eyebrow_chichaxiangbin",
+										"param": [
+											{
+												"type": "slider",
+												"min": 0,
+												"max": 100,
+												"default": 50,
+												"step": 1,
+												"scope": 0.01,
+												"ename": "value"
+											}
+										]
+									},
+									{
+										"name": "微醺酒红",
+										"scene": "/makeupFilter/eyeshadow/eyeshadow_customized/texture/weixunjiuhong.png",
+										"icon": "https://staticsns.cdn.bcebos.com/amis/2023-10/1698378449694/weixunjiuhong.png",
+										"ename": "eyebrow_weixunjiuhong",
+										"param": [
+											{
+												"type": "slider",
+												"min": 0,
+												"max": 100,
+												"default": 50,
+												"step": 1,
+												"scope": 0.01,
+												"ename": "value"
+											}
+										]
+									},
+									{
+										"name": "夜色精灵",
+										"scene": "/makeupFilter/eyeshadow/eyeshadow_customized/texture/yesejingling.png",
+										"icon": "https://staticsns.cdn.bcebos.com/amis/2023-10/1698378450400/yesejingling.png",
+										"ename": "eyebrow_yesejingling",
+										"param": [
+											{
+												"type": "slider",
+												"min": 0,
+												"max": 100,
+												"default": 50,
+												"step": 1,
+												"scope": 0.01,
+												"ename": "value"
+											}
+										]
+									},
+									{
+										"name": "烟雨迷离",
+										"scene": "/makeupFilter/eyeshadow/eyeshadow_customized/texture/yanyumili.png",
+										"icon": "https://staticsns.cdn.bcebos.com/amis/2023-10/1698378450008/yanyumili.png",
+										"ename": "eyebrow_yanyumili",
+										"param": [
+											{
+												"type": "slider",
+												"min": 0,
+												"max": 100,
+												"default": 50,
+												"step": 1,
+												"scope": 0.01,
+												"ename": "value"
+											}
+										]
+									}
+								],
+								"operator_type": 0,
+								"effective_time": 0,
+								"retouch_type": "beauty"
+							},
+							{
+								"name": "睫毛",
+								"type": "algorithm",
+								"algorithmid": 280002,
+								"ename": "eyelash",
+								"rowNum": 6,
+								"moduleType": "rowGroup",
+								"group": [
+									{
+										"name": "无",
+										"scene": "",
+										"icon": "https://staticsns.cdn.bcebos.com/amis/2024-4/1714013312420/none.png",
+										"ename": "eyelash_none"
+									},
+									{
+										"name": "恶魔仙子",
+										"scene": "/makeupFilter/eyelash/eyelash_default/texture/emoxianzi.png",
+										"icon": "https://staticsns.cdn.bcebos.com/amis/2023-10/1698378607951/emoxianzi.png",
+										"ename": "eyelash_emoxianzi",
+										"param": [
+											{
+												"type": "slider",
+												"min": 0,
+												"max": 100,
+												"default": 50,
+												"step": 1,
+												"scope": 0.01,
+												"ename": "value"
+											}
+										]
+									},
+									{
+										"name": "国风狐系",
+										"scene": "/makeupFilter/eyelash/eyelash_default/texture/guofenghuxi.png",
+										"icon": "https://staticsns.cdn.bcebos.com/amis/2023-10/1698378608368/guofenghuxi.png",
+										"ename": "eyelash_guofenghuxi",
+										"param": [
+											{
+												"type": "slider",
+												"min": 0,
+												"max": 100,
+												"default": 50,
+												"step": 1,
+												"scope": 0.01,
+												"ename": "value"
+											}
+										]
+									},
+									{
+										"name": "自然卷翘",
+										"scene": "/makeupFilter/eyelash/eyelash_default/texture/ziranjuanqiao.png",
+										"icon": "https://staticsns.cdn.bcebos.com/amis/2023-10/1698378609121/ziranjuanqiao.png",
+										"ename": "eyelash_ziranjuanqiao",
+										"param": [
+											{
+												"type": "slider",
+												"min": 0,
+												"max": 100,
+												"default": 50,
+												"step": 1,
+												"scope": 0.01,
+												"ename": "value"
+											}
+										]
+									},
+									{
+										"name": "温柔下垂",
+										"scene": "/makeupFilter/eyelash/eyelash_default/texture/wenrouxiacui.png",
+										"icon": "https://staticsns.cdn.bcebos.com/amis/2023-10/1698378608799/wenrouxiachui.png",
+										"ename": "eyelash_wenrouxiachui",
+										"param": [
+											{
+												"type": "slider",
+												"min": 0,
+												"max": 100,
+												"default": 50,
+												"step": 1,
+												"scope": 0.01,
+												"ename": "value"
+											}
+										]
+									}
+								],
+								"operator_type": 0,
+								"effective_time": 0,
+								"retouch_type": "beauty"
+							},
+							{
+								"name": "口红",
+								"type": "algorithm",
+								"algorithmid": 280003,
+								"ename": "lip",
+								"rowNum": 6,
+								"moduleType": "rowGroup",
+								"group": [
+									{
+										"name": "无",
+										"scene": "",
+										"icon": "https://staticsns.cdn.bcebos.com/amis/2024-4/1714013312420/none.png",
+										"ename": "lip_none"
+									},
+									{
+										"name": "正红色",
+										"scene": "199.0,37.0,19.0,1.0",
+										"icon": "https://staticsns.cdn.bcebos.com/amis/2023-10/1698378656115/zhenghongse.png",
+										"ename": "lip_zhenghongse",
+										"param": [
+											{
+												"type": "slider",
+												"min": 0,
+												"max": 100,
+												"default": 50,
+												"step": 1,
+												"scope": 0.01,
+												"ename": "value"
+											}
+										]
+									},
+									{
+										"name": "勃艮第红",
+										"scene": "153.0,38.0,29.0,1.0",
+										"icon": "https://staticsns.cdn.bcebos.com/amis/2023-10/1698647004183/yimase.png",
+										"ename": "lip_yimase",
+										"param": [
+											{
+												"type": "slider",
+												"min": 0,
+												"max": 100,
+												"default": 50,
+												"step": 1,
+												"scope": 0.01,
+												"ename": "value"
+											}
+										]
+									},
+									{
+										"name": "烂番茄",
+										"scene": "165.0,56.0,39.0,1.0",
+										"icon": "https://staticsns.cdn.bcebos.com/amis/2023-10/1698647003774/lanfanqie.png",
+										"ename": "lip_lanfanqie",
+										"param": [
+											{
+												"type": "slider",
+												"min": 0,
+												"max": 100,
+												"default": 50,
+												"step": 1,
+												"scope": 0.01,
+												"ename": "value"
+											}
+										]
+									},
+									{
+										"name": "亮粉色",
+										"scene": "255.0,78.0,114.0,1.0",
+										"icon": "https://staticsns.cdn.bcebos.com/amis/2023-10/1698647003015/liangfense.png",
+										"ename": "lip_liangfense",
+										"param": [
+											{
+												"type": "slider",
+												"min": 0,
+												"max": 100,
+												"default": 50,
+												"step": 1,
+												"scope": 0.01,
+												"ename": "value"
+											}
+										]
+									},
+									{
+										"name": "瑰红色",
+										"scene": "146.0,46.0,52.0,1.0",
+										"icon": "https://staticsns.cdn.bcebos.com/amis/2023-10/1698647003401/guihongse.png",
+										"ename": "lip_guihongse",
+										"param": [
+											{
+												"type": "slider",
+												"min": 0,
+												"max": 100,
+												"default": 50,
+												"step": 1,
+												"scope": 0.01,
+												"ename": "value"
+											}
+										]
+									}
+								],
+								"operator_type": 0,
+								"effective_time": 0,
+								"retouch_type": "beauty"
+							}
+						]
+					}
+				]
+			}
+		]
+	},
+	{
+		"name": "背景",
+		"type": "classify",
+		"classifyid": 60,
+		"ename": "background",
+		"svg_active": "background_active",
+		"algTipPreset": "预设中上传的自定义背景素材，仅支持当前电脑使用",
+		"sub": [
+			{
+				"name": "背景美化",
+				"type": "classify",
+				"classifyid": 61,
+				"moduleType": "group",
+				"sub": [
+					{
+						"name": "纯色背景祛瑕疵",
+						"type": "algorithm",
+						"algorithmid": 610001,
+						"ename": "clear_color_background_to_remove_defects",
+						"param": [
+							{
+								"type": "slider",
+								"min": 0,
+								"max": 100,
+								"default": 0,
+								"step": 1,
+								"scope": 1,
+								"ename": "value"
+							}
+						],
+						"operator_type": 1,
+						"effective_time": 0,
+						"retouch_type": "color"
+					}
+				]
+			},
+			{
+				"name": "证件照换背景",
+				"type": "classify",
+				"classifyid": 62,
+				"moduleType": "group",
+				"sub": [
+					{
+						"name": "证件照换背景",
+						"type": "classify",
+						"classifyid": 63,
+						"moduleType": "tabGroup",
+						"ename": "change_background",
+						"sub": [
+							{
+								"algorithmid": 620001,
+								"effective_time": 0,
+								"ename": "sys_changebackground",
+								"moduleType": "rowGroup",
+								"name": "推荐",
+								"operator_type": 1,
+								"retouch_type": "color",
+								"rowNum": 7,
+								"type": "algorithm",
+								"group": []
+							},
+							{
+								"algorithmid": 620001,
+								"effective_time": 0,
+								"ename": "cus_changebackground",
+								"moduleType": "rowGroup",
+								"name": "自定义",
+								"operator_type": 1,
+								"retouch_type": "color",
+								"rowNum": 7,
+								"type": "algorithm",
+								"group": []
+							}
+						]
+					}
+				]
+			}
+		]
+	},
+	{
+		"name": "衣物",
+		"type": "classify",
+		"classifyid": 70,
+		"ename": "clothing",
+		"svg_active": "clothing_active",
+		"sub": [
+			{
+				"name": "衣服美化",
+				"type": "classify",
+				"classifyid": 71,
+				"moduleType": "group",
+				"sub": [
+					{
+						"name": "衣服祛褶皱",
+						"type": "algorithm",
+						"algorithmid": 710001,
+						"ename": "removing_wrinkles_from_clothing",
+						"param": [
+							{
+								"type": "slider",
+								"min": 0,
+								"max": 100,
+								"default": 0,
+								"step": 1,
+								"scope": 1,
+								"ename": "value"
+							}
+						],
+						"operator_type": 1,
+						"effective_time": 0,
+						"retouch_type": "color"
+					}
+				]
+			}
+		]
+	},
+	{
+		"name": "画面",
+		"type": "classify",
+		"classifyid": 4,
+		"ename": "edit",
+		"svg_active": "edit_active",
+		"unableSetChoose": true,
+		"sub": [
+			{
+				"name": "裁剪",
+				"type": "algorithm",
+				"algorithmid": 410001,
+				"ename": "cut",
+				"param": [
+					{
+						"name": "比例",
+						"type": "drop_list",
+						"ename": "proportion",
+						"drop_list_items": [
+							"自由尺寸",
+							"原始尺寸",
+							"自定义比例",
+							"固定比例",
+							"16:9",
+							"4:3"
+						],
+						"default": "原始尺寸"
+					},
+					{
+						"name": "角度旋转",
+						"type": "slider",
+						"ename": "angular_rotation",
+						"min": -180,
+						"max": 180,
+						"default": 0
+					}
+				],
+				"operator_type": 4,
+				"effective_time": 4
+			}
+		]
+	}
+]

@@ -1,0 +1,92 @@
+{
+    "param": [
+        {
+            "name": "囍糖派01",
+            "traditional_name": "囍糖派01",
+            "icon": "https://staticsns.cdn.bcebos.com/amis/2025-4/1745215711201/xitangpai01.jpg",
+            "material_icon": "color_ai_example/icon/xitangpai/xitangpai01.jpg",
+            "scene": "color_ai_example/images/xitangpai/xitangpai01.jpg",
+            "ename": "xitangpai"
+        },
+        {
+            "name": "囍糖派02",
+            "traditional_name": "囍糖派02",
+            "icon": "https://staticsns.cdn.bcebos.com/amis/2025-4/1745215711421/xitangpai02.jpg",
+            "scene": "color_ai_example/images/xitangpai/xitangpai02.jpg",
+            "material_icon": "color_ai_example/icon/xitangpai/xitangpai02.jpg",
+            "ename": "xitangpai"
+        },
+        {
+            "name": "浮光信步01",
+            "traditional_name": "浮光信步01",
+            "icon": "https://staticsns.cdn.bcebos.com/amis/2025-4/1745825515420/fuguangxinbu01.jpg",
+            "scene": "color_ai_example/images/fuguangxinbu/fuguangxinbu01.jpg",
+            "material_icon": "color_ai_example/icon/fuguangxinbu/fuguangxinbu01.jpg",
+            "ename": "fuguangxinbu"
+        },
+        {
+            "name": "浮光信步02",
+            "traditional_name": "浮光信步02",
+            "icon": "https://staticsns.cdn.bcebos.com/amis/2025-4/1745825515682/fuguangxinbu02.jpg",
+            "scene": "color_ai_example/images/fuguangxinbu/fuguangxinbu02.jpg",
+            "material_icon": "color_ai_example/icon/fuguangxinbu/fuguangxinbu02.jpg",
+            "ename": "fuguangxinbu"
+        },
+        {
+            "name": "纯白誓言01",
+            "traditional_name": "純白誓言01",
+            "icon": "https://staticsns.cdn.bcebos.com/amis/2025-4/1745825548313/chunbaishiyan01.jpg",
+            "scene": "color_ai_example/images/chunbaishiyan/chunbaishiyan01.jpg",
+            "material_icon": "color_ai_example/icon/chunbaishiyan/chunbaishiyan01.jpg",
+            "ename": "chunbaishiyan"
+        },
+        {
+            "name": "纯白誓言02",
+            "traditional_name": "純白誓言02",
+            "icon": "https://staticsns.cdn.bcebos.com/amis/2025-4/1745825548563/chunbaishiyan02.jpg",
+            "scene": "color_ai_example/images/chunbaishiyan/chunbaishiyan02.jpg",
+            "material_icon": "color_ai_example/icon/chunbaishiyan/chunbaishiyan02.jpg",
+            "ename": "chunbaishiyan"
+        },
+        {
+            "name": "锦绣良缘01",
+            "traditional_name": "錦繡良緣01",
+            "icon": "https://staticsns.cdn.bcebos.com/amis/2025-4/1745825575033/jinxiuliangyuan01.jpg",
+            "scene": "color_ai_example/images/jinxiuliangyuan/jinxiuliangyuan01.jpg",
+            "material_icon": "color_ai_example/icon/jinxiuliangyuan/jinxiuliangyuan01.jpg",
+            "ename": "jinxiuliangyuan"
+        },
+        {
+            "name": "锦绣良缘02",
+            "traditional_name": "錦繡良緣02",
+            "icon": "https://staticsns.cdn.bcebos.com/amis/2025-4/1745825575563/jinxiuliangyuan02.jpg",
+            "scene": "color_ai_example/images/jinxiuliangyuan/jinxiuliangyuan02.jpg",
+            "material_icon": "color_ai_example/icon/jinxiuliangyuan/jinxiuliangyuan02.jpg",
+            "ename": "jinxiuliangyuan"
+        },
+        {
+            "name": "绿茵之约01",
+            "traditional_name": "綠茵之約",
+            "icon": "https://staticsns.cdn.bcebos.com/amis/2025-4/1745825592608/lvyinzhiyue01.jpg",
+            "scene": "color_ai_example/images/lvyinzhiyue/lvyinzhiyue01.jpg",
+            "material_icon": "color_ai_example/icon/lvyinzhiyue/lvyinzhiyue01.jpg",
+            "ename": "lvyinzhiyue"
+        },
+        {
+            "name": "绿茵之约02",
+            "traditional_name": "綠茵之約",
+            "icon": "https://staticsns.cdn.bcebos.com/amis/2025-4/1745825592871/lvyinzhiyue02.jpg",
+            "scene": "color_ai_example/images/lvyinzhiyue/lvyinzhiyue02.jpg",
+            "material_icon": "color_ai_example/icon/lvyinzhiyue/lvyinzhiyue02.jpg",
+            "ename": "lvyinzhiyue"
+        },
+        {
+            "name": "绿野漫步",
+            "traditional_name": "綠野漫步01",
+            "icon": "https://staticsns.cdn.bcebos.com/amis/2025-4/1745825600250/lvyemanbu01.jpg",
+            "scene": "color_ai_example/images/lvyemanbu/lvyemanbu01.jpg",
+            "material_icon": "color_ai_example/icon/lvyemanbu/lvyemanbu01.jpg",
+            "ename": "lvyemanbu"
+        }
+    ]
+}

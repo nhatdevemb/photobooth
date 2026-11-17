@@ -1,0 +1,331 @@
+{
+    "theme_makeup": {
+        "210010": {
+            "retouch_id_list": [
+                {
+                    "retouch_id": "280011",
+                    "value": {
+                        "value": 0.5,
+                        "right_value": 0.5,
+                        "scene": "/makeupFilter/eyebrowAdjust/texture/yizimei.png",
+                        "refer_name": "yizimei"
+                    }
+                },
+                {
+                    "retouch_id": "280001",
+                    "value": {
+                        "value": 0.75,
+                        "scene": "/makeupFilter/eyeshadow/eyeshadow_customized/texture/1.png"
+                    }
+                },
+                {
+                    "retouch_id": "280002",
+                    "value": {
+                        "value": 1,
+                        "scene": "/makeupFilter/eyelash/eyelash_default/texture/15.png"
+                    }
+                },
+                {
+                    "retouch_id": "280004",
+                    "value": {
+                        "value": 1,
+                        "scene": "/makeupFilter/rouge/texture/Blush09.png"
+                    }
+                },
+                {
+                    "retouch_id": "280003",
+                    "value": {
+                        "value": 0.75,
+                        "mode": "0",
+                        "scene": "165.0, 69.0, 60.0, 1.00"
+                    }
+                },
+                {
+                    "retouch_id": "280006",
+                    "value": {
+                        "value": 1,
+                        "scene": "/makeupFilter/faceAll/8.png"
+                    }
+                }
+            ]
+        },
+        "210011": {
+            "retouch_id_list": [
+                {
+                    "retouch_id": "280011",
+                    "value": {
+                        "value": 0.6,
+                        "right_value": 0.6,
+                        "scene": "/makeupFilter/eyebrowAdjust/texture/oushitiaomei.png",
+                        "refer_name": "oushitiaomei"
+                    }
+                },
+                {
+                    "retouch_id": "280001",
+                    "value": {
+                        "value": 1,
+                        "right_value": 1,
+                        "scene": "/makeupFilter/eyeshadow/eyeshadow_customized/texture/eyeshadow_oumei.png"
+                    }
+                },
+                {
+                    "retouch_id": "280002",
+                    "value": {
+                        "value": 0.6,
+                        "right_value": 0.6,
+                        "scene": "/makeupFilter/eyelash/eyelash_default/texture/6.png"
+                    }
+                },
+                {
+                    "retouch_id": "280004",
+                    "value": {
+                        "value": 0.6,
+                        "scene": "/makeupFilter/rouge/texture/Blush03.png"
+                    }
+                },
+                {
+                    "retouch_id": "280003",
+                    "value": {
+                        "value": 0.6,
+                        "mode": "0",
+                        "scene": "114.0, 47.0, 38.0, 1.00"
+                    }
+                },
+                {
+                    "retouch_id": "280006",
+                    "value": {
+                        "value": 1,
+                        "scene": "/makeupFilter/faceAll/1.png"
+                    }
+                }
+            ]
+        },
+        "210012": {
+            "retouch_id_list": [
+                {
+                    "retouch_id": "280011",
+                    "value": {
+                        "value": 0.5,
+                        "right_value": 0.5,
+                        "scene": "/makeupFilter/eyebrowAdjust/texture/liuyemei.png",
+                        "refer_name": "liuyemei"
+                    }
+                },
+                {
+                    "retouch_id": "280001",
+                    "value": {
+                        "value": 0.75,
+                        "right_value": 0.75,
+                        "scene": "/makeupFilter/eyeshadow/eyeshadow_customized/texture/1.png"
+                    }
+                },
+                {
+                    "retouch_id": "280002",
+                    "value": {
+                        "value": 0.5,
+                        "right_value": 0.5,
+                        "scene": "/makeupFilter/eyelash/eyelash_default/texture/1.png"
+                    }
+                },
+                {
+                    "retouch_id": "280004",
+                    "value": {
+                        "value": 0.65,
+                        "right_value": 0.65,
+                        "scene": "/makeupFilter/rouge/texture/blush_sweet.png"
+                    }
+                },
+                {
+                    "retouch_id": "280003",
+                    "value": {
+                        "value": 0.5,
+                        "mode": "0",
+                        "scene": "191.0, 63.0, 62.0, 1.000"
+                    }
+                },
+                {
+                    "retouch_id": "280006",
+                    "value": {
+                        "value": 1,
+                        "scene": "/makeupFilter/faceAll/2.png"
+                    }
+                }
+            ]
+        },
+        "210013": {
+            "retouch_id_list": [
+                {
+                    "retouch_id": "280011",
+                    "value": {
+                        "value": 0.5,
+                        "right_value": 0.5,
+                        "scene": "/makeupFilter/eyebrowAdjust/texture/yizimei.png",
+                        "refer_name": "yizimei"
+                    }
+                },
+                {
+                    "retouch_id": "280001",
+                    "value": {
+                        "value": 0.5,
+                        "right_value": 0.5,
+                        "scene": "/makeupFilter/eyeshadow/eyeshadow_customized/texture/chichaxiangbin.png"
+                    }
+                },
+                {
+                    "retouch_id": "280002",
+                    "value": {
+                        "value": 1,
+                        "right_value": 1,
+                        "scene": "/makeupFilter/eyelash/eyelash_default/texture/2.png"
+                    }
+                },
+                {
+                    "retouch_id": "280004",
+                    "value": {
+                        "value": 0.65,
+                        "scene": "/makeupFilter/rouge/texture/blush_girl.png"
+                    }
+                },
+                {
+                    "retouch_id": "280003",
+                    "value": {
+                        "value": 1,
+                        "mode": "0",
+                        "scene": "171.0, 52.0, 56.0, 1.00"
+                    }
+                },
+                {
+                    "retouch_id": "280006",
+                    "value": {
+                        "value": 0.4,
+                        "scene": "/makeupFilter/faceAll/4.png"
+                    }
+                }
+            ]
+        },
+        "210014": {
+            "retouch_id_list": [
+                {
+                    "retouch_id": "280011",
+                    "value": {
+                        "value": 0.06,
+                        "right_value": 0.06,
+                        "scene": "/makeupFilter/eyebrowAdjust/texture/eyebrow_child.png",
+                        "refer_name": "eyebrow_child"
+                    }
+                },
+                {
+                    "retouch_id": "280001",
+                    "value": {
+                        "value": 0.65,
+                        "right_value": 0.65,
+                        "scene": "/makeupFilter/eyeshadow/eyeshadow_customized/texture/1.png"
+                    }
+                },
+                {
+                    "retouch_id": "280002",
+                    "value": {
+                        "value": 0.5,
+                        "right_value": 0.5,
+                        "scene": "/makeupFilter/eyelash/eyelash_default/texture/9.png"
+                    }
+                },
+                {
+                    "retouch_id": "280004",
+                    "value": {
+                        "value": 1,
+                        "right_value": 1,
+                        "scene": "/makeupFilter/rouge/texture/blush_child.png"
+                    }
+                },
+                {
+                    "retouch_id": "280003",
+                    "value": {
+                        "value": 0.7,
+                        "mode": "0",
+                        "scene": "191.0, 63.0, 62.0, 1.00"
+                    }
+                },
+                {
+                    "retouch_id": "280006",
+                    "value": {
+                        "value": 1,
+                        "scene": "/makeupFilter/faceAll/contour_child.png"
+                    }
+                }
+            ]
+        },
+        "210015": {
+            "retouch_id_list": [
+                {
+                    "retouch_id": "280011",
+                    "value": {
+                        "value": 0.35,
+                        "right_value": 0.35,
+                        "scene": "/makeupFilter/eyebrowAdjust/texture/yizimei.png",
+                        "refer_name": "yizimei"
+                    }
+                },
+                {
+                    "retouch_id": "280001",
+                    "value": {
+                        "value": 0.45,
+                        "right_value": 0.45,
+                        "scene": "/makeupFilter/eyeshadow/eyeshadow_customized/texture/2.png"
+                    }
+                },
+                {
+                    "retouch_id": "280003",
+                    "value": {
+                        "value": 0.65,
+                        "mode": "0",
+                        "scene": "124.0, 47.0, 47.0, 1.00"
+                    }
+                },
+                {
+                    "retouch_id": "280006",
+                    "value": {
+                        "value": 0.5,
+                        "scene": "/makeupFilter/faceAll/1.png"
+                    }
+                }
+            ]
+        },
+        "210016": {
+            "retouch_id_list": [
+                {
+                    "retouch_id": "280011",
+                    "value": {
+                        "value": 0.5,
+                        "right_value": 0.5,
+                        "scene": "/makeupFilter/eyebrowAdjust/texture/yudiaomei.png",
+                        "refer_name": "yudiaomei"
+                    }
+                },
+                {
+                    "retouch_id": "280002",
+                    "value": {
+                        "value": 0.5,
+                        "right_value": 0.5,
+                        "scene": "/makeupFilter/eyelash/eyelash_default/texture/10.png"
+                    }
+                },
+                {
+                    "retouch_id": "280003",
+                    "value": {
+                        "value": 0.6,
+                        "mode": "0",
+                        "scene": "152.0, 36.0, 23.0, 1.00"
+                    }
+                },
+                {
+                    "retouch_id": "280006",
+                    "value": {
+                        "value": 1,
+                        "scene": "/makeupFilter/faceAll/contour_child.png"
+                    }
+                }
+            ]
+        }
+    }
+}

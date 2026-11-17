@@ -78,3 +78,26 @@ custom/desktop/dist/
 custom/desktop/staging/
 custom/desktop/node_modules/
 custom/desktop/.cache/
+
+# LK Magic-WIN binary/runtime ignores (keep source & config tracked)
+LK Magic-WIN/*.exe
+LK Magic-WIN/*.dll
+LK Magic-WIN/*.pak
+LK Magic-WIN/*.bin
+LK Magic-WIN/*.dat
+LK Magic-WIN/*.log
+LK Magic-WIN/driver/
+LK Magic-WIN/libgphoto2/
+LK Magic-WIN/libgphoto2_port/
+LK Magic-WIN/locales/
+LK Magic-WIN/runtime/
+LK Magic-WIN/app.asar/node_modules/
+LK Magic-WIN/resources/app.asar
+LK Magic-WIN/resources/app.asar.bak
+LK Magic-WIN/resources/app.asar.unpacked/
+LK Magic-WIN/resources/conf/
+LK Magic-WIN/resources/cdn_assets/
+LK Magic-WIN/resources/rawengine/
+LK Magic-WIN/resources/sys_core/
+LK Magic-WIN/resources/*.db*
+LK Magic-WIN/resources/*.exe

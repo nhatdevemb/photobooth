@@ -5,6 +5,7 @@ Beauty Retouch Engine — Configuration & Presets
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+import os
 from typing import Any, Dict, Optional
 
 
@@ -21,6 +22,11 @@ class BeautyConfig:
     face_model_path: Optional[str] = None
     segmenter_model_path: Optional[str] = None
     enabled: bool = True
+    engine: str = "auto"        # "auto" | "lkmagic" | "mediapipe"
+    lkmagic_url: str = "http://127.0.0.1:5520"
+    lkmagic_timeout_sec: float = 35.0
+    auto_start_lkmagic: bool = True
+    face_slim: bool = False     # Strictly disabled (no face/body reshaping)
 
     def __post_init__(self) -> None:
         # Clamp values
@@ -28,6 +34,9 @@ class BeautyConfig:
         self.brighten = float(max(0.0, min(1.0, self.brighten)))
         self.tone = float(max(0.0, min(1.0, self.tone)))
         self.max_faces = int(max(1, min(4, self.max_faces)))
+        self.face_slim = False
+        raw_engine = str(self.engine or "auto").strip().lower()
+        self.engine = raw_engine if raw_engine in ("auto", "lkmagic", "mediapipe") else "auto"
         if self.preset.lower() == "off" or (self.smooth == 0.0 and self.brighten == 0.0 and self.tone == 0.0):
             self.enabled = False
 
@@ -112,6 +121,12 @@ def resolve_beauty_config(
     tone = base["tone"]
     max_faces = 4
     enabled = canonical_name != "off"
+    engine = os.getenv("BEAUTY_ENGINE", "auto").strip().lower() or "auto"
+    lkmagic_url = os.getenv("LKMAGIC_BRIDGE_URL", "http://127.0.0.1:5520").strip() or "http://127.0.0.1:5520"
+    auto_start_lkmagic = (
+        "PYTEST_CURRENT_TEST" not in os.environ
+        and os.getenv("LKMAGIC_AUTO_START", "1").strip().lower() not in ("0", "false", "no", "off")
+    )
 
     if overrides:
         if "smooth" in overrides:
@@ -127,6 +142,12 @@ def resolve_beauty_config(
                 pass
         if "enabled" in overrides:
             enabled = bool(overrides["enabled"])
+        if "engine" in overrides and overrides["engine"]:
+            engine = str(overrides["engine"]).strip().lower()
+        if "lkmagic_url" in overrides and overrides["lkmagic_url"]:
+            lkmagic_url = str(overrides["lkmagic_url"]).strip()
+        if "auto_start_lkmagic" in overrides:
+            auto_start_lkmagic = bool(overrides["auto_start_lkmagic"])
 
     return BeautyConfig(
         preset=canonical_name,
@@ -137,4 +158,8 @@ def resolve_beauty_config(
         face_model_path=face_model_path,
         segmenter_model_path=segmenter_model_path,
         enabled=enabled,
+        engine=engine,
+        lkmagic_url=lkmagic_url,
+        auto_start_lkmagic=auto_start_lkmagic,
+        face_slim=False,
     )

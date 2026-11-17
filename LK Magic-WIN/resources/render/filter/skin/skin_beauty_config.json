@@ -1,0 +1,68 @@
+{
+    "skin_color_config": {
+        "beauty_name": "skin_color",
+        "skin_color_list": [
+            {
+                "id": 1,
+                "flag": "lengbai",
+                "icon": "",
+                "name": "冷白",
+                "lut_file": "lengbai.png"
+            },
+            {
+                "id": 2,
+                "flag": "naibai",
+                "icon": "",
+                "name": "奶白",
+                "lut_file": "naibai.png"
+            },
+            {
+                "id": 3,
+                "flag": "fenbai",
+                "icon": "",
+                "name": "粉白",
+                "lut_file": "fenbai.png"
+            },
+            {
+                "id": 4,
+                "flag": "nuanbai",
+                "icon": "",
+                "name": "暖白",
+                "lut_file": "nuanbai.png"
+            },
+            {
+                "id": 5,
+                "flag": "jiaotang",
+                "icon": "",
+                "name": "焦糖",
+                "lut_file": "jiaotang.png"
+            },
+            {
+                "id": 6,
+                "flag": "maihei",
+                "icon": "",
+                "name": "麦黑",
+                "lut_file": "maihei.png"
+            }
+        ]
+    },
+    "skin_prefer_config": {
+        "beauty_name": "skin_prefer",
+        "skin_prefer_list": [
+            {
+                "id": 0,
+                "flag": "pianleng",
+                "icon": "",
+                "name": "偏冷",
+                "lut_file": "pianleng.png"
+            },
+            {
+                "id": 1,
+                "flag": "piannuan",
+                "icon": "",
+                "name": "偏暖",
+                "lut_file": "piannuan.png"
+            }
+        ]
+    }
+}

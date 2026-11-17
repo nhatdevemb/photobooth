@@ -177,6 +177,11 @@ final class HealthService
                 'share_ttl_hours' => $this->config->shareTtlHours,
                 'held_sessions_count' => $heldCleanupCount,
             ],
+            'beauty_engine' => [
+                'mode' => $this->config->beautyEngine,
+                'lkmagic_bridge_url' => $this->config->lkmagicBridgeUrl,
+                'face_slim_enabled' => false,
+            ],
             'warnings' => $warnings,
         ];
     }

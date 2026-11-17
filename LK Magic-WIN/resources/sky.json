@@ -1,0 +1,244 @@
+{
+    "param": [
+        {
+            "name": "Trời xanh 1",
+            "traditional_name": "藍天1",
+            "icon": "https://staticsns.cdn.bcebos.com/amis/2025-3/1741617651546/lantian1.jpg",
+            "scene": "makeupFilter/sky/blueSky/1.jpg",
+            "ename": "lantian1",
+            "type_class": "sky"
+        },
+        {
+            "name": "Trời xanh 2",
+            "traditional_name": "藍天2",
+            "icon": "https://staticsns.cdn.bcebos.com/amis/2025-3/1741617651955/lantian2.jpg",
+            "scene": "makeupFilter/sky/blueSky/2.jpg",
+            "ename": "lantian2",
+            "type_class": "sky"
+        },
+        {
+            "name": "Trời xanh 3",
+            "traditional_name": "藍天3",
+            "icon": "https://staticsns.cdn.bcebos.com/amis/2025-3/1741617652205/lantian3.jpg",
+            "scene": "makeupFilter/sky/blueSky/3.jpg",
+            "ename": "lantian3",
+            "type_class": "sky"
+        },
+        {
+            "name": "Trời xanh 4",
+            "traditional_name": "藍天4",
+            "icon": "https://staticsns.cdn.bcebos.com/amis/2025-3/1741617652563/lantian4.jpg",
+            "scene": "makeupFilter/sky/blueSky/4.jpg",
+            "ename": "lantian4",
+            "type_class": "sky"
+        },
+        {
+            "name": "Trời xanh 5",
+            "traditional_name": "藍天5",
+            "icon": "https://staticsns.cdn.bcebos.com/amis/2025-3/1741617652841/lantian5.jpg",
+            "scene": "makeupFilter/sky/blueSky/5.jpg",
+            "ename": "lantian5",
+            "type_class": "sky"
+        },
+        {
+            "name": "Trời xanh 6",
+            "traditional_name": "藍天6",
+            "icon": "https://staticsns.cdn.bcebos.com/amis/2025-3/1741617652967/lantian6.jpg",
+            "scene": "makeupFilter/sky/blueSky/6.jpg",
+            "ename": "lantian6",
+            "type_class": "sky"
+        },
+        {
+            "name": "Trời xanh 7",
+            "traditional_name": "藍天7",
+            "icon": "https://staticsns.cdn.bcebos.com/amis/2025-3/1741617653240/lantian7.jpg",
+            "scene": "makeupFilter/sky/blueSky/7.jpg",
+            "ename": "lantian7",
+            "type_class": "sky"
+        },
+        {
+            "name": "Trời xanh 8",
+            "traditional_name": "藍天8",
+            "icon": "https://staticsns.cdn.bcebos.com/amis/2025-3/1741617653424/lantian8.jpg",
+            "scene": "makeupFilter/sky/blueSky/8.jpg",
+            "ename": "lantian8",
+            "type_class": "sky"
+        },
+        {
+            "name": "Trời xanh 9",
+            "traditional_name": "藍天9",
+            "icon": "https://staticsns.cdn.bcebos.com/amis/2025-3/1741617653717/lantian9.jpg",
+            "scene": "makeupFilter/sky/blueSky/9.jpg",
+            "ename": "lantian9",
+            "type_class": "sky"
+        },
+        {
+            "name": "Trời xanh 10",
+            "traditional_name": "藍天10",
+            "icon": "https://staticsns.cdn.bcebos.com/amis/2025-3/1741617654000/lantian10.jpg",
+            "scene": "makeupFilter/sky/blueSky/10.jpg",
+            "ename": "lantian10",
+            "type_class": "sky"
+        },
+        {
+            "name": "Mây 1",
+            "traditional_name": "雲朵1",
+            "icon": "https://staticsns.cdn.bcebos.com/amis/2025-3/1741617705220/yunduo1.jpg",
+            "scene": "makeupFilter/sky/whiteClouds/1.jpg",
+            "ename": "yunduo1",
+            "type_class": "cloud"
+        },
+        {
+            "name": "Mây 2",
+            "traditional_name": "雲朵2",
+            "icon": "https://staticsns.cdn.bcebos.com/amis/2025-3/1741617705439/yunduo2.jpg",
+            "scene": "makeupFilter/sky/whiteClouds/2.jpg",
+            "ename": "yunduo2",
+            "type_class": "cloud"
+        },
+        {
+            "name": "Mây 3",
+            "traditional_name": "雲朵3",
+            "icon": "https://staticsns.cdn.bcebos.com/amis/2025-3/1741617705757/yunduo3.jpg",
+            "scene": "makeupFilter/sky/whiteClouds/3.jpg",
+            "ename": "yunduo3",
+            "type_class": "cloud"
+        },
+        {
+            "name": "Mây 4",
+            "traditional_name": "雲朵4",
+            "icon": "https://staticsns.cdn.bcebos.com/amis/2025-3/1741617706049/yunduo4.jpg",
+            "scene": "makeupFilter/sky/whiteClouds/4.jpg",
+            "ename": "yunduo4",
+            "type_class": "cloud"
+        },
+        {
+            "name": "Mây 5",
+            "traditional_name": "雲朵5",
+            "icon": "https://staticsns.cdn.bcebos.com/amis/2025-3/1741617706265/yunduo5.jpg",
+            "scene": "makeupFilter/sky/whiteClouds/5.jpg",
+            "ename": "yunduo5",
+            "type_class": "cloud"
+        },
+        {
+            "name": "Mây 6",
+            "traditional_name": "雲朵6",
+            "icon": "https://staticsns.cdn.bcebos.com/amis/2025-3/1741617706443/yunduo6.jpg",
+            "scene": "makeupFilter/sky/whiteClouds/6.jpg",
+            "ename": "yunduo6",
+            "type_class": "cloud"
+        },
+        {
+            "name": "Mây 7",
+            "traditional_name": "雲朵7",
+            "icon": "https://staticsns.cdn.bcebos.com/amis/2025-3/1741617706728/yunduo7.jpg",
+            "scene": "makeupFilter/sky/whiteClouds/7.jpg",
+            "ename": "yunduo7",
+            "type_class": "cloud"
+        },
+        {
+            "name": "Mây 8",
+            "traditional_name": "雲朵8",
+            "icon": "https://staticsns.cdn.bcebos.com/amis/2025-3/1741617706951/yunduo8.jpg",
+            "scene": "makeupFilter/sky/whiteClouds/8.jpg",
+            "ename": "yunduo8",
+            "type_class": "cloud"
+        },
+        {
+            "name": "Mây 9",
+            "traditional_name": "雲朵9",
+            "icon": "https://staticsns.cdn.bcebos.com/amis/2025-3/1741617707139/yunduo9.jpg",
+            "scene": "makeupFilter/sky/whiteClouds/9.jpg",
+            "ename": "yunduo9",
+            "type_class": "cloud"
+        },
+        {
+            "name": "Mây 10",
+            "traditional_name": "雲朵10",
+            "icon": "https://staticsns.cdn.bcebos.com/amis/2025-3/1741617707436/yunduo10.jpg",
+            "scene": "makeupFilter/sky/whiteClouds/10.jpg",
+            "ename": "yunduo10",
+            "type_class": "cloud"
+        },
+        {
+            "name": "Hoàng hôn 1",
+            "traditional_name": "晚霞1",
+            "icon": "https://staticsns.cdn.bcebos.com/amis/2025-3/1741617740555/wanxia1.JPG",
+            "scene": "makeupFilter/sky/afterGlow/1.jpg",
+            "ename": "wanxia1",
+            "type_class": "after_glow"
+        },
+        {
+            "name": "Hoàng hôn 2",
+            "traditional_name": "晚霞2",
+            "icon": "https://staticsns.cdn.bcebos.com/amis/2025-3/1741617740749/wanxia2.jpg",
+            "scene": "makeupFilter/sky/afterGlow/2.jpg",
+            "ename": "wanxia2",
+            "type_class": "after_glow"
+        },
+        {
+            "name": "Hoàng hôn 3",
+            "traditional_name": "晚霞3",
+            "icon": "https://staticsns.cdn.bcebos.com/amis/2025-3/1741617741000/wanxia3.jpg",
+            "scene": "makeupFilter/sky/afterGlow/3.jpg",
+            "ename": "wanxia3",
+            "type_class": "after_glow"
+        },
+        {
+            "name": "Hoàng hôn 4",
+            "traditional_name": "晚霞4",
+            "icon": "https://staticsns.cdn.bcebos.com/amis/2025-3/1741617741259/wanxia4.jpg",
+            "scene": "makeupFilter/sky/afterGlow/4.jpg",
+            "ename": "wanxia4",
+            "type_class": "after_glow"
+        },
+        {
+            "name": "Hoàng hôn 5",
+            "traditional_name": "晚霞5",
+            "icon": "https://staticsns.cdn.bcebos.com/amis/2025-3/1741617741428/wanxia5.jpg",
+            "scene": "makeupFilter/sky/afterGlow/5.jpg",
+            "ename": "wanxia5",
+            "type_class": "after_glow"
+        },
+        {
+            "name": "Hoàng hôn 6",
+            "traditional_name": "晚霞6",
+            "icon": "https://staticsns.cdn.bcebos.com/amis/2025-3/1741617741608/wanxia6.jpg",
+            "scene": "makeupFilter/sky/afterGlow/6.jpg",
+            "ename": "wanxia6",
+            "type_class": "after_glow"
+        },
+        {
+            "name": "Hoàng hôn 7",
+            "traditional_name": "晚霞7",
+            "icon": "https://staticsns.cdn.bcebos.com/amis/2025-3/1741617741889/wanxia7.jpg",
+            "scene": "makeupFilter/sky/afterGlow/7.jpg",
+            "ename": "wanxia7",
+            "type_class": "after_glow"
+        },
+        {
+            "name": "Hoàng hôn 8",
+            "traditional_name": "晚霞8",
+            "icon": "https://staticsns.cdn.bcebos.com/amis/2025-3/1741617742204/wanxia8.jpg",
+            "scene": "makeupFilter/sky/afterGlow/8.jpg",
+            "ename": "wanxia8",
+            "type_class": "after_glow"
+        },
+        {
+            "name": "Hoàng hôn 9",
+            "traditional_name": "晚霞9",
+            "icon": "https://staticsns.cdn.bcebos.com/amis/2025-3/1741617742480/wanxia9.JPG",
+            "scene": "makeupFilter/sky/afterGlow/9.jpg",
+            "ename": "wanxia9",
+            "type_class": "after_glow"
+        },
+        {
+            "name": "Hoàng hôn 10",
+            "traditional_name": "晚霞10",
+            "icon": "https://staticsns.cdn.bcebos.com/amis/2025-3/1741617742825/wanxia10.JPG",
+            "scene": "makeupFilter/sky/afterGlow/10.jpg",
+            "ename": "wanxia10",
+            "type_class": "after_glow"
+        }
+    ]
+}

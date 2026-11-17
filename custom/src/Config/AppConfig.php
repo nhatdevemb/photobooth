@@ -51,6 +51,8 @@ final class AppConfig
     public readonly string $pythonBin;
     public readonly string $dccBaseUrl;
     public readonly string $dccCameraId;
+    public readonly string $lkmagicBridgeUrl;
+    public readonly string $beautyEngine;
 
     /**
      * @param array<string, string> $overrides
@@ -141,7 +143,7 @@ final class AppConfig
             shareSigningKey: $get('SHARE_SIGNING_KEY', 'dev_local_signing_key_photobooth_operator_edition_v1_hmac_sha256'),
             countdownSeconds: (int) $get('COUNTDOWN_SECONDS', '3'),
             captureTimeoutSeconds: (int) $get('CAPTURE_TIMEOUT_SECONDS', '15'),
-            renderTimeoutSeconds: (int) $get('RENDER_TIMEOUT_SECONDS', '30'),
+            renderTimeoutSeconds: (int) $get('RENDER_TIMEOUT_SECONDS', '90'),
             printSubmitTimeoutSeconds: (int) $get('PRINT_SUBMIT_TIMEOUT_SECONDS', '10'),
             printQueryTimeoutSeconds: (int) $get('PRINT_QUERY_TIMEOUT_SECONDS', '5'),
             workerHeartbeatSeconds: (int) $get('WORKER_HEARTBEAT_SECONDS', '2'),
@@ -155,7 +157,9 @@ final class AppConfig
             upstreamSha: $upstreamSha,
             pythonBin: $get('PYTHON_BIN', PHP_OS_FAMILY === 'Windows' ? 'python.exe' : 'python3'),
             dccBaseUrl: rtrim($get('DCC_BASE_URL', 'http://127.0.0.1:5513'), '/'),
-            dccCameraId: $get('DCC_CAMERA_ID', '')
+            dccCameraId: $get('DCC_CAMERA_ID', ''),
+            lkmagicBridgeUrl: rtrim($get('LKMAGIC_BRIDGE_URL', 'http://127.0.0.1:5520'), '/'),
+            beautyEngine: strtolower(trim($get('BEAUTY_ENGINE', 'auto')))
         );
 
         $instance->validate();
@@ -207,7 +211,9 @@ final class AppConfig
         string $upstreamSha,
         string $pythonBin = 'python3',
         string $dccBaseUrl = 'http://127.0.0.1:5513',
-        string $dccCameraId = ''
+        string $dccCameraId = '',
+        string $lkmagicBridgeUrl = 'http://127.0.0.1:5520',
+        string $beautyEngine = 'auto'
     ) {
         $this->appEnv = $appEnv;
         $this->appVersion = $appVersion;
@@ -251,6 +257,8 @@ final class AppConfig
         $this->pythonBin = $pythonBin;
         $this->dccBaseUrl = $dccBaseUrl;
         $this->dccCameraId = $dccCameraId;
+        $this->lkmagicBridgeUrl = $lkmagicBridgeUrl;
+        $this->beautyEngine = $beautyEngine;
     }
 
     public function validate(): void
@@ -285,6 +293,22 @@ final class AppConfig
                 "Cấu hình DEFAULT_BEAUTY_PRESET không hợp lệ: '{$this->defaultBeautyPreset}'.",
                 503
             );
+        }
+
+        if (!in_array($this->beautyEngine, ['auto', 'lkmagic', 'mediapipe'], true)) {
+            throw new ApiException(
+                'INVALID_BEAUTY_CONFIG',
+                "Cấu hình BEAUTY_ENGINE không hợp lệ: '{$this->beautyEngine}' (chỉ nhận 'auto', 'lkmagic' hoặc 'mediapipe').",
+                503
+            );
+        }
+
+        $lk = parse_url($this->lkmagicBridgeUrl);
+        if (!is_array($lk) || ($lk['scheme'] ?? '') !== 'http'
+            || !in_array($lk['host'] ?? '', ['127.0.0.1', '[::1]', 'localhost'], true)
+            || isset($lk['user'], $lk['pass']) || isset($lk['user']) || isset($lk['query'])
+            || isset($lk['fragment']) || !in_array($lk['path'] ?? '', ['', '/'], true)) {
+            throw new ApiException('INVALID_BEAUTY_CONFIG', 'LKMAGIC_BRIDGE_URL phải là HTTP loopback, ví dụ http://127.0.0.1:5520.', 503);
         }
 
         self::validateShareBaseUrl($this->shareBaseUrl);

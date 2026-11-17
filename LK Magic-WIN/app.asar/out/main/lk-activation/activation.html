@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self'; connect-src 'none'; base-uri 'none'; form-action 'none'; object-src 'none'">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Kích hoạt LK magic</title>
+  <link rel="stylesheet" href="activation.css">
+  <script src="activation-ui.js" defer></script>
+</head>
+<body>
+  <main>
+    <header><span class="mark" aria-hidden="true">LK</span><div><h1>Kích hoạt LK magic</h1><p>Vĩnh viễn <span>·</span> 1 máy tính <span>·</span> Offline</p></div></header>
+    <section aria-labelledby="machine-label">
+      <div class="label-row"><label for="machine" id="machine-label">Mã máy của bạn</label><button id="copy" type="button" class="text-button">Sao chép mã</button></div>
+      <textarea id="machine" rows="2" readonly spellcheck="false" aria-describedby="machine-help"></textarea>
+      <p class="hint" id="machine-help">Gửi mã này cho người cấp key để nhận key dành riêng cho máy này.</p>
+      <button id="retry" type="button" class="text-button" hidden>Thử đọc lại mã máy</button>
+    </section>
+    <section aria-labelledby="key-label">
+      <div class="label-row"><label for="key" id="key-label">Key kích hoạt</label><button id="choose" type="button" class="text-button">Chọn file key</button></div>
+      <textarea id="key" rows="4" placeholder="Dán key LK1… hoặc chọn file .lkkey" spellcheck="false" autocomplete="off"></textarea>
+    </section>
+    <p id="status" role="status" aria-live="polite">Đang đọc thông tin kích hoạt…</p>
+    <div class="actions"><button id="quit" class="secondary" type="button">Để sau</button><button id="activate" class="primary" type="button" disabled>Kích Hoạt KEY</button></div>
+    <footer><span>Key chỉ dùng trên máy có mã tương ứng.</span><button id="support" type="button" class="text-button">Liên hệ cấp key</button></footer>
+  </main>
+</body>
+</html>

@@ -88,7 +88,7 @@ def caddy_config(public, settings, ports, data):
             env SCRIPT_FILENAME {json.dumps(public + '/' + script)}
             env SCRIPT_NAME /{script}
             env REQUEST_URI {{http.request.orig_uri}}
-            read_timeout 45s
+            read_timeout 120s
         }}
     }}
 }}''')
@@ -142,6 +142,23 @@ def main():
                                          stdin=subprocess.DEVNULL, stdout=log, stderr=log, cwd=project, creationflags=flags))
         children.append(subprocess.Popen([str(php), *php_options, str(project / "custom/bin/worker.php")],
                                          stdin=subprocess.DEVNULL, stdout=log, stderr=log, cwd=runtime / "php", creationflags=flags))
+        if os.getenv("PB_DESKTOP_TEST") != "1" and os.getenv("LKMAGIC_AUTO_START", "1") != "0" and not os.getenv("PB_SOAK_SESSIONS"):
+            lk_candidates = [
+                Path(os.getenv("LKMAGIC_EXECUTABLE", "")),
+                project.parent / "LK Magic-WIN" / "LK magic.exe",
+                Path(os.getenv("LOCALAPPDATA", "")) / "Programs" / "LK magic" / "LK magic.exe",
+            ]
+            for lk_exe in lk_candidates:
+                if lk_exe.name and lk_exe.is_file():
+                    lk_env = os.environ.copy()
+                    lk_env["LK_PHOTOBOOTH_BACKGROUND"] = "1"
+                    lk_env["LK_PHOTOBOOTH_PORT"] = os.getenv("LK_PHOTOBOOTH_PORT", "5520")
+                    try:
+                        subprocess.Popen([str(lk_exe)], cwd=str(lk_exe.parent), env=lk_env,
+                                         stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, creationflags=flags)
+                    except OSError:
+                        pass
+                    break
         opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))
         deadline = time.monotonic() + 20
         while time.monotonic() < deadline:

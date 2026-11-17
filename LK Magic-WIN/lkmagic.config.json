@@ -1,0 +1,7 @@
+{
+  "ApiBaseUrl": "https://taivoto.top",
+  "WebsiteUrl": "https://taivoto.top",
+  "TelegramBotUrl": "",
+  "EnableLegacyRuntimeCompatibility": true,
+  "EnableInsecureTlsCompatibility": false
+}

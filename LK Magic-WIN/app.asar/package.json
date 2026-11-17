@@ -1,0 +1,29 @@
+{
+    "version":  "3.12.10",
+    "description":  "LK magic AI Photo Retouching",
+    "main":  "./out/main/index.js",
+    "author":  "Baidu.com, Inc.",
+    "homepage":  "https://pan.baidu.com/",
+    "license":  "https://pan.baidu.com/disk/main#/protocol/duty_mobi",
+    "dependencies":  {
+                         "@electron-toolkit/preload":  "^3.0.0",
+                         "@electron-toolkit/utils":  "^3.0.0",
+                         "@sentry/electron":  "4.14.0",
+                         "@sentry/vue":  "7.77.0",
+                         "axios":  "1.14.0",
+                         "electron-updater":  "6.1.8",
+                         "html2canvas":  "^1.4.1",
+                         "koffi":  "2.8.11",
+                         "qrcode":  "^1.5.4",
+                         "vue-i18n":  "^10.0.5",
+                         "vue-observe-visibility":  "^1.0.0"
+                     },
+    "engines":  {
+                    "node":  "\u003e=16.17.0",
+                    "npm":  "\u003e=8.0.0"
+                },
+    "packageType":  "standard",
+    "name":  "lk-magic",
+    "title":  "LK magic",
+    "productName":  "LK magic"
+}

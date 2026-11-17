@@ -18,7 +18,8 @@ if (process.env.PB_DESKTOP_DATA_DIR) {
     app.setPath('crashDumps', path.join(path.dirname(data), 'electron-crashes'));
 }
 const setupUrl = pathToFileURL(path.join(directory, 'setup.html')).href;
-let window, supervisor, ownedDcc, stopping = false, ready = false;
+const lkmagicPort = Number(process.env.LK_PHOTOBOOTH_PORT || 5520);
+let window, supervisor, ownedDcc, ownedLkMagic = false, stopping = false, ready = false;
 
 if (!app.requestSingleInstanceLock()) app.quit();
 else {
@@ -27,6 +28,17 @@ else {
 }
 
 async function exists(file) { return access(file).then(() => true).catch(() => false); }
+async function findLkMagicExecutable() {
+    const candidates = [
+        process.env.LKMAGIC_EXECUTABLE,
+        path.resolve(project, '..', 'LK Magic-WIN', 'LK magic.exe'),
+        path.join(app.getPath('appData'), '..', 'Local', 'Programs', 'LK magic', 'LK magic.exe'),
+    ].filter(Boolean);
+    for (const candidate of candidates) {
+        if (await exists(candidate)) return candidate;
+    }
+    return '';
+}
 async function loadSettings() {
     try { return JSON.parse(await readFile(path.join(data, 'desktop-settings.json'), 'utf8')); }
     catch { return {}; }
@@ -88,6 +100,22 @@ ipcMain.handle('setup:launch', async (event, input) => {
                 launched.on('exit', () => { if (ownedDcc === launched) ownedDcc = null; });
             }
         }
+        if (process.env.PB_DESKTOP_TEST !== '1' && process.env.LKMAGIC_AUTO_START !== '0') {
+            const lkRunning = await fetch(`http://127.0.0.1:${lkmagicPort}/api/v1/health`, { signal: AbortSignal.timeout(1000) }).then((r) => r.ok).catch(() => false);
+            if (!lkRunning) {
+                const lkExe = await findLkMagicExecutable();
+                if (lkExe) {
+                    const lkProc = spawn(lkExe, [], {
+                        cwd: path.dirname(lkExe),
+                        windowsHide: true,
+                        stdio: 'ignore',
+                        env: { ...process.env, LK_PHOTOBOOTH_BACKGROUND: '1', LK_PHOTOBOOTH_PORT: String(lkmagicPort) },
+                    });
+                    lkProc.on('error', () => {});
+                    ownedLkMagic = true;
+                }
+            }
+        }
         const secretFile = path.join(data, 'desktop-secret.json');
         let secret;
         if (await exists(secretFile)) secret = JSON.parse(await readFile(secretFile, 'utf8')).signingKey;
@@ -132,6 +160,10 @@ ipcMain.handle('setup:launch', async (event, input) => {
 async function stopRuntime() {
     ready = false;
     const child = supervisor;
+    if (ownedLkMagic) {
+        ownedLkMagic = false;
+        await fetch(`http://127.0.0.1:${lkmagicPort}/api/v1/shutdown`, { method: 'POST', signal: AbortSignal.timeout(2000) }).catch(() => {});
+    }
     if (!child) { if (ownedDcc) { ownedDcc.kill(); ownedDcc = null; } return; }
     await new Promise((resolve) => {
         const timeout = setTimeout(() => { child.kill(); resolve(); }, 8000);
