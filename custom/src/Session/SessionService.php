@@ -207,14 +207,21 @@ final class SessionService
             $session = $this->lockSessionRow($pdo, $sessionId);
             $this->assertRevisionMatches($session, $revision);
             $this->assertNoActiveContentJob($session);
-            if ((int) $session['configuration_locked'] === 1) {
-                throw new ApiException('CONFIGURATION_LOCKED', 'Cấu hình đã khóa. Hãy bắt đầu phiên mới để thay đổi.', 409);
-            }
-            if ($session['state'] !== 'NEW') {
-                throw new ApiException('INVALID_STATE', 'Chỉ được cấu hình phiên chưa bắt đầu chụp.', 422);
+            $layoutLocked = (int) $session['configuration_locked'] === 1;
+            if ($layoutLocked) {
+                if (isset($payload['layout_id']) && $payload['layout_id'] !== $session['layout_id']) {
+                    throw new ApiException('CONFIGURATION_LOCKED', 'Bố cục đã khóa sau khi bắt đầu chụp. Bắt đầu phiên mới để đổi bố cục.', 409);
+                }
+                $photoCount = $pdo->prepare('SELECT COUNT(*) FROM session_slots WHERE session_id=:id AND current_photo_id IS NOT NULL');
+                $photoCount->execute([':id' => $sessionId]);
+                if (!in_array($session['state'], ['CAPTURED', 'REVIEW'], true) || (int) $photoCount->fetchColumn() !== (int) $session['capture_count']) {
+                    throw new ApiException('CONFIGURATION_LOCKED', 'Chụp đủ ảnh trước khi chọn filter và template. Ảnh đã duyệt cần mở lại trước khi chỉnh.', 409);
+                }
+            } elseif ($session['state'] !== 'NEW') {
+                throw new ApiException('INVALID_STATE', 'Phiên hiện tại không cho phép chỉnh cấu hình.', 422);
             }
             $layoutId = (string) ($payload['layout_id'] ?? $session['layout_id']);
-            $layout = $this->catalog->layout($layoutId);
+            $layout = $layoutLocked ? $this->catalog->layout($layoutId, $session['layout_version']) : $this->catalog->layout($layoutId);
             $lut = (string) ($payload['lut_id'] ?? $session['selected_lut']);
             if ($lut === $session['selected_lut'] && (!isset($payload['lut_version']) || $payload['lut_version'] === $session['lut_version'])) {
                 $lutInfo = $this->luts->resolve($lut, $session['lut_version']);
@@ -280,6 +287,17 @@ final class SessionService
             $beautySmooth = max(0, min(100, $beautySmooth));
             $beautyBrighten = max(0, min(100, $beautyBrighten));
             $beautyTone = max(0, min(100, $beautyTone));
+
+            $styleChanged = $lut !== $session['selected_lut'] || $lutInfo['version'] !== $session['lut_version']
+                || $template['id'] !== $session['template_id'] || $template['version'] !== $session['template_version']
+                || $beautyPreset !== $session['beauty_preset'] || $beautySmooth !== (int) $session['beauty_smooth']
+                || $beautyBrighten !== (int) $session['beauty_brighten'] || $beautyTone !== (int) $session['beauty_tone'];
+            if ($layoutLocked && $styleChanged) {
+                // A new style needs a new render; published originals and historic finals stay immutable.
+                $pdo->prepare('UPDATE renders SET valid=0 WHERE session_id=:id')->execute([':id' => $sessionId]);
+                $pdo->prepare("UPDATE sessions SET state='CAPTURED', current_render_id=NULL WHERE id=:id")->execute([':id' => $sessionId]);
+                if (!isset($payload['ui_step'])) { $step = 3; }
+            }
 
             $now = Clock::nowIso();
             $pdo->prepare('UPDATE sessions SET selected_lut=:lut,lut_version=:lutv,lut_intensity=:luti,lut_sha256=:luts,layout_id=:layout,layout_version=:lv,template_id=:template,template_version=:tv,capture_count=:count,ui_step=:step,beauty_preset=:bpreset,beauty_smooth=:bsmooth,beauty_brighten=:bbrighten,beauty_tone=:btone,revision=revision+1,updated_at=:now WHERE id=:id')
@@ -576,7 +594,7 @@ final class SessionService
 
                 $pdo->prepare(
                     'UPDATE sessions
-                     SET state = :new_state, pre_job_state = :pre_state, revision = :rev, active_job_id = :jid, updated_at = :now, configuration_locked = 1, ui_step = 4
+                     SET state = :new_state, pre_job_state = :pre_state, revision = :rev, active_job_id = :jid, updated_at = :now, configuration_locked = 1, ui_step = 2
                      WHERE id = :id'
                 )->execute([
                     ':new_state' => 'CAPTURING',
@@ -1124,7 +1142,7 @@ final class SessionService
 
             $pdo->prepare(
                 'UPDATE sessions
-                 SET ui_step = 4, state = :st, revision = :rev, current_render_id = NULL, current_final_id = NULL, updated_at = :now
+                 SET ui_step = 2, state = :st, revision = :rev, current_render_id = NULL, current_final_id = NULL, updated_at = :now
                  WHERE id = :id'
             )->execute([
                 ':st' => 'CAPTURED',
@@ -2030,7 +2048,7 @@ final class SessionService
             'layout_version' => (string) $session['layout_version'],
             'capture_count' => (int) $session['capture_count'],
             'configuration_locked' => (bool) $session['configuration_locked'],
-            'ui_step' => in_array($session['state'], ['RENDERING','REVIEW','FINALIZED','CLOSED'], true) ? 5 : (int) $session['ui_step'],
+            'ui_step' => in_array($session['state'], ['RENDERING','FINALIZED','CLOSED'], true) ? 5 : (int) $session['ui_step'],
             'slots' => $slots,
             'current_render' => $currentRender,
             'current_final' => $currentFinal,

@@ -13,13 +13,18 @@ export async function setup(page, layout = 'postcard-three')
 {
     await page.locator('#btn-new-session').click();
     await expect(page.locator('[data-step="1"]')).toHaveAttribute('aria-current', 'step');
-    await page.locator('[data-lut-id="korean-soft"]').click();
+    await page.locator('[data-layout-id="' + layout + '"]').click();
     await page.locator('#btn-next').click();
-    await page.locator(`[data-layout-id="${layout}"]`).click();
+    await expect(page.locator('[data-step="2"]')).toHaveAttribute('aria-current', 'step');
+}
+
+export async function style(page, lut = 'korean-soft')
+{
+    await page.locator('#btn-next').click();
+    await page.locator('[data-lut-id="' + lut + '"]').click();
     await page.locator('#btn-next').click();
     await page.locator('[data-style="cute"]').click();
     await page.locator('#btn-next').click();
-    await expect(page.locator('[data-step="4"]')).toHaveAttribute('aria-current', 'step');
 }
 
 export async function review(page, layout = 'postcard-three', waitPreview = true)
@@ -27,7 +32,7 @@ export async function review(page, layout = 'postcard-three', waitPreview = true
     await setup(page, layout);
     await page.locator('#btn-auto-capture-all').click();
     await expect(page.locator('.slot-thumb-box img')).toHaveCount(layout === 'single' ? 1 : layout === 'grid-four' ? 4 : 3);
-    await page.locator('#btn-next').click();
+    await style(page);
     if (waitPreview) await expect(page.locator('#btn-finalize-session')).toBeEnabled();
 }
 

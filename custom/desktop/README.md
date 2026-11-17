@@ -1,12 +1,12 @@
 # Photobooth Windows với digiCamControl
 
-Bản thử 0.1.0 chạy Operator Edition trong Electron, dùng PHP/Python/Caddy đóng gói sẵn. Camera thật giao tiếp với digiCamControl đã cài trên Windows. Máy in luôn dùng mock trong bản này.
+Bản thử 0.1.1 chạy Operator Edition trong Electron, dùng PHP/Python/Caddy đóng gói sẵn. Camera thật giao tiếp với digiCamControl đã cài trên Windows. Máy in luôn dùng mock trong bản này.
 
 ## Cài và mở app
 
-1. Chạy `dist/Photobooth-Setup-0.1.0-x64.exe` từ Explorer, cài cho tài khoản Windows hiện tại và mở shortcut **Photobooth Operator**. Không cần cài Electron, PHP, Python, Node, Canon SDK hoặc Visual Studio Build Tools để dùng app.
+1. Chạy `dist/Photobooth-Setup-0.1.1-x64.exe` từ Explorer, cài cho tài khoản Windows hiện tại và mở shortcut **Photobooth Operator**. Không cần cài Electron, PHP, Python, Node, Canon SDK hoặc Visual Studio Build Tools để dùng app.
 2. Lần đầu chọn **Ảnh mô phỏng để thử app**, chọn IP LAN của laptop và hai cổng khác nhau (mặc định operator 8080, guest 8081). Tạo Admin với mật khẩu ít nhất 12 ký tự.
-3. Bấm **Khởi động Photobooth**, đăng nhập và chạy luồng Filter → Bố cục → Template → Chụp → Xem lại → QR. Lệnh in là mô phỏng, không ra giấy.
+3. Bấm **Khởi động Photobooth**, đăng nhập và chạy luồng Bố cục → Chụp ảnh → Filter/Beauty → Template → Duyệt/QR. Lệnh in là mô phỏng, không ra giấy.
 4. Dữ liệu lưu ở `%LOCALAPPDATA%\PhotoboothOperator\data`, tách khỏi thư mục cài. Nâng cấp bằng bộ cài mới giữ dữ liệu; gỡ app không tự xóa ảnh. Menu **Photobooth → Cấu hình / khởi động lại** quay về thiết lập; tài khoản đã tạo không bị đặt lại mật khẩu.
 
 Bộ cài thử chưa ký chứng thư phát hành. Windows có thể hiện cảnh báo nhà phát hành chưa xác định. Chỉ dùng artifact do chính lần build này tạo và đối chiếu SHA-256 trong `dist/SHA256SUMS.txt`.
@@ -17,11 +17,11 @@ Bộ cài thử chưa ký chứng thư phát hành. Windows có thể hiện c�
 2. Bật R10 ở chế độ ảnh tĩnh, chọn JPEG và AF, nối cáp USB truyền dữ liệu. Trong USB app selection chọn **Photo Import/Remote Control**. Đóng EOS Utility nếu đang giữ camera.
 3. Trong digiCamControl tạo/chọn session dành riêng cho Photobooth; tắt auto-export/resize/chuyển đổi ảnh. Bật **Webserver**, **Allow interaction**, tắt **Allow public access**; cổng mặc định 5513.
 4. Trong app chọn **Canon R10 qua digiCamControl**. Khi chỉ có một camera có thể để trống serial; nếu có nhiều camera phải nhập đúng serial. App chỉ mở digiCamControl khi API chưa phản hồi và đường dẫn `CameraControl.exe` hợp lệ; không đóng instance đã mở sẵn.
-5. Tại bước chụp, bấm **Bật live view R10** rồi thử một ảnh và retake. Không bấm chụp trên DCC/camera trong lúc app đang chạy một job.
+5. Live view tự bật khi đăng nhập vào bàn chụp và được giữ qua các bước, kể cả đếm 3–2–1. Nếu kết nối lỗi, bấm **Bật live view R10** để thử lại. Không bấm chụp trên DCC/camera trong lúc app đang chạy một job.
 
 Nếu timeout/mất USB, kiểm tra tình trạng thiết bị và tạo thao tác chụp mới. App không tự gửi lại màn trập khi không biết lệnh trước đã chụp hay chưa; retake lỗi giữ ảnh cũ. JPEG trong DATA_DIR được giữ nguyên byte trước khi áp Beauty/LUT và ghép template.
 
-R10 thật, tốc độ live view và autofocus vẫn cần nghiệm thu trên thiết bị. Việc bộ kiểm thử DCC giả lập đạt không xác nhận các khả năng này trên camera thật.
+Ngày 17/11/2026 đã kiểm thử một ảnh bằng R10 thật: live view cập nhật trong từng nhịp 3–2–1, nhận JPEG, chọn filter/template sau chụp và tạo QR. Đây là smoke test trên thiết bị, chưa thay thế nghiệm thu 100 lần chụp, đo FPS dài hạn và kiểm tra rút USB. Khi màn trập mở/đang tải JPEG, máy ảnh có thể tạm ngắt live view; app giữ khung cuối rồi tiếp tục khi thiết bị trả hình.
 
 ## Wi-Fi và cổng mạng
 
@@ -50,10 +50,12 @@ Build wrapper gọi npm bằng Node + argv array vì shell/PowerShell trên mộ
 
 - `npm test`: kiểm tra cấu hình và HTTP E2E với FastCGI/worker/pipeline thật, DCC giả lập, đủ bốn layout, retake, chống gửi lệnh trùng, QR được giải mã và guest isolation. Có thư mục dữ liệu tiếng Việt.
 - `npm run test:soak`: 30 phiên qua DCC HTTP giả lập, một retake mỗi phiên, render/finalize/QR/đóng phiên; máy in thật không tham gia.
+- `npm run test:liveview`: DCC giả lập, xác nhận frame mới được hiển thị tại từng nhịp 3–2–1, chuyển đủ các bước và tạo QR. Chỉ đặt `PB_REAL_DCC=1` khi chủ động muốn chụp một ảnh thật với R10 đang kết nối; DCC cần chạy ở cổng 5513.
+- `node scripts/test-packaged-session-cycle.mjs`: chạy trọn hai phiên liên tiếp trên executable đóng gói, gồm QR/tải đúng hash, in mock, đóng phiên và tạo/chụp phiên mới; xác nhận trạng thái sạch và live view tiếp tục. DCC giả lập, Beauty Off, không kiểm thử LK Magic hoặc in thật.
 - `npm run test:electron`: mở app từ source bằng Playwright; `npm run test:packaged`: thử executable trong `dist/win-unpacked`. Hai bài này có thể hiện cửa sổ ngắn để chụp screenshot và dùng DATA_DIR tạm.
 - Chạy PHPUnit/Pytest bằng PHP/Python trong `runtime/`; đặt `PYTHON_BIN` là đường dẫn tuyệt đối tới Python đóng gói. Xem kết quả cụ thể ở [báo cáo Windows](../../plan/windows-test-report.md).
 - Maintenance chạy tự động sau năm phút và mỗi giờ; incoming DCC cũ được dọn theo retention khi camera không bị khóa, giữ nguyên ảnh đã publish và biên nhận chống chụp trùng.
 - Log vận hành: `data/logs/app.jsonl` và `data/logs/desktop-runtime.log`. Không gửi `desktop-secret.json`, mật khẩu hoặc ảnh khách khi chia sẻ log.
 - Nếu chạy trong sandbox Codex báo Electron không đọc được install directory, thử bản cài bằng Explorer trong tài khoản Windows bình thường. Giữ sandbox Electron bật; không dùng `--no-sandbox` để phát hành. Lỗi quyền của môi trường chạy thử không phải thiếu Electron.
 
-Chưa nghiệm thu Windows 11 trên máy sạch, firewall LAN thực tế, R10 vật lý, in thật hoặc ca chạy bốn giờ. Bộ cài hiện là bản thử để kiểm chứng phần mềm trước khi vận hành sự kiện.
+Chưa nghiệm thu Windows 11 trên máy sạch, firewall LAN thực tế, độ bền R10, in thật hoặc ca chạy bốn giờ. Bộ cài hiện là bản thử để kiểm chứng phần mềm trước khi vận hành sự kiện.

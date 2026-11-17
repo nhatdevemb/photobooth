@@ -17,6 +17,8 @@ const env = {
     TRUSTED_HOSTS: '127.0.0.1,localhost,192.168.4.1',
     CAMERA_ADAPTER: process.env.PB_BROWSER_CAMERA || 'mock',
     PRINTER_ADAPTER: 'mock',
+    BEAUTY_ENGINE: 'mediapipe',
+    LKMAGIC_AUTO_START: '0',
     MOCK_CAPTURE_DELAY_MS: '0',
     MOCK_COUNTDOWN_DELAY_MS: '0',
     MOCK_PRINTER_SCENARIO: process.env.PB_BROWSER_PRINTER_SCENARIO || 'normal',

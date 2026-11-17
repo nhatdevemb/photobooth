@@ -1,5 +1,5 @@
 import { test, expect } from 'playwright/test';
-import { login, setup, review, cleanup } from './helpers.mjs';
+import { login, setup, style, review, cleanup } from './helpers.mjs';
 test.afterEach(cleanup);
 
 test('four-shot wizard persists locked choices and produces the approved print', async ({ page }, info) => {
@@ -17,7 +17,7 @@ test('four-shot wizard persists locked choices and produces the approved print',
         expect(await page.locator('#btn-next').evaluate((button) => button.getBoundingClientRect().bottom <= innerHeight)).toBe(true);
         await page.screenshot({ path: info.outputPath(`capture-${size.width}.png`), fullPage: true });
     }
-    await page.locator('#btn-next').click();
+    await style(page);
     await expect(page.locator('#btn-finalize-session')).toBeEnabled();
     for (const size of [{ width: 1366, height: 768 }, { width: 1920, height: 1080 }]) {
         await page.setViewportSize(size);
@@ -82,12 +82,15 @@ with zipfile.ZipFile(sys.argv[2],'w',zipfile.ZIP_DEFLATED) as z:
     await page.locator('#btn-new-session').click();
     for (const size of [{ width: 1366, height: 768 }, { width: 1920, height: 1080 }]) {
         await page.setViewportSize(size);
-        await expect(page.locator('#selection-preview')).toBeVisible();
+        await expect(page.locator('#live-preview-img')).toBeVisible();
         expect(await page.locator('#btn-next').evaluate((button) => button.getBoundingClientRect().bottom <= innerHeight)).toBe(true);
         await page.screenshot({ path: info.outputPath(`filter-${size.width}.png`), fullPage: true });
     }
-    await page.locator('#btn-next').click();
     await page.locator('[data-layout-id="single"]').click();
+    await page.locator('#btn-next').click();
+    await page.locator('#btn-auto-capture-all').click();
+    await expect(page.locator('.slot-thumb-box img')).toHaveCount(1);
+    await page.locator('#btn-next').click();
     await page.locator('#btn-next').click();
     await page.locator('[data-template-id="browser-custom-single"]').click();
     await expect(page.locator('[data-template-id="browser-custom-single"]')).toHaveAttribute('aria-pressed', 'true');

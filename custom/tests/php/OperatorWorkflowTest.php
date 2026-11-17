@@ -80,6 +80,8 @@ final class OperatorWorkflowTest extends TestCase
             'PRINTER_ADAPTER' => 'mock',
             'MOCK_CAPTURE_DELAY_MS' => '0',
             'MOCK_COUNTDOWN_DELAY_MS' => '0',
+            'BEAUTY_ENGINE' => 'mediapipe',
+            'LKMAGIC_AUTO_START' => '0',
         ];
         return new Container(array_merge($baseEnv, $extraEnv));
     }
@@ -253,6 +255,49 @@ final class OperatorWorkflowTest extends TestCase
             'revision' => $resolve['json']['session_revision'], 'final_asset_id' => $session['current_final']['id'], 'copies' => 1, 'action' => 'reprint',
         ]);
         self::assertSame(404, $rejected['status']);
+    }
+
+
+    public function testStyleCanChangeAfterCaptureWithoutChangingOriginalsOrApprovingStaleRender(): void
+    {
+        $session = $this->apiRequest('POST', '/custom/api/sessions')['json'];
+        $id = $session['id'];
+        $session = $this->apiRequest('POST', "/custom/api/sessions/{$id}/configuration", ['revision'=>$session['revision'], 'layout_id'=>'single', 'beauty_preset'=>'off', 'ui_step'=>2])['json'];
+        $this->apiRequest('POST', "/custom/api/sessions/{$id}/slots/1/capture", ['revision'=>$session['revision']]);
+        $this->container->workerRunner->drainAll();
+        $session = $this->apiRequest('GET', "/custom/api/sessions/{$id}")['json'];
+        self::assertSame(2, $session['ui_step']);
+        $original = $session['slots'][0]['photo'];
+        $payload = ['revision'=>$session['revision'], 'lut_id'=>'film-400', 'template_id'=>'cute-single', 'beauty_preset'=>'off', 'ui_step'=>3];
+        $key = Uuid::v4();
+        $styled = $this->apiRequest('POST', "/custom/api/sessions/{$id}/configuration", $payload, null, null, $key);
+        self::assertSame(200, $styled['status'], $styled['raw_body']);
+        self::assertSame($styled['json'], $this->apiRequest('POST', "/custom/api/sessions/{$id}/configuration", $payload, null, null, $key)['json']);
+        $session = $styled['json'];
+        self::assertSame($original, $session['slots'][0]['photo']);
+        self::assertSame(3, $session['ui_step']);
+        $blocked = $this->apiRequest('POST', "/custom/api/sessions/{$id}/configuration", ['revision'=>$session['revision'], 'layout_id'=>'grid-four']);
+        self::assertSame('CONFIGURATION_LOCKED', $blocked['json']['error']['code']);
+        $this->apiRequest('POST', "/custom/api/sessions/{$id}/render", ['revision'=>$session['revision']]);
+        $this->container->workerRunner->drainAll();
+        $session = $this->apiRequest('GET', "/custom/api/sessions/{$id}")['json'];
+        $oldRender = $session['current_render']['id'];
+        $session = $this->apiRequest('POST', "/custom/api/sessions/{$id}/configuration", ['revision'=>$session['revision'], 'lut_id'=>'original', 'template_id'=>'minimal-single', 'ui_step'=>4])['json'];
+        self::assertSame('CAPTURED', $session['state']);
+        self::assertNull($session['current_render']);
+        self::assertSame(4, $session['ui_step']);
+        self::assertSame($original, $session['slots'][0]['photo']);
+        $stale = $this->apiRequest('POST', "/custom/api/sessions/{$id}/finalize", ['revision'=>$session['revision'], 'render_id'=>$oldRender]);
+        self::assertGreaterThanOrEqual(400, $stale['status']);
+        $this->apiRequest('POST', "/custom/api/sessions/{$id}/render", ['revision'=>$session['revision']]);
+        $this->container->workerRunner->drainAll();
+        $session = $this->apiRequest('GET', "/custom/api/sessions/{$id}")['json'];
+        self::assertNotSame($oldRender, $session['current_render']['id']);
+        $this->apiRequest('POST', "/custom/api/sessions/{$id}/finalize", ['revision'=>$session['revision'], 'render_id'=>$session['current_render']['id']]);
+        $session = $this->apiRequest('GET', "/custom/api/sessions/{$id}")['json'];
+        self::assertSame('FINALIZED', $session['state']);
+        $blocked = $this->apiRequest('POST', "/custom/api/sessions/{$id}/configuration", ['revision'=>$session['revision'], 'lut_id'=>'vintage-fade']);
+        self::assertSame('CONFIGURATION_LOCKED', $blocked['json']['error']['code']);
     }
 
     public function testWizardGridConfigurationLocksOnFailedCaptureAndRestartReplays(): void

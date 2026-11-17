@@ -1,5 +1,5 @@
 import { test, expect } from 'playwright/test';
-import { login, setup, cleanup } from './helpers.mjs';
+import { login, setup, style, cleanup } from './helpers.mjs';
 
 test.afterEach(cleanup);
 
@@ -62,7 +62,7 @@ for (const [layout, count] of [['single', 1], ['strip-three', 3], ['postcard-thr
         const oldPhoto = session.slots[0].photo.id;
         await page.reload();
         await expect(page.locator('.slot-thumb-box img')).toHaveCount(count);
-        await expect(page.locator('#webcam-video')).toBeHidden();
+        await expect(page.locator('#webcam-video')).toBeVisible();
         await page.waitForTimeout(500);
         session = (await (await page.request.get('/custom/api/sessions/active')).json()).active_session;
         expect(session.slots[0].photo.id).toBe(oldPhoto);
@@ -90,8 +90,7 @@ test('phone viewport can switch camera, stop and capture a JPEG with an accurate
     await setup(page, 'single');
     await page.locator('#btn-webcam-enable').click();
     await expect(page.locator('#camera-badge')).toContainText('trực tiếp');
-    await expect(page.locator('#webcam-lut-canvas')).toBeVisible();
-    await expect(page.locator('#webcam-status')).toContainText('Filter: Hàn Quốc');
+    await expect(page.locator('#webcam-status')).toContainText('Filter: Gốc');
     await expect(page.locator('#btn-webcam-mirror')).toHaveAttribute('aria-pressed', 'true');
     await expect(page.locator('#webcam-video')).toHaveClass(/mirrored/);
     await expect(page.locator('#webcam-lut-canvas')).toHaveClass(/mirrored/);
@@ -125,6 +124,7 @@ test('phone viewport can switch camera, stop and capture a JPEG with an accurate
 test('permission errors are actionable and never substitute mock photos', async ({ page }) => {
     await login(page);
     await setup(page, 'single');
+    await page.locator('#btn-webcam-stop').click();
     await page.evaluate(() => {
         navigator.mediaDevices.getUserMedia = async () => { throw new DOMException('denied', 'NotAllowedError'); };
     });

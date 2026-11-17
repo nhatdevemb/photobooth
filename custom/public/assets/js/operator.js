@@ -12,12 +12,12 @@ const state = {
     layouts: [], templates: [], presets: [], share: null, previewKey: null,
     previewReady: false, renderError: '', job: null, history: [], cursor: null,
     detail: null, print: null, resolve: null, templatePreview: null, sampleGeneration: 0,
-    lutEditor: null, lutQuery: '', captureSlot: null,
+    cameraAttempted: false, cameraStarting: null, lutEditor: null, lutQuery: '', captureSlot: null,
 };
-const dccCamera = dccMode ? new DccCamera($('live-preview-img'), $('camera-badge'), $('dcc-status'), api, () => Boolean(state.job)) : null;
+const dccCamera = dccMode ? new DccCamera($('live-preview-img'), $('camera-badge'), $('dcc-status'), api) : null;
 const labels = { NEW: 'Chưa chụp', CAPTURING: 'Đang chụp', CAPTURED: 'Đã chụp', RENDERING: 'Đang ghép ảnh', REVIEW: 'Chờ duyệt', FINALIZED: 'Đã duyệt', CLOSED: 'Đã hoàn tất', CANCELLED: 'Đã hủy' };
-const stepTitles = ['Chọn filter yêu thích', 'Chọn bố cục ảnh', 'Chọn template yêu thích'];
-const descriptions = ['Filter sẽ áp dụng cho tất cả ảnh trong phiên này.', 'Chọn số lượng và vị trí ảnh trên giấy 100 × 148 mm.', 'Trang trí phù hợp với bố cục đã chọn.'];
+const stepTitles = { 1: 'Chọn bố cục ảnh', 3: 'Chọn filter yêu thích', 4: 'Chọn template yêu thích' };
+const descriptions = { 1: 'Chọn số lượng và vị trí ảnh trước khi chụp.', 3: 'Chọn màu và làm đẹp cho bộ ảnh vừa chụp.', 4: 'Chọn khung trang trí cho bộ ảnh của bạn.' };
 const esc = (value) => String(value ?? '').replace(/[&<>"']/g, (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[char]));
 const code = (id) => `PB-${id.slice(0, 8).toUpperCase()}`;
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
@@ -163,15 +163,39 @@ function printAction(session, finalId)
     ) ? 'reprint' : 'print';
 }
 
+function syncLiveView(visible)
+{
+    if (!visible) {
+        state.cameraAttempted = false;
+        if (browserMode && browserCamera.stream) browserCamera.stop();
+        dccCamera?.stop();
+        return;
+    }
+    if (state.cameraAttempted || state.cameraStarting || (!browserMode && !dccMode)) return;
+    state.cameraAttempted = true;
+    state.cameraStarting = (browserMode ? browserCamera.open($('webcam-device').value) : dccCamera.start())
+        .then(() => {
+            if (!state.user || state.view !== 'workspace') {
+                if (browserMode) browserCamera.stop();
+                else dccCamera.stop();
+                return;
+            }
+            syncCaptureLut(state.session);
+            updateCropGuide();
+        })
+        .catch((error) => { (dccMode ? $('dcc-status') : $('webcam-status')).textContent = error.message + ' Bấm Bật camera để thử lại.'; })
+        .finally(() => { state.cameraStarting = null; render(); });
+}
+
 function render()
 {
     const loggedIn = Boolean(state.user);
-    if (browserMode && (!loggedIn || state.view !== 'workspace' || state.step !== 4 || !state.session)) browserCamera.stop();
-    if (dccCamera && (!loggedIn || state.view !== 'workspace' || state.step !== 4 || !state.session)) dccCamera.stop();
+    syncLiveView(loggedIn && state.view === 'workspace');
     $('login-view').hidden = loggedIn;
     $('auth-user-bar').hidden = !loggedIn;
     for (const view of ['workspace', 'history', 'admin', 'luts']) $(view + '-view').hidden = !loggedIn || state.view !== view;
     $('wizard-nav').hidden = !loggedIn || state.view !== 'workspace' || !state.session;
+    $('selection-preview-dock').hidden = !loggedIn || state.view !== 'workspace' || !state.session || ![3, 4].includes(state.step);
     if (!loggedIn) return;
     $('current-user-display').textContent = state.user.username;
     $('current-role-badge').textContent = state.user.role === 'admin' ? 'Quản trị viên' : 'Người vận hành';
@@ -188,50 +212,55 @@ function render()
     $('configuration-summary').hidden = !session?.configuration_locked;
     if (session?.configuration_locked) {
         const beautyDesc = session.beauty ? (session.beauty.enabled ? `Làm đẹp: ${session.beauty.preset}` : 'Làm đẹp: Tắt') : '';
-        $('configuration-summary').textContent = `🔒 ${session.lut.name} · ${session.lut_intensity}% · v${session.lut_version} · ${layoutFor()?.name} · ${templateFor()?.name} · ${beautyDesc} · ${session.capture_count} ảnh. Bắt đầu lại để đổi lựa chọn.`;
+        $('configuration-summary').textContent = `🔒 Bố cục: ${layoutFor()?.name} · ${session.capture_count} ảnh. Filter: ${session.lut.name} (${session.lut_intensity}%) · ${templateFor()?.name} · ${beautyDesc}. Chọn filter và template sau khi chụp đủ ảnh.`;
     }
     for (const id of ['selection-panel', 'capture-panel', 'review-panel', 'wizard-footer']) $(id).hidden = true;
     if (!session) {
+        syncCaptureLut(null);
         $('btn-new-session').disabled = state.busy;
         return;
     }
-    if (session.configuration_locked && state.step < 4) state.step = 4;
+    if (session.configuration_locked && state.step === 1) state.step = 2;
+    if (!allCaptured() && state.step > 2) state.step = session.configuration_locked ? 2 : 1;
+    const final = ['FINALIZED', 'CLOSED'].includes(session.state);
     document.querySelectorAll('[data-step]').forEach((button) => {
         const step = Number(button.dataset.step);
-        button.disabled = state.busy || (session.configuration_locked ? step < 4 || (step === 5 && !allCaptured()) : step > session.ui_step);
+        button.disabled = state.busy || (final ? step !== 5 : (step === 1 && session.configuration_locked) || (step >= 3 && !allCaptured()));
         if (step === state.step) button.setAttribute('aria-current', 'step');
         else button.removeAttribute('aria-current');
     });
     $('wizard-footer').hidden = state.step === 5;
-    $('wizard-progress').textContent = `${state.step} / 5${session.configuration_locked ? ' · Cấu hình đã khóa' : ''}`;
-    $('btn-back').disabled = state.busy || state.step === 1 || session.configuration_locked;
-    $('btn-next').disabled = state.busy || (state.step === 4 && !allCaptured());
-    $('btn-next').textContent = state.step === 4 ? 'Xem ảnh ghép →' : 'Tiếp tục →';
-    if (state.step <= 3) renderSelection();
-    else if (state.step === 4) renderCapture();
+    $('wizard-progress').textContent = state.step + ' / 5';
+    $('btn-back').disabled = state.busy || state.step === 1 || (state.step === 2 && session.configuration_locked);
+    $('btn-next').disabled = state.busy || (state.step === 2 && !allCaptured());
+    $('btn-next').textContent = ({ 1: 'Sang chụp ảnh →', 2: 'Chọn filter →', 3: 'Chọn template →', 4: 'Xem ảnh ghép →' })[state.step] || 'Tiếp tục →';
+    if ([1, 3, 4].includes(state.step)) renderSelection();
+    else if (state.step === 2) renderCapture();
     else renderReview();
+    syncCaptureLut(session);
+    updateCropGuide();
 }
 
 function renderSelection()
 {
     $('selection-panel').hidden = false;
-    $('selection-title').textContent = `✦ ${stepTitles[state.step - 1]}`;
-    $('selection-description').textContent = descriptions[state.step - 1];
-    $('configuration-note').textContent = 'Bạn có thể đổi lựa chọn trước khi bắt đầu chụp.';
+    $('selection-title').textContent = `✦ ${stepTitles[state.step]}`;
+    $('selection-description').textContent = descriptions[state.step];
+    $('configuration-note').textContent = state.step === 1 ? 'Bố cục được giữ cố định khi bắt đầu chụp.' : 'Ảnh gốc được giữ nguyên. Lựa chọn áp dụng cho bản ảnh ghép mới.';
     const session = state.session;
-    $('filter-search-wrap').hidden = state.step !== 1;
+    $('filter-search-wrap').hidden = state.step !== 3;
     if (document.activeElement !== $('filter-search')) $('filter-search').value = state.lutQuery;
     let items;
-    if (state.step === 1) {
+    if (state.step === 3) {
         const available = [...state.presets];
         if (!available.some((item) => item.id === session.selected_lut && item.version === session.lut_version)) available.unshift(session.lut);
         items = available.filter((item) => item.name.toLocaleLowerCase('vi').includes(state.lutQuery.toLocaleLowerCase('vi'))).map((preset) => ({ ...preset, image:preset.sample_url, attr:'data-lut-id', detail:`${preset.intensity}%${preset.readonly ? '' : ` · v${preset.version}`}`, selected:preset.id === session.selected_lut && preset.version === session.lut_version }));
-    } else if (state.step === 2) {
+    } else if (state.step === 1) {
         items = state.layouts.map((layout) => ({ id: layout.id, name: layout.name, detail: `${layout.capture_count} ảnh`, image: layout.thumbnail, attr: 'data-layout-id', selected: layout.id === session.layout_id }));
     } else {
         items = state.templates.filter((item) => item.layout_id === session.layout_id).map((item) => ({ ...item, image: item.preview_url, attr: 'data-template-id', selected: item.id === session.template_id && item.version === session.template_version }));
     }
-    $('selection-cards').className = `selection-cards ${state.step === 2 ? 'layout-cards' : state.step === 3 ? 'template-cards' : 'filter-cards'}`;
+    $('selection-cards').className = `selection-cards ${state.step === 1 ? 'layout-cards' : state.step === 4 ? 'template-cards' : 'filter-cards'}`;
     $('selection-cards').innerHTML = items.map((item) => `<button type="button" class="choice-card ${item.selected ? 'selected' : ''}" ${item.attr}="${esc(item.id)}" ${item.version ? `data-version="${esc(item.version)}"` : ''} ${item.style ? `data-style="${esc(item.style)}"` : ''} aria-pressed="${Boolean(item.selected)}" ${state.busy ? 'disabled' : ''}><div class="choice-image"><img src="${esc(item.image)}" alt=""><span class="choice-check" aria-hidden="true">✓</span></div><strong>${esc(item.name)}</strong>${item.detail ? `<small>${esc(item.detail)}</small>` : ''}</button>`).join('');
     $('selection-cards').querySelectorAll('button').forEach((button) => button.addEventListener('click', () => run(async () => {
         const update = button.dataset.lutId ? { lut_id: button.dataset.lutId, lut_version:button.dataset.version } : button.dataset.layoutId ? { layout_id: button.dataset.layoutId } : { template_id: button.dataset.templateId, template_version: button.dataset.version };
@@ -239,33 +268,33 @@ function renderSelection()
     })));
     const beautyBox = $('beauty-settings');
     if (beautyBox) {
-        beautyBox.hidden = state.step !== 1;
-        if (state.step === 1 && session.beauty) {
+        beautyBox.hidden = state.step !== 3;
+        if (state.step === 3 && session.beauty) {
             const currentPreset = session.beauty.preset || 'natural';
             document.querySelectorAll('.beauty-preset-btn').forEach((btn) => {
                 const p = btn.dataset.beautyPreset;
                 btn.classList.toggle('active', p === currentPreset);
-                btn.disabled = state.busy || Boolean(session.configuration_locked);
+                btn.disabled = state.busy;
             });
             if ($('val-smooth')) $('val-smooth').textContent = `${session.beauty.smooth}%`;
             if ($('range-smooth')) {
                 $('range-smooth').value = session.beauty.smooth;
-                $('range-smooth').disabled = state.busy || Boolean(session.configuration_locked);
+                $('range-smooth').disabled = state.busy;
             }
             if ($('val-brighten')) $('val-brighten').textContent = `${session.beauty.brighten}%`;
             if ($('range-brighten')) {
                 $('range-brighten').value = session.beauty.brighten;
-                $('range-brighten').disabled = state.busy || Boolean(session.configuration_locked);
+                $('range-brighten').disabled = state.busy;
             }
             if ($('val-tone')) $('val-tone').textContent = `${session.beauty.tone}%`;
             if ($('range-tone')) {
                 $('range-tone').value = session.beauty.tone;
-                $('range-tone').disabled = state.busy || Boolean(session.configuration_locked);
+                $('range-tone').disabled = state.busy;
             }
         }
     }
     paintSample($('selection-preview'), layoutFor(), templateFor(), session.lut).catch(() => {
-        if (state.step <= 3) $('configuration-note').textContent = 'Không tải được ảnh mẫu. Hãy tải lại trang.';
+        if ([1, 3, 4].includes(state.step)) $('configuration-note').textContent = 'Không tải được ảnh mẫu. Hãy tải lại trang.';
     });
 }
 
@@ -292,16 +321,34 @@ async function paintSample(canvas, layout, template, lut = 'original')
     const generation = String(++state.sampleGeneration);
     canvas.dataset.generation = generation;
     const preset = typeof lut === 'string' ? state.presets.find((item) => item.id === lut) : lut;
-    const [photo, overlay, background] = await Promise.all([
-        loadImage(preset.sample_url), loadImage(template.overlay_url),
+    const captured = canvas === $('selection-preview') && allCaptured();
+    const [photos, overlay, background, cube] = await Promise.all([
+        captured ? Promise.all(state.session.slots.map((slot) => loadImage(slot.photo.url))) : loadImage(preset.sample_url).then((photo) => layout.slots.map(() => photo)),
+        loadImage(template.overlay_url),
         template.background_url ? loadImage(template.background_url) : Promise.resolve(null),
+        captured ? getCubeLut(state.session) : Promise.resolve(null),
     ]);
+    if (cube) {
+        const filterCanvas = document.createElement('canvas');
+        const filter = new LutCanvasRenderer(filterCanvas);
+        for (let index = 0; index < photos.length; index++) {
+            if (filter.render(photos[index], cube, state.session.lut_intensity / 100)) {
+                const copy = document.createElement('canvas');
+                copy.width = filterCanvas.width; copy.height = filterCanvas.height;
+                copy.getContext('2d').drawImage(filterCanvas, 0, 0);
+                photos[index] = copy;
+            }
+        }
+        // This short-lived renderer is only for the paper preview.
+        filter.gl?.getExtension('WEBGL_lose_context')?.loseContext();
+    }
     if (canvas.dataset.generation !== generation) return false;
     const context = canvas.getContext('2d');
     context.fillStyle = 'white';
     context.fillRect(0, 0, 1181, 1748);
     if (background) context.drawImage(background, 0, 0, 1181, 1748);
-    for (const slot of layout.slots) {
+    for (const [index, slot] of layout.slots.entries()) {
+        const photo = photos[index];
         const scale = Math.max(slot.width / photo.width, slot.height / photo.height);
         const width = slot.width / scale, height = slot.height / scale;
         context.drawImage(photo, (photo.width - width) / 2, (photo.height - height) / 2, width, height, slot.x, slot.y, slot.width, slot.height);
@@ -315,7 +362,7 @@ function renderCapture()
     $('capture-panel').hidden = false;
     const session = state.session;
     $('capture-title').textContent = `Chụp ${session.capture_count} ảnh liên tiếp`;
-    $('capture-progress').textContent = `${session.accepted_slots} / ${session.capture_count} ảnh${session.configuration_locked ? ' · Cấu hình đã khóa' : ''}`;
+    $('capture-progress').textContent = `${session.accepted_slots} / ${session.capture_count} ảnh${session.configuration_locked ? ' · Bố cục đã khóa' : ''}`;
     $('slots-container').innerHTML = session.slots.map((slot) => `<div class="slot-card"><div class="slot-thumb-box">${slot.photo ? `<img src="${esc(slot.photo.url)}" data-raw-src="${esc(slot.photo.url)}" alt="Ảnh ${slot.slot}">` : '<span aria-hidden="true">◎</span>'}</div><div><strong>Ảnh ${slot.slot}</strong><small>${slot.photo ? `Đã chụp · v${slot.photo.version}` : 'Chưa chụp'}</small><button type="button" class="btn-slot-action" data-slot="${slot.slot}" ${state.busy ? 'disabled' : ''}>${slot.photo ? 'Chụp lại ảnh này' : 'Chụp khung này'}</button></div></div>`).join('');
     $('slots-container').querySelectorAll('[data-slot]').forEach((button) => button.addEventListener('click', () => run(() => capture(Number(button.dataset.slot)))));
     $('btn-auto-capture-all').disabled = state.busy || allCaptured();
@@ -328,7 +375,6 @@ function renderCapture()
     for (const id of ['btn-webcam-enable', 'btn-webcam-switch', 'btn-webcam-mirror', 'btn-webcam-stop', 'webcam-device']) $(id).disabled = state.busy;
     for (const id of ['btn-dcc-enable', 'btn-dcc-stop']) $(id).disabled = state.busy;
     updateCropGuide();
-    syncCaptureLut(session);
 }
 
 async function getCubeLut(session)
@@ -346,15 +392,16 @@ async function getCubeLut(session)
 
 async function syncCaptureLut(session = state.session)
 {
-    if (!session || state.view !== 'workspace' || state.step !== 4) return;
+    if (state.view !== 'workspace') return;
+    if (!session) { browserCamera.setFilter(null); $('webcam-lut-canvas').hidden = true; return; }
     const lutData = await getCubeLut(session);
-    if (state.session?.id !== session.id || state.step !== 4) return;
+    if (state.session?.id !== session.id || state.view !== 'workspace') return;
     browserCamera.setFilter(lutData, session.lut_intensity, session.lut?.name || session.selected_lut);
     const lutCanvas = $('webcam-lut-canvas');
     if (!browserMode && lutCanvas) {
         lutCanvas.classList.remove('mirrored');
         const mockImg = $('live-preview-img');
-        if (lutData && session.lut_intensity > 0 && mockImg && mockImg.complete && mockImg.naturalWidth > 0) {
+        if (lutData && session.lut_intensity > 0 && mockImg && !mockImg.hidden && mockImg.complete && mockImg.naturalWidth > 0) {
             if (browserCamera.lutRenderer?.render(mockImg, lutData, session.lut_intensity / 100)) {
                 lutCanvas.hidden = false;
             }
@@ -405,7 +452,7 @@ function updateCropGuide()
 
 function fitBrowserPreview()
 {
-    if (!browserMode || $('capture-panel').hidden) return;
+    if ($('workspace-view').hidden) return;
     const box = $('crop-guide').parentElement;
     if (window.innerWidth <= 800) {
         box.style.removeProperty('--camera-preview-height');
@@ -419,12 +466,14 @@ function fitBrowserPreview()
     const boxStyle = getComputedStyle(box);
     const borders = parseFloat(boxStyle.borderTopWidth) + parseFloat(boxStyle.borderBottomWidth);
     const contentWidth = column.clientWidth - parseFloat(boxStyle.borderLeftWidth) - parseFloat(boxStyle.borderRightWidth);
-    const source = $('webcam-video');
-    const ratio = source.videoWidth && source.videoHeight ? source.videoWidth / source.videoHeight : 16 / 9;
+    const source = browserMode ? $('webcam-video') : $('live-preview-img');
+    const sourceWidth = source.videoWidth || source.naturalWidth;
+    const sourceHeight = source.videoHeight || source.naturalHeight;
+    const ratio = sourceWidth && sourceHeight ? sourceWidth / sourceHeight : 16 / 9;
     const fullHeight = contentWidth / ratio + borders;
     const controlsHeight = column.offsetHeight - box.offsetHeight;
     const footerHeight = footer.offsetHeight + parseFloat(footerStyle.marginTop) + parseFloat(footerStyle.marginBottom);
-    const panelTop = $('capture-panel').getBoundingClientRect().top + window.scrollY;
+    const panelTop = $('liveview-panel').getBoundingClientRect().top;
     const available = window.innerHeight - panelTop - controlsHeight - footerHeight - parseFloat(workspaceStyle.paddingBottom) - 8;
     // Short or zoomed viewports may scroll; keep a useful viewfinder size.
     const height = Math.max(Math.min(320, fullHeight), Math.min(fullHeight, available));
@@ -707,32 +756,18 @@ $('btn-restart-session').addEventListener('click', () => {
         state.renderError = '';
     });
 });
-$('btn-next').addEventListener('click', () => run(async () => {
-    if (state.step < 4) {
-        const next = state.step + 1;
-        await configure({ ui_step: next });
-        state.step = next;
-    } else if (allCaptured()) {
-        state.step = 5;
-        await renderCollage();
-    }
-}));
-$('btn-back').addEventListener('click', () => run(async () => {
-    if (!state.session.configuration_locked && state.step > 1) {
-        await configure({ ui_step: state.step - 1 });
-        state.step--;
-    }
-}));
-document.querySelectorAll('[data-step]').forEach((button) => button.addEventListener('click', () => run(async () => {
-    const next = Number(button.dataset.step);
-    if (state.session.configuration_locked) {
-        if (next < 4 || (next === 5 && !allCaptured())) return;
-        state.step = next;
-        if (next === 5 && state.session.state === 'CAPTURED' && !state.session.current_render) await renderCollage();
-    } else if (next <= state.session.ui_step) {
-        state.step = next;
-    }
-})));
+async function goStep(next)
+{
+    if (!state.session || next === state.step) return;
+    if (next === 1 && state.session.configuration_locked) return;
+    if (next >= 3 && !allCaptured()) return;
+    if (next < 5) await configure({ ui_step: next });
+    state.step = next;
+    if (next === 5 && !state.session.current_render) await renderCollage();
+}
+$('btn-next').addEventListener('click', () => run(() => goStep(state.step + 1)));
+$('btn-back').addEventListener('click', () => run(() => goStep(state.step - 1)));
+document.querySelectorAll('[data-step]').forEach((button) => button.addEventListener('click', () => run(() => goStep(Number(button.dataset.step)))));
 $('btn-auto-capture-all').addEventListener('click', () => run(async () => {
     for (const slot of state.session.slots.map((item) => item.slot)) {
         if (!state.session.slots.find((item) => item.slot === slot).photo) await capture(slot);
@@ -753,7 +788,7 @@ $('btn-review-retake').addEventListener('click', () => run(async () => {
         await api('POST', `/sessions/${state.session.id}/reopen`, { revision: state.session.revision });
         await loadSession(state.session.id);
     }
-    state.step = 4;
+    state.step = 2;
     state.share = null;
 }));
 $('btn-close-session').addEventListener('click', () => run(async () => {
@@ -786,7 +821,7 @@ $('filter-search').addEventListener('input', () => { state.lutQuery = $('filter-
 $('btn-nav-health').addEventListener('click', () => { $('health-panel').hidden = !$('health-panel').hidden; health(); });
 document.querySelectorAll('.beauty-preset-btn').forEach((button) => {
     button.addEventListener('click', () => run(async () => {
-        if (!state.session || state.session.configuration_locked) return;
+        if (!state.session) return;
         const preset = button.dataset.beautyPreset;
         await configure({ beauty_preset: preset });
     }));
@@ -796,7 +831,7 @@ if ($('range-smooth')) {
         $('val-smooth').textContent = `${$('range-smooth').value}%`;
     });
     $('range-smooth').addEventListener('change', () => run(async () => {
-        if (!state.session || state.session.configuration_locked) return;
+        if (!state.session) return;
         await configure({ beauty_smooth: Number($('range-smooth').value) });
     }));
 }
@@ -805,7 +840,7 @@ if ($('range-brighten')) {
         $('val-brighten').textContent = `${$('range-brighten').value}%`;
     });
     $('range-brighten').addEventListener('change', () => run(async () => {
-        if (!state.session || state.session.configuration_locked) return;
+        if (!state.session) return;
         await configure({ beauty_brighten: Number($('range-brighten').value) });
     }));
 }
@@ -814,7 +849,7 @@ if ($('range-tone')) {
         $('val-tone').textContent = `${$('range-tone').value}%`;
     });
     $('range-tone').addEventListener('change', () => run(async () => {
-        if (!state.session || state.session.configuration_locked) return;
+        if (!state.session) return;
         await configure({ beauty_tone: Number($('range-tone').value) });
     }));
 }
@@ -1073,10 +1108,10 @@ async function checkAuthOnBoot()
 setInterval(health, 5000);
 let frame = 1;
 $('live-preview-img')?.addEventListener('load', () => {
-    if (!browserMode && state.user && state.view === 'workspace' && state.step === 4) syncCaptureLut(state.session);
+    if (!browserMode && state.user && state.view === 'workspace') { syncCaptureLut(state.session); updateCropGuide(); }
 });
 setInterval(() => {
-    if (document.body.dataset.mock === 'true' && state.user && state.view === 'workspace' && state.step === 4) {
+    if (document.body.dataset.mock === 'true' && state.user && state.view === 'workspace') {
         frame = frame % 3 + 1;
         $('live-preview-img').src = `/custom/assets/mock-preview/frame-${frame}.jpg`;
     }

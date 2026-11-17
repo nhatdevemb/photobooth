@@ -1,23 +1,33 @@
 /** DCC owns the USB camera. Only authenticated PHP APIs are exposed to the renderer. */
 export class DccCamera {
-    constructor(image, badge, status, api, paused) {
-        Object.assign(this, { image, badge, status, api, paused });
+    constructor(image, badge, status, api) {
+        Object.assign(this, { image, badge, status, api });
         this.active = false;
         this.generation = 0;
         this.objectUrl = null;
     }
 
     async start() {
-        await this.api('POST', '/camera/preview/start', {});
-        this.active = true;
-        this.status.textContent = 'Live view R10 · JPEG gốc được nhận riêng khi chụp. Beauty xử lý sau chụp.';
-        this.badge.textContent = '● Canon qua digiCamControl';
+        if (this.active) return;
+        if (this.starting) return this.starting;
         const generation = ++this.generation;
-        this.loop(generation);
+        this.starting = (async () => {
+            await this.api('POST', '/camera/preview/start', {});
+            if (generation !== this.generation) {
+                await this.api('POST', '/camera/preview/stop', {});
+                return;
+            }
+            this.active = true;
+            this.status.textContent = 'Live view R10 luôn bật, cả lúc đếm ngược. JPEG gốc được nhận riêng khi chụp.';
+            this.badge.textContent = '● Canon qua digiCamControl';
+            this.loop(generation);
+        })();
+        try { await this.starting; }
+        finally { this.starting = null; }
     }
 
     async stop() {
-        if (!this.active) return;
+        if (!this.active && !this.starting) return;
         this.active = false;
         this.generation++;
         this.controller?.abort();
@@ -31,7 +41,7 @@ export class DccCamera {
 
     async loop(generation) {
         while (this.active && generation === this.generation) {
-            if (this.paused() || document.hidden) {
+            if (document.hidden) {
                 await new Promise((resolve) => setTimeout(resolve, 100));
                 continue;
             }
@@ -43,6 +53,8 @@ export class DccCamera {
                 try { response = await fetch('/custom/api/camera/preview.jpg', { credentials: 'same-origin', cache: 'no-store', signal: this.controller.signal }); }
                 finally { clearTimeout(timeout); }
                 if (response.status === 409) {
+                    const body = await response.json();
+                    if (body.error?.code !== 'CAMERA_BUSY') throw new Error(body.error?.message || 'Camera đã thay đổi. Bật lại live view.');
                     await new Promise((resolve) => setTimeout(resolve, 100));
                     continue;
                 }

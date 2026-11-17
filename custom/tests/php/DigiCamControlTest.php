@@ -102,12 +102,14 @@ final class DigiCamControlTest extends TestCase
         $settings = [];
         $last = '-';
         $triggers = 0;
+        $previewStarts = 0;
         $fixture = dirname(__DIR__) . '/fixtures/slot-1.jpg';
         // A real JPEG with no dependence on the image pipeline to generate the fixture.
         $image = imagecreatetruecolor(96, 64);
         ob_start(); imagejpeg($image, null, 95); $jpeg = ob_get_clean(); imagedestroy($image);
-        $adapter = $this->adapter(function (string $url) use (&$settings, &$last, &$triggers, $jpeg): string {
+        $adapter = $this->adapter(function (string $url) use (&$settings, &$last, &$triggers, &$previewStarts, $jpeg): string {
             parse_str((string) parse_url($url, PHP_URL_QUERY), $q);
+            if (isset($q['CMD'])) { $previewStarts++; return 'OK'; }
             if ($q['slc'] === 'list') { return '12345'; }
             if ($q['slc'] === 'set') {
                 if (!in_array($q['param1'] ?? '', ['camera', 'session', 'session.folder', 'session.filenametemplate'], true)) { return 'Unknow parameter'; }
@@ -123,11 +125,13 @@ final class DigiCamControlTest extends TestCase
             if ($q['param1'] === 'lastcaptured') { return $last; }
             return $q['param1'] === 'session' ? 'Photobooth' : ($settings[$q['param1']] ?? 'Unknow parameter');
         });
+        $adapter->startPreview();
         $first = $adapter->capture($this->directory . '/pending', 1, 1, time() + 10);
         $second = $adapter->capture($this->directory . '/pending', 1, 1, time() + 10);
         self::assertSame(hash('sha256', $jpeg), $first['sha256']);
         self::assertSame($first, $second);
         self::assertSame(1, $triggers);
+        self::assertGreaterThanOrEqual(2, $previewStarts);
     }
 
     public function testRejectsNonJpegLiveView(): void

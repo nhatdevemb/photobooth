@@ -41,18 +41,19 @@ test('admin imports a mixed batch, previews intensity and uses the activated fil
         await page.setViewportSize(size);
         expect(await page.locator('#btn-next').evaluate((button) => button.getBoundingClientRect().bottom <= innerHeight)).toBe(true);
     }
-    await page.locator('#filter-search').fill('Portrait Upload');
-    await expect(page.locator('#selection-cards [data-lut-id]')).toHaveCount(1);
-    await page.locator(`[data-lut-id="${filter.id}"]`).click();
-    await page.locator('#btn-next').click();
     await page.locator('[data-layout-id="single"]').click();
-    await page.locator('#btn-next').click();
     await page.locator('#btn-next').click();
     await page.locator('#btn-auto-capture-all').click();
     await expect(page.locator('.slot-thumb-box img')).toHaveCount(1);
+    await page.locator('#btn-next').click();
+    await page.locator('#filter-search').fill('Portrait Upload');
+    await expect(page.locator('#selection-cards [data-lut-id]')).toHaveCount(1);
+    await page.locator(`[data-lut-id="${filter.id}"]`).click();
+
     await expect(page.locator('#configuration-summary')).toContainText('65%');
     await page.reload();
     await expect(page.locator('#configuration-summary')).toContainText('Portrait Upload E2E');
+    await page.locator('#btn-next').click();
     await page.locator('#btn-next').click();
     await expect(page.locator('#btn-finalize-session')).toBeEnabled();
     await page.locator('#btn-finalize-session').click();
@@ -131,6 +132,11 @@ if (process.env.PB_DAEDAL_LUT_DIR) {
         expect(active).toHaveLength(20);
         await page.locator('#btn-nav-workspace').click();
         await page.locator('#btn-new-session').click();
+        await page.locator('[data-layout-id="single"]').click();
+        await page.locator('#btn-next').click();
+        await page.locator('#btn-auto-capture-all').click();
+        await expect(page.locator('.slot-thumb-box img')).toHaveCount(1);
+        await page.locator('#btn-next').click();
         await page.locator('#filter-search').fill('DAEDAL');
         await expect(page.locator('#selection-cards [data-lut-id]')).toHaveCount(20);
         await expect.poll(() => page.locator('#selection-preview').evaluate((canvas) => canvas.getContext('2d').getImageData(590,874,1,1).data[3])).toBe(255);

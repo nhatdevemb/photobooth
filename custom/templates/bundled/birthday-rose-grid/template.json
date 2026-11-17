@@ -1,0 +1,17 @@
+{
+    "id": "birthday-rose-grid",
+    "name": "Sinh nhật · Nơ Hồng Pastel (2×2)",
+    "style": "birthday-rose",
+    "version": "1.0.0",
+    "layout_id": "grid-four",
+    "layout_version": "1.0.0",
+    "overlay": "overlay.png",
+    "background": "background.png",
+    "preview": "preview.jpg",
+    "license": "Original project artwork; MIT",
+    "hashes": {
+        "overlay.png": "4e256d2962e4bc50c0f58feb7fae0d4b15df3ecded4c7e34a096bd72ed75e8bb",
+        "background.png": "e5759369246d8f390d3e07c539c06dd2114aee94554f5dfb6c58d27344bff08f",
+        "preview.jpg": "b61250862a25da013a0ee594f15e81341ed1ef804fbbaf34d7443636bf673911"
+    }
+}

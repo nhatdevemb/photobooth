@@ -1,0 +1,17 @@
+{
+    "id": "birthday-coquette-strip",
+    "name": "Sinh nhật · Nơ Kem Dâu (Dải 3)",
+    "style": "birthday-coquette",
+    "version": "1.0.0",
+    "layout_id": "strip-three",
+    "layout_version": "1.0.0",
+    "overlay": "overlay.png",
+    "background": "background.png",
+    "preview": "preview.jpg",
+    "license": "Original project artwork; MIT",
+    "hashes": {
+        "overlay.png": "51b51818df2e94ef237b53339431554335b93ae6229d9ef89e7f208d29298dbc",
+        "background.png": "10041cf31440b953227001f6052087d4791f8b2854a478291967378e60ccb51d",
+        "preview.jpg": "a92cb3e13f6ec9104b1eb4016839869322ed05612bf6fda9a92c2aa3aea99cf4"
+    }
+}

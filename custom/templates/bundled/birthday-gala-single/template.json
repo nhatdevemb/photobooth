@@ -1,0 +1,17 @@
+{
+    "id": "birthday-gala-single",
+    "name": "Sinh nhật · Tiệc Đêm Vàng (Đơn)",
+    "style": "birthday-gala",
+    "version": "1.0.0",
+    "layout_id": "single",
+    "layout_version": "1.0.0",
+    "overlay": "overlay.png",
+    "background": "background.png",
+    "preview": "preview.jpg",
+    "license": "Original project artwork; MIT",
+    "hashes": {
+        "overlay.png": "e105322798d356ffa5b6475be0bfb537405cab149ec3183cf4aeb2dd867b8d87",
+        "background.png": "a9ae1fbc5e7509cb2e0e5cff3f62ec2696dffbd5ade3b5b99e78987a0ea2b3fc",
+        "preview.jpg": "c6d32e49f7c7db8497b7d543ee221eabbdb6c0fa3b2dfdfbcc18f1a7fc8efadb"
+    }
+}

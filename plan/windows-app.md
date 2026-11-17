@@ -1,6 +1,8 @@
 # Kế hoạch Photobooth Windows với Canon R10 và digiCamControl
 
-Ngày cập nhật: 15/11/2026 (Asia/Saigon). Trạng thái: đã triển khai bản thử Windows 0.1.0 và kiểm thử mô phỏng; R10 thật chưa nghiệm thu. Xem [báo cáo kiểm thử](windows-test-report.md) và [hướng dẫn sử dụng/build](../custom/desktop/README.md).
+Ngày cập nhật: 17/11/2026 (Asia/Saigon). Trạng thái: đã triển khai bản thử Windows 0.1.1; đã thử một ảnh R10 thật và live view trong đếm ngược, còn chờ nghiệm thu độ bền. Xem [báo cáo kiểm thử](windows-test-report.md) và [hướng dẫn sử dụng/build](../custom/desktop/README.md).
+
+Cập nhật luồng theo yêu cầu 17/11: Bố cục → Chụp → Filter/Beauty → Template → Duyệt/QR. Live view giữ bật trên bàn chụp, kể cả đếm ngược. Bố cục khóa sau lần chụp đầu; filter và template được đổi sau khi đủ ảnh, bản render cũ bị vô hiệu hóa khi đổi. Các đoạn mô tả ghim toàn bộ cấu hình trước chụp bên dưới là quyết định của bản trước và đã được thay bằng quy tắc này.
 
 ## 1. Mục tiêu và quyết định
 
@@ -62,7 +64,7 @@ DCC không cung cấp idempotency theo job ID trong giao diện được tài li
 
 - UI lấy frame mới nhất, mục tiêu 10 FPS trên máy booth, tối đa một request frame đang chờ; không tích hàng đợi frame cũ.
 - Mọi start/stop preview và capture đi qua cùng bộ điều phối thiết bị; thao tác preview không được thay đổi session folder trong lúc capture.
-- Tạm dừng polling khi chụp; khôi phục khi job kết thúc và người dùng vẫn ở bước camera. Rời màn hình hoặc đóng app thì ngừng preview.
+- Giữ polling trong đếm ngược và qua các bước trên bàn chụp. Chỉ trả CAMERA_BUSY khi capture thực sự giữ khóa; giữ khung cuối và tiếp tục khi có frame mới. Rời bàn chụp/đăng xuất/đóng app thì ngừng preview.
 - Trong thời gian vận hành, DCC session dành riêng cho Photobooth; không chụp thủ công trên DCC/camera hoặc chạy EOS Utility đồng thời. Khi phát hiện ảnh ngoài luồng, báo lỗi cần operator xử lý.
 - DCC do app mở được theo dõi và đóng theo vòng đời app; instance đã mở sẵn chỉ kết nối sau kiểm tra camera/session, không bị app tự đóng. Không tự kết nối lại và chụp tiếp sau lỗi.
 - Tắt Allow public access trong DCC. Thiết lập này không có nghĩa là chặn truy cập LAN. Chặn kết nối từ LAN tới cổng DCC bằng cấu hình bind loopback nếu bản cài hỗ trợ, nếu không dùng firewall và kiểm thử từ điện thoại. Chỉ guest port được mở trên mạng Private.

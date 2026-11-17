@@ -19,14 +19,23 @@ final class DigiCamControlCameraAdapter implements CameraAdapterInterface
 
     public function getMode(): string { return 'digicamcontrol'; }
 
-    private function lock(int $operation = LOCK_EX)
+    private function lock(int $operation = LOCK_EX, float $waitSeconds = 0)
     {
         $directory = $this->config->dataDir . '/dcc';
         if (!is_dir($directory) && !mkdir($directory, 0750, true) && !is_dir($directory)) {
             throw new ApiException('STORAGE_ERROR', 'Không tạo được thư mục camera.', 503);
         }
         $handle = fopen($directory . '/camera.lock', 'c+');
-        if ($handle === false || !flock($handle, $operation | LOCK_NB)) {
+        $deadline = microtime(true) + $waitSeconds;
+        $locked = false;
+        if ($handle !== false) {
+            do {
+                $locked = flock($handle, $operation | LOCK_NB);
+                if ($locked || microtime(true) >= $deadline) { break; }
+                usleep(20000);
+            } while (true);
+        }
+        if (!$locked) {
             if (is_resource($handle)) { fclose($handle); }
             throw new ApiException('CAMERA_BUSY', 'Máy ảnh đang chụp hoặc đổi live view. Vui lòng đợi.', 409);
         }
@@ -38,6 +47,7 @@ final class DigiCamControlCameraAdapter implements CameraAdapterInterface
         $lock = $this->lock();
         try {
             $this->client->preview(true, $this->client->selectCamera());
+            file_put_contents($this->config->dataDir . '/dcc/preview-enabled', '1', LOCK_EX);
             return ['status' => 'started', 'frame_urls' => ['/custom/api/camera/preview.jpg']];
         } finally { fclose($lock); }
     }
@@ -45,7 +55,10 @@ final class DigiCamControlCameraAdapter implements CameraAdapterInterface
     public function stopPreview(): void
     {
         $lock = $this->lock();
-        try { $this->client->preview(false, $this->client->selectCamera()); }
+        try {
+            @unlink($this->config->dataDir . '/dcc/preview-enabled');
+            $this->client->preview(false, $this->client->selectCamera());
+        }
         finally { fclose($lock); }
     }
 
@@ -65,7 +78,9 @@ final class DigiCamControlCameraAdapter implements CameraAdapterInterface
 
     public function capture(string $destinationDir, int $slot, int $version, int $deadlineUnix, ?string $faultScenario = null): array
     {
-        $lock = $this->lock();
+        // Let an in-flight JPEG preview finish before owning the shutter. Countdown
+        // keeps streaming; only the actual capture serializes with preview access.
+        $lock = $this->lock(LOCK_EX, 2.5);
         try {
             $directory = realpath($destinationDir);
             $dataRoot = realpath($this->config->dataDir);
@@ -101,7 +116,7 @@ final class DigiCamControlCameraAdapter implements CameraAdapterInterface
             $this->client->command('set', 'session.folder', $incoming, $camera);
             $this->client->command('set', 'session.filenametemplate', $stem, $camera);
             // Verify both settings; successful HTTP alone does not prove DCC accepted them.
-            $actualFolder = str_replace('\\', '/', $this->client->slc('get', 'session.folder', '', $camera));
+            $actualFolder = preg_replace('~[\\\\/]+~', '/', $this->client->slc('get', 'session.folder', '', $camera));
             if (strcasecmp(rtrim($actualFolder, '/'), rtrim(str_replace('\\', '/', $incoming), '/')) !== 0
                 || $this->client->slc('get', 'session.filenametemplate', '', $camera) !== $stem) {
                 throw new ApiException('DCC_SESSION_MISMATCH', 'DCC không giữ đúng thư mục/tên ảnh dành cho job. Kiểm tra session trước khi chụp.', 409);
@@ -145,7 +160,13 @@ final class DigiCamControlCameraAdapter implements CameraAdapterInterface
                 usleep(100000);
             }
             throw new ApiException('CAPTURE_TIMEOUT', 'Chưa nhận đúng JPEG. Không tự gửi lại lệnh chụp.', 504);
-        } finally { fclose($lock); }
+        } finally {
+            if (is_file($this->config->dataDir . '/dcc/preview-enabled')) {
+                try { $this->client->preview(true, $this->client->selectCamera()); }
+                catch (\Throwable) { error_log('DCC live view could not resume after capture.'); }
+            }
+            fclose($lock);
+        }
     }
 
     private function writeReceipt(string $path, array $receipt, ?string $state = null): void

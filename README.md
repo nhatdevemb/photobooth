@@ -3,7 +3,7 @@
 
 > **Upstream Baseline:** Pinned to [`PhotoboothProject/photobooth` `v4.5.1`](https://github.com/PhotoboothProject/photobooth/tree/v4.5.1) (`a8841409ed8d0db485191269d6c302505b67f64f`). Toàn bộ phần mở rộng Operator Edition nằm độc lập trong thư mục [`custom/`](custom/) và tài liệu kế hoạch/kiến trúc tại [`plan/`](plan/).
 
-**Bản thử Windows với Canon EOS R10:** đã có bộ cài 0.1.0, dùng digiCamControl làm cầu nối USB cho live view và chụp JPEG; không cần tự cài Electron hoặc lấy Canon EDSDK. Máy in dùng mô phỏng; R10 thật chưa nghiệm thu. Xem [hướng dẫn Windows](custom/desktop/README.md), [báo cáo kiểm thử](plan/windows-test-report.md) và [kế hoạch nghiệm thu](plan/windows-app.md).
+**Bản thử Windows với Canon EOS R10:** đã có bộ cài 0.1.1, dùng digiCamControl làm cầu nối USB cho live view và chụp JPEG; không cần tự cài Electron hoặc lấy Canon EDSDK. Máy in dùng mô phỏng; đã thử một lần chụp R10 thật, còn chờ nghiệm thu độ bền. Xem [hướng dẫn Windows](custom/desktop/README.md), [báo cáo kiểm thử](plan/windows-test-report.md) và [kế hoạch nghiệm thu](plan/windows-app.md).
 
 ## 1. Tổng quan Kiến trúc (Operator Edition)
 

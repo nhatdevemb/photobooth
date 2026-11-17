@@ -6,6 +6,7 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 import os from 'node:os';
 import { randomBytes } from 'node:crypto';
 import { validateSettings, publicSettings } from './lib/settings.mjs';
+import { dccResponds } from './lib/dcc-probe.mjs';
 
 const directory = path.dirname(fileURLToPath(import.meta.url));
 const resources = app.isPackaged ? process.resourcesPath : directory;
@@ -108,7 +109,7 @@ ipcMain.handle('setup:launch', async (event, input) => {
             if (!await exists(file)) throw new Error(`Thiếu thành phần: ${path.basename(file)}. Chạy bước prepare runtime và stage trước.`);
         }
         if (settings.cameraMode === 'digicamcontrol' && settings.dccExecutable) {
-            const running = await fetch(`http://127.0.0.1:${settings.dccPort}/?slc=list&param1=cameras`, { signal: AbortSignal.timeout(1500) }).then((r) => r.ok).catch(() => false);
+            const running = await dccResponds(path.join(runtime, 'php'), settings.dccPort);
             if (!running) {
                 if (path.basename(settings.dccExecutable).toLowerCase() !== 'cameracontrol.exe' || !await exists(settings.dccExecutable)) throw new Error('Đường dẫn digiCamControl không hợp lệ.');
                 ownedDcc = spawn(settings.dccExecutable, [], { windowsHide: false, stdio: 'ignore' });

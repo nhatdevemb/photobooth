@@ -1,0 +1,17 @@
+{
+    "id": "birthday-pastel-grid",
+    "name": "Sinh nhật · Pastel Cầu Vồng (2×2)",
+    "style": "birthday-pastel",
+    "version": "1.0.0",
+    "layout_id": "grid-four",
+    "layout_version": "1.0.0",
+    "overlay": "overlay.png",
+    "background": "background.png",
+    "preview": "preview.jpg",
+    "license": "Original project artwork; MIT",
+    "hashes": {
+        "overlay.png": "65431cc6bb96a984ffb2d022828979343dd58c135357fc439f37b760ae166305",
+        "background.png": "f5f1b69a893333c97cfe613b39f058270cf3ed7091dd505f1691d228c3c6bed1",
+        "preview.jpg": "490666b0bc8090c7d100120c54c0f174750c78bebb96c651626c99f140a71639"
+    }
+}
