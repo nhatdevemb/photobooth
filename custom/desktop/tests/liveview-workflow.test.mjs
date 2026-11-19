@@ -29,7 +29,7 @@ const eventually = async (predicate, message, timeout = 20000) => {
 };
 
 const sessionCycle = process.env.PB_TEST_SESSION_CYCLE === '1';
-test(sessionCycle ? 'packaged app finishes print/QR/close and starts a clean second session with live view' : 'live view streams through 3-2-1 and layout/capture/filter/template/review without duplicate shutters', { timeout: sessionCycle ? 180000 : 120000 }, async (t) => {
+test(sessionCycle ? 'packaged app keeps live view on capture only across two sessions' : 'live view streams only on capture including 3-2-1', { timeout: sessionCycle ? 180000 : 120000 }, async (t) => {
     if (process.platform !== 'win32') return t.skip('Windows desktop integration');
     const real = process.env.PB_REAL_DCC === '1';
     const beauty = process.env.PB_TEST_BEAUTY === '1';
@@ -99,8 +99,18 @@ test(sessionCycle ? 'packaged app finishes print/QR/close and starts a clean sec
     await page.locator('#login-username').fill('liveviewadmin');
     await page.locator('#login-password').fill('LiveviewPrivate123!');
     await page.locator('#btn-login-submit').click();
-    await eventually(() => frames >= 3, 'Auto live view did not start');
-    if (!real) assert.equal(previewStarts, 1);
+    await page.locator('#btn-new-session').waitFor();
+    const checkCameraOff = async (label) => {
+        assert.equal(await page.locator('#liveview-panel').isHidden(), true, label);
+        const before = frames;
+        const starts = previewStarts;
+        await new Promise((resolve) => setTimeout(resolve, 350));
+        assert.equal(frames, before, label + ' requested a camera frame');
+        assert.equal(previewStarts, starts, label + ' restarted live view');
+    };
+    await checkCameraOff('Waiting screen');
+    assert.equal(frames, 0);
+    assert.equal(previewStarts, 0);
     if (beauty) {
         await page.locator('#btn-nav-health').click();
         await eventually(() => page.locator('#health-lkmagic').textContent().then((text) => text.includes('LK Magic')), 'Bridge status missing');
@@ -132,9 +142,29 @@ test(sessionCycle ? 'packaged app finishes print/QR/close and starts a clean sec
     const firstEvent = sessionCycle ? await settingsSave('Minh và Lan', 'wedding', 'frame-1.jpg') : null;
     await page.locator('#btn-new-session').click();
     await page.locator('[data-layout-id=single]').click();
+    await checkCameraOff('Layout selection');
     assert.equal(await page.locator('#btn-next').evaluate((button) => button.getBoundingClientRect().bottom <= innerHeight), true, 'Layout footer below viewport');
     await page.locator('#btn-next').click();
     await eventually(() => page.locator('[data-step="2"]').getAttribute('aria-current').then(Boolean), 'Capture step missing');
+    await eventually(() => frames >= 3, 'Live view did not start at capture');
+    if (!real) assert.equal(previewStarts, 1);
+    if (process.env.PB_TEST_RUNTIME_RECOVERY === '1') {
+        assert.equal(real, false);
+        const active = () => page.evaluate(async () => (await (await fetch('/custom/api/sessions/active')).json()).active_session);
+        const before = await active();
+        const runtimeLog = path.join(base, 'data', 'logs', 'desktop-runtime.log');
+        const runtimePid = async () => {
+            const log = await readFile(runtimeLog, 'utf8');
+            return Number([...log.matchAll(/Runtime started \(PID (\d+)\)/g)].at(-1)?.[1]);
+        };
+        const pid = await runtimePid();
+        const oldFrames = frames;
+        process.kill(pid, 'SIGTERM');
+        await eventually(async () => await runtimePid() !== pid && frames > oldFrames + 2, 'Supervisor or live view did not recover');
+        assert.equal((await active()).id, before.id);
+        assert.equal(shutters, 0, 'Restarting the supervisor must not fire the shutter');
+        console.log('Verified Electron supervisor recovery with the same session and resumed live view.');
+    }
     assert.equal(await page.locator('#btn-next').evaluate((button) => button.getBoundingClientRect().bottom <= innerHeight), true, 'Capture footer below viewport');
     let displayed = 0;
     await page.exposeFunction('frameDisplayed', () => { displayed++; });
@@ -150,7 +180,30 @@ test(sessionCycle ? 'packaged app finishes print/QR/close and starts a clean sec
     await eventually(() => page.locator('#btn-next').isEnabled(), 'Capture remained busy');
     assert.equal(shutters, 1);
     if (!real) assert.ok(previewStarts >= 2, 'Live view was not resumed after shutter');
-    await page.locator('#btn-next').click();
+    const leaveCapture = async (stepButton) => {
+        const stopped = page.waitForResponse((res) => res.url().endsWith('/camera/preview/stop'));
+        await page.locator(stepButton).click();
+        assert.equal((await stopped).status(), 200, 'Could not stop DCC preview when leaving capture');
+    };
+    await leaveCapture('#btn-next');
+    await checkCameraOff('Filter selection');
+    const selectionPreview = page.locator('#selection-preview');
+    await selectionPreview.waitFor();
+    const capturedMatches = await page.evaluate(async () => {
+        const session = (await (await fetch('/custom/api/sessions/active')).json()).active_session;
+        const image = new Image();
+        image.src = session.slots[0].photo.url;
+        await image.decode();
+        const preview = document.getElementById('selection-preview');
+        const pixel = document.createElement('canvas');
+        pixel.width = pixel.height = 1;
+        const ctx = pixel.getContext('2d');
+        ctx.drawImage(image, Math.floor(image.naturalWidth / 2), Math.floor(image.naturalHeight / 2), 1, 1, 0, 0, 1, 1);
+        const source = ctx.getImageData(0, 0, 1, 1).data;
+        const rendered = preview.getContext('2d').getImageData(590, 874, 1, 1).data;
+        return source.slice(0, 3).every((value, i) => Math.abs(value - rendered[i]) < 24);
+    });
+    assert.equal(capturedMatches, true, 'Filter preview does not contain the captured JPEG');
     await page.locator('[data-lut-id=film-400]').click();
     await page.locator(beauty ? '[data-beauty-preset=natural]' : '[data-beauty-preset=off]').click();
     assert.equal(await page.locator('#btn-next').evaluate((button) => button.getBoundingClientRect().bottom <= innerHeight), true, 'Filter footer below viewport');
@@ -162,20 +215,27 @@ test(sessionCycle ? 'packaged app finishes print/QR/close and starts a clean sec
         assert.equal(await page.locator('[data-template-id=cute-single]').count(), 0);
         assert.equal(await page.locator('#btn-nav-settings').isDisabled(), true);
     }
-    assert.equal(await page.locator('#live-preview-img').isVisible(), true);
+    await selectionPreview.waitFor();
+    await checkCameraOff('Template selection');
+    const previewWidth = await selectionPreview.evaluate((canvas) => canvas.getBoundingClientRect().width);
+    assert.ok(previewWidth >= 240, 'Captured photo preview is too small to compare templates');
     assert.equal(await page.locator('#btn-next').evaluate((button) => button.getBoundingClientRect().bottom <= innerHeight), true, 'Template footer below viewport');
     const enterReview = async () => {
-        const stopped = page.waitForResponse((res) => res.url().endsWith('/camera/preview/stop'));
         await page.locator('#btn-next').click();
-        assert.equal((await stopped).status(), 200, 'Could not stop live view at review');
-        assert.equal(await page.locator('#liveview-panel').isHidden(), true);
         await eventually(() => page.locator('#btn-finalize-session').isEnabled(), 'Review did not load');
+        await checkCameraOff('Review');
     };
     await enterReview();
-    const reviewFrames = frames;
     await page.locator('[data-step="4"]').click();
-    await eventually(() => frames >= reviewFrames + 3, 'Live view did not resume at template selection');
+    await selectionPreview.waitFor();
+    await checkCameraOff('Back to template selection');
+    await enterReview();
+    const reviewFrames = frames;
+    await page.locator('#btn-review-retake').click();
+    await eventually(() => frames >= reviewFrames + 3, 'Live view did not resume for retake');
     assert.equal(await page.locator('#live-preview-img').isVisible(), true);
+    await leaveCapture('[data-step="4"]');
+    await selectionPreview.waitFor();
     await enterReview();
     for (const size of [{ width: 1366, height: 768 }, { width: 1920, height: 1080 }, { width: 390, height: 844 }]) {
         await page.setViewportSize(size);
@@ -226,8 +286,7 @@ test(sessionCycle ? 'packaged app finishes print/QR/close and starts a clean sec
         assert.equal(await active(), null);
         assert.equal(await page.locator('#modal-qr-img').isVisible(), false);
         await eventually(() => page.locator('#webcam-lut-canvas').isHidden(), 'Old session filter remained on live view');
-        const beforeNew = frames;
-        await eventually(() => frames >= beforeNew + 3, 'Live view stopped between sessions');
+        await checkCameraOff('Between sessions');
         assert.equal(await download(firstQr), first.current_final.sha256);
         const nextEvent = await settingsSave('Sinh nhật Bé Na', 'birthday', 'frame-2.jpg', true);
         assert.notEqual(nextEvent.id, firstEvent.id);
@@ -252,7 +311,10 @@ test(sessionCycle ? 'packaged app finishes print/QR/close and starts a clean sec
         assert.equal(await page.locator('#btn-next').isEnabled(), true);
         assert.equal(shutters, 1, 'Creating a new session must never trigger capture');
         await page.locator('[data-layout-id=single]').click();
+        await checkCameraOff('Second layout selection');
+        const firstFrames = frames;
         await page.locator('#btn-next').click();
+        await eventually(() => frames > firstFrames + 2, 'Live view did not start for the next session');
         assert.equal(await page.locator('.slot-thumb-box img').count(), 0, 'Old photo leaked into the second session');
         await page.locator('#btn-auto-capture-all').click();
         await eventually(() => page.locator('.slot-thumb-box img').count().then((n) => n === 1), 'Second capture did not complete');

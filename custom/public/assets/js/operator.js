@@ -12,7 +12,7 @@ const state = {
     user: null, csrf: null, session: null, step: 1, view: 'workspace', busy: false,
     settings: null, eventPreviews: [], copies: 1,
     layouts: [], templates: [], presets: [], share: null, previewKey: null,
-    previewReady: false, renderError: '', job: null, history: [], cursor: null,
+    selectionPreviewKey: null, previewReady: false, renderError: '', job: null, history: [], cursor: null,
     detail: null, print: null, resolve: null, templatePreview: null, sampleGeneration: 0,
     cameraAttempted: false, cameraStarting: null, lutEditor: null, lutQuery: '', captureSlot: null,
 };
@@ -61,15 +61,25 @@ async function api(method, path, data = null, key = null)
     }
     // A network retry reuses the same request and key, including for print and restart.
     let response;
-    for (let attempt = 0; attempt < 2; attempt++) {
+    const attempts = method === 'GET' ? 5 : 2;
+    for (let attempt = 0; attempt < attempts; attempt++) {
         try {
             response = await fetch(`/custom/api${path}`, options);
-            break;
         } catch (error) {
-            if (attempt === 1) throw error;
+            if (attempt === attempts - 1) throw error;
+            await sleep(200 * (attempt + 1));
+            continue;
         }
+        if (method === 'GET' && [502, 503, 504].includes(response.status) && attempt < attempts - 1) {
+            await response.body?.cancel();
+            await sleep(200 * (attempt + 1));
+            continue;
+        }
+        break;
     }
-    const result = await response.json();
+    const result = await response.json().catch(() => {
+        throw Object.assign(new Error('Dịch vụ đang gián đoạn. Tải lại phiên để kiểm tra kết quả thao tác.'), { status: response.status });
+    });
     if (!response.ok) {
         const error = new Error(result.error?.message || `Lỗi HTTP ${response.status}`);
         error.status = response.status;
@@ -145,6 +155,8 @@ function signOut()
     state.session = null;
     state.share = null;
     state.previewKey = null;
+    state.selectionPreviewKey = null;
+    $('selection-preview').dataset.generation = '';
     state.print = null;
     state.settings = null;
     frameLayerCache.clear();
@@ -177,19 +189,24 @@ function printAction(session, finalId)
 
 function liveViewVisible()
 {
-    return Boolean(state.user) && state.view === 'workspace' && (!state.session || state.step !== 5);
+    return Boolean(state.user && state.session) && state.view === 'workspace' && state.step === 2;
 }
 
 function syncLiveView()
 {
     const visible = liveViewVisible();
     $('liveview-panel').hidden = !visible;
-    $('workspace-stage').classList.toggle('review-stage', Boolean(state.session) && state.step === 5);
+    const previewVisible = Boolean(state.user && state.session) && state.view === 'workspace' && [3, 4].includes(state.step);
+    $('selection-preview-panel').hidden = !previewVisible;
+    $('workspace-stage').classList.toggle('single-column-stage', !visible && !previewVisible);
     if (!visible) {
         state.cameraAttempted = false;
         if (browserMode && browserCamera.stream) browserCamera.stop();
         dccCamera?.stop();
         return;
+    }
+    if (document.body.dataset.mock === 'true' && !$('live-preview-img').hasAttribute('src')) {
+        $('live-preview-img').src = '/custom/assets/mock-preview/frame-1.jpg';
     }
     if (state.cameraAttempted || state.cameraStarting || (!browserMode && !dccMode)) return;
     state.cameraAttempted = true;
@@ -218,7 +235,6 @@ function render()
     $('auth-user-bar').hidden = !loggedIn;
     for (const view of ['workspace', 'history', 'admin', 'luts', 'settings']) $(view + '-view').hidden = !loggedIn || state.view !== view;
     $('wizard-nav').hidden = !loggedIn || state.view !== 'workspace' || !state.session;
-    $('selection-preview-dock').hidden = !loggedIn || state.view !== 'workspace' || !state.session || ![3, 4].includes(state.step);
     if (!loggedIn) return;
     $('current-user-display').textContent = state.user.username;
     $('current-role-badge').textContent = state.user.role === 'admin' ? 'Quản trị viên' : 'Người vận hành';
@@ -319,9 +335,36 @@ function renderSelection()
             }
         }
     }
-    paintSample($('selection-preview'), layoutFor(), templateFor(), session.lut, session).catch(() => {
-        if ([1, 3, 4].includes(state.step)) $('configuration-note').textContent = 'Không tải được ảnh mẫu. Hãy tải lại trang.';
-    });
+    if (!$('selection-preview-panel').hidden) renderCapturedPreview(session);
+}
+
+function renderCapturedPreview(session)
+{
+    const layout = layoutFor(session);
+    const template = templateFor(session);
+    const key = JSON.stringify([
+        session.id, layout?.id, template?.id, template?.version,
+        session.selected_lut, session.lut_version, session.lut_intensity,
+        session.slots.map((slot) => slot.photo.id),
+    ]);
+    if (state.selectionPreviewKey === key) return;
+    state.selectionPreviewKey = key;
+    const preview = $('selection-preview');
+    const status = $('selection-preview-status');
+    preview.hidden = true;
+    status.hidden = false;
+    status.textContent = 'Đang ghép ảnh xem trước…';
+    paintSample(preview, layout, template, session.lut, session)
+        .then((painted) => {
+            if (!painted || state.selectionPreviewKey !== key) return;
+            preview.hidden = false;
+            status.hidden = true;
+        })
+        .catch(() => {
+            if (state.selectionPreviewKey !== key) return;
+            state.selectionPreviewKey = null;
+            status.textContent = 'Không tải được ảnh xem trước. Hãy thử chọn lại màu hoặc khung.';
+        });
 }
 
 async function configure(update)
@@ -361,19 +404,20 @@ async function paintSample(canvas, layout, template, lut = 'original', session =
     const generation = String(++state.sampleGeneration);
     canvas.dataset.generation = generation;
     const preset = typeof lut === 'string' ? state.presets.find((item) => item.id === lut) : lut;
-    const captured = canvas === $('selection-preview') && allCaptured();
+    const captured = canvas === $('selection-preview');
     const [photos, overlay, background, cube, lettering] = await Promise.all([
-        captured ? Promise.all(state.session.slots.map((slot) => loadImage(slot.photo.url))) : loadImage(preset.sample_url).then((photo) => layout.slots.map(() => photo)),
+        captured ? Promise.all(session.slots.map((slot) => loadImage(slot.photo.url))) : loadImage(preset.sample_url).then((photo) => layout.slots.map(() => photo)),
         loadImage(template.overlay_url),
         template.background_url ? loadImage(template.background_url) : Promise.resolve(null),
-        captured ? getCubeLut(state.session) : Promise.resolve(null),
+        captured ? getCubeLut(session) : Promise.resolve(null),
         previewLettering(template, session, frame),
     ]);
+    if (canvas.dataset.generation !== generation) return false;
     if (cube) {
         const filterCanvas = document.createElement('canvas');
         const filter = new LutCanvasRenderer(filterCanvas);
         for (let index = 0; index < photos.length; index++) {
-            if (filter.render(photos[index], cube, state.session.lut_intensity / 100)) {
+            if (filter.render(photos[index], cube, session.lut_intensity / 100)) {
                 const copy = document.createElement('canvas');
                 copy.width = filterCanvas.width; copy.height = filterCanvas.height;
                 copy.getContext('2d').drawImage(filterCanvas, 0, 0);
@@ -383,7 +427,6 @@ async function paintSample(canvas, layout, template, lut = 'original', session =
         // This short-lived renderer is only for the paper preview.
         filter.gl?.getExtension('WEBGL_lose_context')?.loseContext();
     }
-    if (canvas.dataset.generation !== generation) return false;
     const context = canvas.getContext('2d');
     context.fillStyle = 'white';
     context.fillRect(0, 0, 1181, 1748);
@@ -434,10 +477,9 @@ async function getCubeLut(session)
 
 async function syncCaptureLut(session = state.session)
 {
-    if (state.view !== 'workspace') return;
-    if (!session) { browserCamera.setFilter(null); $('webcam-lut-canvas').hidden = true; return; }
+    if (!liveViewVisible()) { $('webcam-lut-canvas').hidden = true; return; }
     const lutData = await getCubeLut(session);
-    if (state.session?.id !== session.id || state.view !== 'workspace') return;
+    if (state.session !== session || !liveViewVisible()) return;
     browserCamera.setFilter(lutData, session.lut_intensity, session.lut?.name || session.selected_lut);
     const lutCanvas = $('webcam-lut-canvas');
     if (!browserMode && lutCanvas) {
@@ -494,7 +536,7 @@ function updateCropGuide()
 
 function fitBrowserPreview()
 {
-    if ($('workspace-view').hidden) return;
+    if (!liveViewVisible() || $('workspace-view').hidden) return;
     const box = $('crop-guide').parentElement;
     if (window.innerWidth <= 800) {
         box.style.removeProperty('--camera-preview-height');
@@ -527,7 +569,14 @@ async function waitJob(id)
     const sessionId = state.session.id;
     const limit = state.session.active_job?.type === 'render' ? 800 : 240;
     for (let attempt = 0; attempt < limit; attempt++) {
-        const job = await api('GET', `/jobs/${id}`);
+        let job;
+        try {
+            job = await api('GET', `/jobs/${id}`);
+        } catch (error) {
+            if (!(error instanceof TypeError) && ![502, 503, 504].includes(error.status)) throw error;
+            await sleep(500);
+            continue;
+        }
         state.job = job;
         render();
         if (job.status === 'SUCCEEDED' || job.status === 'FAILED') {
@@ -1477,10 +1526,10 @@ setInterval(async () => {
 }, 1800);
 let frame = 1;
 $('live-preview-img')?.addEventListener('load', () => {
-    if (!browserMode && state.user && state.view === 'workspace') { syncCaptureLut(state.session); updateCropGuide(); }
+    if (!browserMode && liveViewVisible()) { syncCaptureLut(state.session); updateCropGuide(); }
 });
 setInterval(() => {
-    if (document.body.dataset.mock === 'true' && state.user && state.view === 'workspace') {
+    if (document.body.dataset.mock === 'true' && liveViewVisible()) {
         frame = frame % 3 + 1;
         $('live-preview-img').src = `/custom/assets/mock-preview/frame-${frame}.jpg`;
     }

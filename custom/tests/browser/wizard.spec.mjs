@@ -82,9 +82,9 @@ with zipfile.ZipFile(sys.argv[2],'w',zipfile.ZIP_DEFLATED) as z:
     await page.locator('#btn-new-session').click();
     for (const size of [{ width: 1366, height: 768 }, { width: 1920, height: 1080 }]) {
         await page.setViewportSize(size);
-        await expect(page.locator('#live-preview-img')).toBeVisible();
+        await expect(page.locator('#liveview-panel')).toBeHidden();
         expect(await page.locator('#btn-next').evaluate((button) => button.getBoundingClientRect().bottom <= innerHeight)).toBe(true);
-        await page.screenshot({ path: info.outputPath(`filter-${size.width}.png`), fullPage: true });
+        await page.screenshot({ path: info.outputPath(`layout-${size.width}.png`), fullPage: true });
     }
     await page.locator('[data-layout-id="single"]').click();
     await page.locator('#btn-next').click();

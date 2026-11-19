@@ -459,6 +459,9 @@ final class PrintService
     public function processNextPendingPrint(?string $scenarioOverride = null, bool $crashAfterSubmitting = false): ?array
     {
         $pdo = $this->db->pdo();
+        if ($pdo->query("SELECT 1 FROM print_requests WHERE status = 'PENDING' LIMIT 1")->fetchColumn() === false) {
+            return null;
+        }
 
         // Claim one PENDING print_request and transition to SUBMITTING after verifying SHA-256
         $claimed = $this->db->transaction(function (PDO $txPdo): ?array {

@@ -73,6 +73,11 @@ for (const [layout, count] of [['single', 1], ['strip-three', 3], ['postcard-thr
         await expect(page.locator('#btn-next')).toBeEnabled();
         await page.locator('#btn-next').click();
         await expect(page.locator('#webcam-video')).toBeHidden();
+        await expect.poll(() => page.locator('#webcam-video').evaluate((video) => video.srcObject)).toBeNull();
+        await expect(page.locator('#selection-preview')).toBeVisible();
+        await page.locator('#btn-next').click();
+        await expect(page.locator('#selection-preview')).toBeVisible();
+        await page.locator('#btn-next').click();
         await expect(page.locator('#btn-finalize-session')).toBeEnabled();
         await page.locator('#btn-finalize-session').click();
         await expect(page.locator('#modal-qr-img')).toBeVisible();

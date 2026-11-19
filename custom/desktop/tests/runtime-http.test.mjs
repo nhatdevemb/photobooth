@@ -36,7 +36,7 @@ test('Windows FastCGI + worker + DCC HTTP: four layouts, retake, immutable JPEG,
     const data = await mkdtemp(path.join(cache, 'http-e2e-Thử-'));
     const fixture = await readFile(path.join(project, 'custom/tests/fixtures/slot-1-v1.jpg'));
     const settings = {};
-    let last = '-', triggers = 0, nextFixture = fixture;
+    let last = '-', triggers = 0, nextFixture = fixture, holdShutter = false;
     const dcc = httpServer(async (request, response) => {
         try {
             const url = new URL(request.url, 'http://127.0.0.1');
@@ -51,6 +51,7 @@ test('Windows FastCGI + worker + DCC HTTP: four layouts, retake, immutable JPEG,
             else if (q.slc === 'get') body = q.param1 === 'session' ? 'Photobooth' : q.param1 === 'camera' ? '1234567890' : q.param1 === 'lastcaptured' ? last : settings[q.param1] || 'Unknow parameter';
             else if (q.slc === 'capture') {
                 triggers++;
+                if (holdShutter) return; // Keep the adapter request inflight until the worker is stopped.
                 last = settings['session.filenametemplate'] + '.jpg';
                 await writeFile(path.join(settings['session.folder'], last), nextFixture);
             }
@@ -140,6 +141,40 @@ test('Windows FastCGI + worker + DCC HTTP: four layouts, retake, immutable JPEG,
         }
         assert.fail(message);
     };
+    const runtimeLog = path.join(data, 'logs/desktop-runtime.log');
+    const servicePid = async (pattern) => {
+        const log = await readFile(runtimeLog, 'utf8');
+        const matches = [...log.matchAll(pattern)];
+        return Number(matches.at(-1)?.[1] ?? 0);
+    };
+    const restartService = async (pattern) => {
+        const before = await waitFor(() => servicePid(pattern), Boolean, 'Missing managed service PID');
+        process.kill(before, 'SIGTERM');
+        return waitFor(() => servicePid(pattern), (pid) => pid && pid !== before, 'Managed service did not restart');
+    };
+    const caddyConfig = await readFile(path.join(data, 'Caddyfile'), 'utf8');
+    const backendPort = caddyConfig.match(/reverse_proxy 127\.0\.0\.1:(\d+)/)[1];
+    await restartService(new RegExp('PHP FastCGI :' + backendPort + ' executable PID (\\d+)\\r?\\n', 'g'));
+    assert.equal((await api('GET', '/camera')).camera_state, 'connected');
+    await restartService(/Worker Beauty executable PID (\d+)\r?\n/g);
+    await restartService(/Caddy started \(PID (\d+)\)/g);
+    await waitFor(() => fetch(origin + '/').then((r) => r.ok).catch(() => false), Boolean, 'Caddy did not resume HTTP');
+    assert.equal(triggers, 0);
+
+    const interrupted = await api('POST', '/sessions', {}, randomUUID(), 201);
+    holdShutter = true;
+    const accepted = await api('POST', '/sessions/' + interrupted.id + '/slots/1/capture',
+        { revision: interrupted.revision }, randomUUID(), 202);
+    await waitFor(() => triggers, (number) => number === 1, 'Camera did not receive interrupted shutter');
+    await restartService(/Worker chụp\/ghép\/in executable PID (\d+)\r?\n/g);
+    const reconciled = await finish(interrupted.id);
+    const interruptedJob = await api('GET', '/jobs/' + accepted.job_id);
+    assert.equal(interruptedJob.status, 'FAILED');
+    assert.equal(interruptedJob.error?.code, 'WORKER_CRASHED_DURING_CAPTURE');
+    assert.equal(triggers, 1, 'An uncertain shutter must never be replayed');
+    holdShutter = false;
+    await api('POST', '/sessions/' + interrupted.id + '/cancel', { revision: reconciled.revision }, randomUUID(), 200);
+
     const beautyHealth = async () => (await api('GET', '/health')).beauty_engine;
     assert.equal((await beautyHealth()).bridge.status, 'starting');
     bridgeReady = true;
@@ -198,7 +233,7 @@ test('Windows FastCGI + worker + DCC HTTP: four layouts, retake, immutable JPEG,
     assert.equal(failedCheck.bridge.status, 'ready');
     assert.match(failedCheck.diagnostic.error, /TEST_NATIVE_EXPORT_FAILED/);
 
-    let expectedTriggers = 3;
+    let expectedTriggers = 4;
     const layouts = ['single', 'strip-three', 'postcard-three', 'grid-four'];
     const sessionCount = Number(process.env.PB_SOAK_SESSIONS || 4);
     assert.ok(Number.isInteger(sessionCount) && sessionCount >= 4 && sessionCount <= 100);

@@ -1,6 +1,6 @@
 {
   "name": "photobooth-operator-desktop",
-  "version": "0.1.5",
+  "version": "0.1.7",
   "private": true,
   "description": "Photobooth Windows với Canon R10 qua digiCamControl",
   "author": "Photobooth Operator",

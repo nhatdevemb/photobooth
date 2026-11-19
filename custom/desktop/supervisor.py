@@ -3,6 +3,8 @@ from __future__ import annotations
 
 import ctypes
 from ctypes import wintypes
+from dataclasses import dataclass
+from datetime import datetime
 import json
 import os
 from pathlib import Path
@@ -58,6 +60,73 @@ def create_job():
     return kernel, handle  # Keep the non-inheritable job handle alive until process exit.
 
 
+@dataclass
+class Service:
+    name: str
+    command: list
+    cwd: Path
+    env: dict | None = None
+    required: bool = True
+    isolated: bool = True
+    process: subprocess.Popen | None = None
+    started_at: float = 0
+    retry_at: float = 0
+    failures: int = 0
+
+    def start(self, log):
+        command = self.command
+        if self.isolated:
+            command = [sys.executable, str(Path(__file__).resolve()), "--service", self.name, *command]
+        self.process = subprocess.Popen(command, stdin=subprocess.DEVNULL, stdout=log, stderr=log,
+                                        cwd=self.cwd, env=self.env, creationflags=subprocess.CREATE_NO_WINDOW)
+        self.started_at = time.monotonic()
+        log_event(log, f"{self.name} started (PID {self.process.pid})")
+
+    def tick(self, log):
+        now = time.monotonic()
+        if self.process is not None:
+            code = self.process.poll()
+            if code is None:
+                return
+            if now - self.started_at >= 60:
+                self.failures = 0
+            reason = f"PID {self.process.pid}, mã thoát {code}"
+            self.process = None
+            self.schedule_retry(now, log, reason)
+        elif now >= self.retry_at:
+            try:
+                self.start(log)
+            except OSError as error:
+                self.schedule_retry(now, log, str(error))
+
+    def schedule_retry(self, now, log, reason):
+        self.failures += 1
+        if self.required and self.failures > 3:
+            message = f"{self.name} đã dừng sau 3 lần phục hồi ({reason})."
+            log_event(log, message)
+            raise RuntimeError(message)
+        delay = (1, 2, 4, 10, 30)[min(self.failures - 1, 4)]
+        self.retry_at = now + delay
+        log_event(log, f"{self.name} đã dừng ({reason}). Khởi động lại sau {delay} giây.")
+
+
+def log_event(log, message):
+    timestamp = datetime.now().astimezone().isoformat(timespec="seconds")
+    log.write(f"[{timestamp}] [supervisor] {message}\n".encode("utf-8"))
+
+
+def run_isolated_service(name, command):
+    # Attach before spawning so a crashed PHP process cannot leave a renderer
+    # holding a lock or writing to a job's files when the replacement starts.
+    job = create_job()
+    child = subprocess.Popen(command, creationflags=subprocess.CREATE_NO_WINDOW)
+    print(f"[service] {name} executable PID {child.pid}", flush=True)
+    code = child.wait()
+    print(f"[service] {name} executable PID {child.pid} exited ({code})", flush=True)
+    _ = job  # The OS closes this handle on process exit and stops remaining children.
+    return 0 if code == 0 else 1
+
+
 def reserve_ports(operator_port, guest_port):
     sockets = []
     try:
@@ -82,6 +151,12 @@ def caddy_config(public, settings, ports, data):
         blocks.append(f'''http://:{port} {{
     bind {host}
     reverse_proxy {upstreams} {{
+        lb_policy least_conn
+        lb_try_duration 1s
+        fail_duration 3s
+        lb_retry_match {{
+            method GET HEAD
+        }}
         transport fastcgi {{
             root {json.dumps(public)}
             split .php
@@ -129,40 +204,33 @@ def main():
     stopped = threading.Event()
     threading.Thread(target=lambda: (sys.stdin.read(), stopped.set()), daemon=True).start()
     log = (data / "logs/desktop-runtime.log").open("ab", buffering=0)
-    children = []
-
-    def start_service(name, command, cwd, env=None):
-        child = subprocess.Popen(command, stdin=subprocess.DEVNULL, stdout=log, stderr=log,
-                                 cwd=cwd, env=env, creationflags=flags)
-        children.append((name, child))
-
-    def check_services():
-        for name, child in children:
-            code = child.poll()
-            if code is not None:
-                message = f"{name} đã dừng (PID {child.pid}, mã thoát {code})."
-                log.write((message + "\n").encode("utf-8"))
-                raise RuntimeError(message)
-
+    log_event(log, f"Runtime started (PID {os.getpid()})")
+    # Individual FastCGI and Beauty failures can degrade without stopping the booth.
+    cgi_env = {**os.environ, "PHP_FCGI_MAX_REQUESTS": "0"}
+    config = data / "Caddyfile"
+    services = [
+        Service(f"PHP FastCGI :{port}",
+                [str(runtime / "php/php-cgi.exe"), *php_options, "-b", f"127.0.0.1:{port}"],
+                runtime / "php", env=cgi_env, required=False)
+        for port in ports
+    ]
+    services.extend([
+        Service("Caddy", [str(runtime / "caddy/caddy.exe"), "run", "--config", str(config), "--adapter", "caddyfile"],
+                project, isolated=False),
+        Service("Worker chụp/ghép/in", [str(php), *php_options, str(project / "custom/bin/worker.php")], runtime / "php"),
+        Service("Worker Beauty", [str(php), *php_options, str(project / "custom/bin/beauty-worker.php")],
+                runtime / "php", required=False),
+    ])
+    maintenance = None
     for sock in sockets:
         sock.close()
     try:
-        # PHP normally exits after 500 FastCGI requests. Live view can reach this
-        # limit during a session, and this supervisor owns the worker lifetime.
-        cgi_env = {**os.environ, "PHP_FCGI_MAX_REQUESTS": "0"}
-        for port in ports:
-            start_service(f"PHP FastCGI :{port}",
-                          [str(runtime / "php/php-cgi.exe"), *php_options, "-b", f"127.0.0.1:{port}"],
-                          runtime / "php", env=cgi_env)
-        config = data / "Caddyfile"
         config.write_text(caddy_config(project / "custom/public", settings, ports, data), encoding="utf-8")
-        start_service("Caddy", [str(runtime / "caddy/caddy.exe"), "run", "--config", str(config), "--adapter", "caddyfile"], project)
-        start_service("Worker chụp/ghép/in", [str(php), *php_options, str(project / "custom/bin/worker.php")], runtime / "php")
-        start_service("Worker Beauty", [str(php), *php_options, str(project / "custom/bin/beauty-worker.php")], runtime / "php")
         opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))
         deadline = time.monotonic() + 20
         while time.monotonic() < deadline:
-            check_services()
+            for service in services:
+                service.tick(log)
             try:
                 with opener.open(f'http://127.0.0.1:{settings["operatorPort"]}/', timeout=1) as response:
                     if response.status == 200:
@@ -172,19 +240,31 @@ def main():
         else:
             raise RuntimeError("Web server chưa sẵn sàng. Xem logs/desktop-runtime.log.")
         emit("ready", "Photobooth đã sẵn sàng.")
-        maintenance = None
         next_maintenance = time.monotonic() + 300
         while not stopped.wait(0.25):
-            check_services()
-            if time.monotonic() >= next_maintenance and (maintenance is None or maintenance.poll() is not None):
-                maintenance = subprocess.Popen([str(php), *php_options, str(project / "custom/bin/maintenance.php")],
-                                               stdin=subprocess.DEVNULL, stdout=log, stderr=log, cwd=runtime / "php", creationflags=flags)
-                next_maintenance = time.monotonic() + 3600
+            for service in services:
+                service.tick(log)
+            if maintenance is not None and (code := maintenance.poll()) is not None:
+                if code != 0:
+                    log_event(log, f"Bảo trì thoát với mã {code}.")
+                maintenance = None
+            if maintenance is None and time.monotonic() >= next_maintenance:
+                try:
+                    maintenance = subprocess.Popen(
+                        [str(php), *php_options, str(project / "custom/bin/maintenance.php")],
+                        stdin=subprocess.DEVNULL, stdout=log, stderr=log, cwd=runtime / "php", creationflags=flags)
+                    next_maintenance = time.monotonic() + 3600
+                except OSError as error:
+                    log_event(log, f"Không khởi động được bảo trì ({error}). Thử lại sau 60 giây.")
+                    next_maintenance = time.monotonic() + 60
     finally:
-        for _, child in reversed(children):
+        children = [service.process for service in reversed(services) if service.process is not None]
+        if maintenance is not None:
+            children.append(maintenance)
+        for child in children:
             if child.poll() is None:
                 child.terminate()
-        for _, child in children:
+        for child in children:
             try:
                 child.wait(timeout=3)
             except subprocess.TimeoutExpired:
@@ -196,6 +276,8 @@ def main():
 
 if __name__ == "__main__":
     try:
+        if len(sys.argv) > 3 and sys.argv[1] == "--service":
+            sys.exit(run_isolated_service(sys.argv[2], sys.argv[3:]))
         main()
     except Exception as error:
         emit("error", str(error))

@@ -133,8 +133,15 @@ final class WorkerRunner
         $this->releaseSingletonLock();
     }
 
+    private int $nextIdleHeartbeatNs = 0;
+
     public function updateHeartbeat(?string $activeJobId = null, string $status = 'RUNNING'): void
     {
+        $nowNs = hrtime(true);
+        $idle = $activeJobId === null && $status === 'IDLE';
+        if ($idle && $nowNs < $this->nextIdleHeartbeatNs) {
+            return;
+        }
         $nowIso = Clock::nowIso();
         $pdo = $this->db->pdo();
 
@@ -157,6 +164,7 @@ final class WorkerRunner
             ':st' => $status,
         ]);
 
+        $this->nextIdleHeartbeatNs = $idle ? $nowNs + 1_000_000_000 : 0;
         if ($activeJobId !== null) {
             $pdo->prepare('UPDATE jobs SET heartbeat_at = :now WHERE id = :id')
                 ->execute([':now' => $nowIso, ':id' => $activeJobId]);
@@ -262,7 +270,8 @@ final class WorkerRunner
         $reconciledPrints = $this->printService->reconcileInterruptedSubmissions();
 
         // 4. Clean pending directories and isolate unreferenced orphan files
-        $orphanStats = $this->assetStore->reconcileStartupOrphans($pdo);
+        // A replacement worker can start while PHP is publishing an approved image.
+        $orphanStats = $this->db->transaction(fn (PDO $txPdo) => $this->assetStore->reconcileStartupOrphans($txPdo));
 
         $this->updateHeartbeat(null, 'IDLE');
 
@@ -320,6 +329,11 @@ final class WorkerRunner
      */
     public function processNextQueuedJob(?string $faultScenarioOverride = null): ?array
     {
+        // Avoid taking SQLite's writer lock on every idle poll.
+        if ($this->db->pdo()->query("SELECT 1 FROM jobs WHERE status = 'QUEUED' LIMIT 1")->fetchColumn() === false) {
+            return null;
+        }
+
         $claimed = $this->db->transaction(function (PDO $txPdo): ?array {
             $stmt = $txPdo->query(
                 "SELECT * FROM jobs WHERE status = 'QUEUED' ORDER BY created_at ASC LIMIT 1"
