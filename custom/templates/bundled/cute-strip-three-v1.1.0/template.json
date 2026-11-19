@@ -1,0 +1,47 @@
+{
+    "id": "cute-strip-three",
+    "name": "Cute",
+    "style": "cute",
+    "version": "1.1.0",
+    "layout_id": "strip-three",
+    "layout_version": "1.0.0",
+    "overlay": "overlay.png",
+    "background": "background.png",
+    "preview": "preview.jpg",
+    "license": "Original project artwork; MIT",
+    "hashes": {
+        "overlay.png": "0031030c9ec6e3df613dc0e84fc4ec52dccb7abaf8bacba0be4a83a0734d5c8a",
+        "background.png": "4b88c17a7b1dc49d8a07459fb235885d701fb14530f967664990c8847b18af5c",
+        "preview.jpg": "f23d2984be77b5703c00bc065e2a008c5f936639d63c16b49ace928ab77a0b40"
+    },
+    "category": "other",
+    "text_slots": {
+        "name": {
+            "x": 115,
+            "y": 2,
+            "width": 950,
+            "height": 30,
+            "size": 28,
+            "min_size": 16,
+            "color": "#282536"
+        },
+        "date": {
+            "x": 115,
+            "y": 1716,
+            "width": 174,
+            "height": 30,
+            "size": 21,
+            "min_size": 17,
+            "color": "#282536"
+        },
+        "wish": {
+            "x": 305,
+            "y": 1716,
+            "width": 760,
+            "height": 30,
+            "size": 23,
+            "min_size": 16,
+            "color": "#282536"
+        }
+    }
+}

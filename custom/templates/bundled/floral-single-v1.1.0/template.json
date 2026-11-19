@@ -1,0 +1,47 @@
+{
+    "id": "floral-single",
+    "name": "Hoa",
+    "style": "floral",
+    "version": "1.1.0",
+    "layout_id": "single",
+    "layout_version": "1.0.0",
+    "overlay": "overlay.png",
+    "background": "background.png",
+    "preview": "preview.jpg",
+    "license": "Original project artwork; MIT",
+    "hashes": {
+        "overlay.png": "080683de7438c4641f5a5a4deb0ef8980d7ad3fd6f7f7f5ed5b4cbc6fe762eb2",
+        "background.png": "114bccd50e4a8ec63d2c2f9f92d22fa74f3185268828a5bc6554c516ed1d2100",
+        "preview.jpg": "ef8b8d55b4d209eb15eab8c625e5c05407eadfc84917e972a10767880a414c82"
+    },
+    "category": "other",
+    "text_slots": {
+        "name": {
+            "x": 115,
+            "y": 2,
+            "width": 950,
+            "height": 30,
+            "size": 28,
+            "min_size": 16,
+            "color": "#282536"
+        },
+        "date": {
+            "x": 115,
+            "y": 1716,
+            "width": 174,
+            "height": 30,
+            "size": 21,
+            "min_size": 17,
+            "color": "#282536"
+        },
+        "wish": {
+            "x": 305,
+            "y": 1716,
+            "width": 760,
+            "height": 30,
+            "size": 23,
+            "min_size": 16,
+            "color": "#282536"
+        }
+    }
+}

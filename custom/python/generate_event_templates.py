@@ -134,6 +134,14 @@ def draw_variable_stroke(
             draw.ellipse((S(px - r), S(py - r), S(px + r), S(py + r)), fill=fill)
 
 
+DRAW_LETTERING = True
+
+
+def draw_event_text(draw: ImageDraw.ImageDraw, *args, **kwargs) -> None:
+    if DRAW_LETTERING:
+        draw.text(*args, **kwargs)
+
+
 def draw_tracked_text(
     draw: ImageDraw.ImageDraw,
     cx: float,
@@ -145,7 +153,7 @@ def draw_tracked_text(
     anchor: str = "mm",
 ) -> float:
     """Render horizontally tracked text centered at cx with vertical anchor ('mm' or 'mt')."""
-    if not text:
+    if not DRAW_LETTERING or not text:
         return 0.0
     widths = [max(0.0, draw.textlength(ch, font=font)) for ch in text]
     step_gap = tracking * SS
@@ -729,7 +737,7 @@ def build_wedding_burgundy_single(layout: dict) -> Tuple[Image.Image, Image.Imag
     draw.line(pts_S([(320, 37), (415, 37)]), fill=soft_burgundy, width=max(2, int(round(S(1.2)))))
     draw.line(pts_S([(766, 37), (861, 37)]), fill=soft_burgundy, width=max(2, int(round(S(1.2)))))
 
-    draw.text((S(CANVAS_W / 2), S(1692)), "To Love and To Cherish", font=f_script_bot, fill=burgundy, anchor="mm")
+    draw_event_text(draw, (S(CANVAS_W / 2), S(1692)), "To Love and To Cherish", font=f_script_bot, fill=burgundy, anchor="mm")
     draw_tracked_text(draw, CANVAS_W / 2, 1722, "FOREVER  &  ALWAYS", f_caps_bot, soft_burgundy, tracking=5.5)
 
     # Signature Ref #1 style ivory-filled burgundy-outlined corner bows positioned cleanly in header/footer corners
@@ -767,19 +775,19 @@ def build_wedding_burgundy_strip(layout: dict) -> Tuple[Image.Image, Image.Image
 
     # Ornate wedding crest emblem
     draw_wedding_rings_crest(draw, 160, 885, 48, burgundy, soft_burgundy)
-    draw.text((S(160), S(990)), "Love", font=f_script, fill=burgundy, anchor="mm")
-    draw.text((S(160), S(1080)), "&", font=f_mono, fill=soft_burgundy, anchor="mm")
+    draw_event_text(draw, (S(160), S(990)), "Love", font=f_script, fill=burgundy, anchor="mm")
+    draw_event_text(draw, (S(160), S(1080)), "&", font=f_mono, fill=soft_burgundy, anchor="mm")
 
     draw.line(pts_S([(86, 1170), (234, 1170)]), fill=soft_burgundy, width=max(2, int(round(S(1.2)))))
-    draw.text((S(160), S(1235)), "To Love", font=f_script, fill=burgundy, anchor="mm")
-    draw.text((S(160), S(1290)), "and To Cherish", font=f_script, fill=burgundy, anchor="mm")
+    draw_event_text(draw, (S(160), S(1235)), "To Love", font=f_script, fill=burgundy, anchor="mm")
+    draw_event_text(draw, (S(160), S(1290)), "and To Cherish", font=f_script, fill=burgundy, anchor="mm")
     draw_tracked_text(draw, 160, 1465, "FOREVER & ALWAYS", f_small, soft_burgundy, tracking=2.8)
     draw_botanical_sprig(draw, 160, 1590, 96, 90, burgundy, soft_burgundy, ivory_a, pairs=4)
 
     # Right 319px sidebar (cx = 1021): balanced vertical wedding typography + botanical + bow
     draw_tracked_text(draw, 1021, 165, "HAPPY WEDDING", f_caps, burgundy, tracking=3.0)
     draw.line(pts_S([(946, 210), (1096, 210)]), fill=soft_burgundy, width=max(2, int(round(S(1.2)))))
-    draw.text((S(1021), S(280)), "Best Day Ever", font=f_script, fill=soft_burgundy, anchor="mm")
+    draw_event_text(draw, (S(1021), S(280)), "Best Day Ever", font=f_script, fill=soft_burgundy, anchor="mm")
 
     draw_botanical_sprig(draw, 1021, 610, 260, -90, soft_burgundy, burgundy, (235, 220, 206, 255), pairs=6)
     draw_coquette_bow(draw, 1021, 740, scale=0.45, angle_deg=6, stroke=burgundy, fill=ivory_a, style="outline")
@@ -808,7 +816,7 @@ def build_wedding_rose_grid(layout: dict) -> Tuple[Image.Image, Image.Image]:
 
     # Top editorial typography matching Reference #2 right card
     draw_tracked_text(draw, CANVAS_W / 2, 24, "HAPPY WEDDING", f_title, rose, tracking=6.5)
-    draw.text((S(CANVAS_W / 2), S(56)), "Forever  &  Always  ·  With Love", font=f_sub, fill=soft_rose, anchor="mm")
+    draw_event_text(draw, (S(CANVAS_W / 2), S(56)), "Forever  &  Always  ·  With Love", font=f_sub, fill=soft_rose, anchor="mm")
     draw.line(pts_S([(190, 56), (370, 56)]), fill=(234, 200, 212, 255), width=max(2, int(round(S(1.2)))))
     draw.line(pts_S([(811, 56), (991, 56)]), fill=(234, 200, 212, 255), width=max(2, int(round(S(1.2)))))
 
@@ -855,7 +863,7 @@ def build_wedding_rose_postcard(layout: dict) -> Tuple[Image.Image, Image.Image]
     draw_tracked_text(draw, CANVAS_W / 2, 1157, "FOREVER BEGINS", resolve_font(FONT_SERIF_LUX, 15), soft_rose, tracking=4.8)
 
     # Footer below slot 3
-    draw.text((S(CANVAS_W / 2), S(1694)), "Just Married", font=f_script, fill=rose, anchor="mm")
+    draw_event_text(draw, (S(CANVAS_W / 2), S(1694)), "Just Married", font=f_script, fill=rose, anchor="mm")
     draw_tracked_text(draw, CANVAS_W / 2, 1726, "SAVE THE DATE  ·  THE BEST DAY EVER", f_bot, soft_rose, tracking=4.2)
 
     # Opposite diagonal delicate bows hugging corners cleanly outside 50px inset
@@ -897,7 +905,7 @@ def build_wedding_champagne_grid(layout: dict) -> Tuple[Image.Image, Image.Image
     draw_botanical_sprig(draw, 712, 874, 145, 0, sage, gold, ivory_pearl, pairs=4)
 
     # Footer
-    draw.text((S(CANVAS_W / 2), S(1692)), "Happily Ever After", font=f_sub, fill=gold, anchor="mm")
+    draw_event_text(draw, (S(CANVAS_W / 2), S(1692)), "Happily Ever After", font=f_sub, fill=gold, anchor="mm")
     draw_tracked_text(draw, CANVAS_W / 2, 1721, "CELEBRATING LOVE", f_foot, (158, 122, 60, 255), tracking=6.0)
     draw_sparkle(draw, 355, 1702, 8, light_gold)
     draw_sparkle(draw, CANVAS_W - 355, 1702, 8, light_gold)
@@ -931,7 +939,7 @@ def build_birthday_coquette_strip(layout: dict) -> Tuple[Image.Image, Image.Imag
     draw_coquette_bow(draw, 160, 220, scale=1.18, angle_deg=-4, stroke=cherry, fill=cherry, highlight=blush, style="filled")
     draw_tracked_text(draw, 160, 445, "HAPPY", f_title, cherry, tracking=4.5)
     draw_tracked_text(draw, 160, 488, "BIRTHDAY", f_title, cherry, tracking=4.0)
-    draw.text((S(160), S(545)), "Make a Wish", font=f_script, fill=rose_pink, anchor="mm")
+    draw_event_text(draw, (S(160), S(545)), "Make a Wish", font=f_script, fill=rose_pink, anchor="mm")
 
     draw_birthday_cake(
         draw, 160, 885, 1.38,
@@ -953,7 +961,7 @@ def build_birthday_coquette_strip(layout: dict) -> Tuple[Image.Image, Image.Imag
     draw_coquette_bow(draw, 1021, 745, scale=0.65, angle_deg=6, stroke=cherry, fill=blush, style="silk")
 
     draw_cupcake(draw, 1021, 955, 2.0, (240, 194, 134, 255), blush, gold)
-    draw.text((S(1021), S(1110)), "Celebrate!", font=f_script, fill=cherry, anchor="mm")
+    draw_event_text(draw, (S(1021), S(1110)), "Celebrate!", font=f_script, fill=cherry, anchor="mm")
 
     draw_cherry_duo(draw, 1021, 1325, 1.05, cherry, sage, cherry)
     draw_tracked_text(draw, 1021, 1500, "SPECIAL MOMENTS", f_small, rose_pink, tracking=2.6)
@@ -988,7 +996,7 @@ def build_birthday_rose_grid(layout: dict) -> Tuple[Image.Image, Image.Image]:
     f_foot = resolve_font(FONT_SANS_BOLD, 16)
 
     draw_tracked_text(draw, CANVAS_W / 2, 26, "HAPPY BIRTHDAY", f_title, berry, tracking=5.8)
-    draw.text((S(CANVAS_W / 2), S(56)), "Make a Wish  ·  Best Day Ever", font=f_sub, fill=(214, 114, 148, 255), anchor="mm")
+    draw_event_text(draw, (S(CANVAS_W / 2), S(56)), "Make a Wish  ·  Best Day Ever", font=f_sub, fill=(214, 114, 148, 255), anchor="mm")
     draw_sparkle(draw, 225, 40, 10, gold)
     draw_sparkle(draw, CANVAS_W - 225, 40, 10, gold)
     draw_sparkle(draw, 195, 56, 6, berry)
@@ -1058,7 +1066,7 @@ def build_birthday_cake_postcard(layout: dict) -> Tuple[Image.Image, Image.Image
     draw_tracked_text(draw, CANVAS_W / 2, 1157, "SPECIAL DAY", resolve_font(FONT_SANS_BOLD, 15), lavender, tracking=4.5)
 
     # Bottom footer with glowing birthday candles row & calligraphic wish
-    draw.text((S(CANVAS_W / 2), S(1706)), "Sweetest Birthday Wishes", font=f_bot, fill=strawberry, anchor="mm")
+    draw_event_text(draw, (S(CANVAS_W / 2), S(1706)), "Sweetest Birthday Wishes", font=f_bot, fill=strawberry, anchor="mm")
     for cx_c, col_c in ((220, sky), (255, apricot), (290, strawberry), (891, strawberry), (926, apricot), (961, lavender)):
         draw.rounded_rectangle((S(cx_c - 4), S(1692), S(cx_c + 4), S(1726)), radius=S(2), fill=col_c)
         draw.ellipse((S(cx_c - 4), S(1680), S(cx_c + 4), S(1690)), fill=(255, 198, 72, 255))
@@ -1090,7 +1098,7 @@ def build_birthday_gala_single(layout: dict) -> Tuple[Image.Image, Image.Image]:
     draw.line(pts_S([(811, 41), (951, 41)]), fill=deep_gold, width=max(2, int(round(S(1.2)))))
 
     draw_tracked_text(draw, CANVAS_W / 2, 1692, "HAPPY BIRTHDAY", f_bot, gold, tracking=6.5)
-    draw.text((S(CANVAS_W / 2), S(1720)), "Make a Wish  ·  Shine Bright", font=f_sub, fill=pale_gold, anchor="mm")
+    draw_event_text(draw, (S(CANVAS_W / 2), S(1720)), "Make a Wish  ·  Shine Bright", font=f_sub, fill=pale_gold, anchor="mm")
 
     # Foil corner sparkles & petite gold ribbon accents cleanly inside top/bottom corners
     for cx_s, cy_s, r_s, c_s in (
@@ -1141,7 +1149,7 @@ def build_birthday_pastel_grid(layout: dict) -> Tuple[Image.Image, Image.Image]:
     f_foot = resolve_font(FONT_SANS_BOLD, 17)
 
     draw_tracked_text(draw, CANVAS_W / 2, 27, "HAPPY BIRTHDAY", f_title, lilac, tracking=5.4)
-    draw.text((S(CANVAS_W / 2), S(57)), "Sweet Moments  ·  Celebrate Today", font=f_sub, fill=pink, anchor="mm")
+    draw_event_text(draw, (S(CANVAS_W / 2), S(57)), "Sweet Moments  ·  Celebrate Today", font=f_sub, fill=pink, anchor="mm")
 
     # Pastel corner balloons tucked neatly inside upper corners (y<=74, safe above y=85)
     draw_balloon(draw, 38, 25, 16, pink, None, lilac, tilt=-12, tail_len=24.0)

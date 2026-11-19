@@ -1,0 +1,47 @@
+{
+    "id": "wedding-champagne-grid",
+    "name": "Cưới · Vàng Champagne (2×2)",
+    "style": "wedding-champagne",
+    "version": "1.1.0",
+    "layout_id": "grid-four",
+    "layout_version": "1.0.0",
+    "overlay": "overlay.png",
+    "background": "background.png",
+    "preview": "preview.jpg",
+    "license": "Original project artwork; MIT",
+    "hashes": {
+        "overlay.png": "9736d741f63c655b5a07488b220e7bdf6af0e28851bd908a8f16497a6a46eaaa",
+        "background.png": "d7bcd000041f4b76bbb777f06ca66412f142470c866db459fa3d436cc9e669f6",
+        "preview.jpg": "977b84a06d979942a3c2bbf2c5e459309afa02b772d28d40e41d3982fc786dc2"
+    },
+    "category": "wedding",
+    "text_slots": {
+        "name": {
+            "x": 115,
+            "y": 2,
+            "width": 950,
+            "height": 30,
+            "size": 28,
+            "min_size": 16,
+            "color": "#592936"
+        },
+        "date": {
+            "x": 115,
+            "y": 1716,
+            "width": 174,
+            "height": 30,
+            "size": 21,
+            "min_size": 17,
+            "color": "#592936"
+        },
+        "wish": {
+            "x": 305,
+            "y": 1716,
+            "width": 760,
+            "height": 30,
+            "size": 23,
+            "min_size": 16,
+            "color": "#592936"
+        }
+    }
+}

@@ -1,6 +1,6 @@
 {
   "name": "photobooth-operator-desktop",
-  "version": "0.1.1",
+  "version": "0.1.5",
   "private": true,
   "description": "Photobooth Windows với Canon R10 qua digiCamControl",
   "author": "Photobooth Operator",
@@ -14,6 +14,7 @@
     "start": "electron .",
     "prepare:runtime": "node scripts/prepare-runtime.mjs",
     "stage": "node scripts/stage.mjs",
+    "build:windows": "node scripts/build-release.mjs",
     "dist": "npm run stage && node scripts/build-windows.mjs",
     "test": "node --test tests/settings.test.mjs tests/runtime-http.test.mjs",
     "test:electron": "node --test tests/electron-smoke.test.mjs",

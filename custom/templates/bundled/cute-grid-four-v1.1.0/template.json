@@ -1,0 +1,47 @@
+{
+    "id": "cute-grid-four",
+    "name": "Cute",
+    "style": "cute",
+    "version": "1.1.0",
+    "layout_id": "grid-four",
+    "layout_version": "1.0.0",
+    "overlay": "overlay.png",
+    "background": "background.png",
+    "preview": "preview.jpg",
+    "license": "Original project artwork; MIT",
+    "hashes": {
+        "overlay.png": "f5ed2f04f2a3127259e5fdd7e3dcfd1629cfecac73752178b3df6b64515401ac",
+        "background.png": "4b88c17a7b1dc49d8a07459fb235885d701fb14530f967664990c8847b18af5c",
+        "preview.jpg": "8c12f78e6ea3812815665592c35bd774bdb8731c43e4f042207f644bfedb5f74"
+    },
+    "category": "other",
+    "text_slots": {
+        "name": {
+            "x": 115,
+            "y": 2,
+            "width": 950,
+            "height": 30,
+            "size": 28,
+            "min_size": 16,
+            "color": "#282536"
+        },
+        "date": {
+            "x": 115,
+            "y": 1716,
+            "width": 174,
+            "height": 30,
+            "size": 21,
+            "min_size": 17,
+            "color": "#282536"
+        },
+        "wish": {
+            "x": 305,
+            "y": 1716,
+            "width": 760,
+            "height": 30,
+            "size": 23,
+            "min_size": 16,
+            "color": "#282536"
+        }
+    }
+}

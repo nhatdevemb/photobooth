@@ -85,6 +85,23 @@ components:
             template_id: { type: string }
             template_version: { type: string, example: 1.0.0 }
             ui_step: { type: integer, minimum: 1, maximum: 4 }
+    EventCategory:
+      type: string
+      enum: [all, wedding, birthday, other]
+    FrameText:
+      type: object
+      properties:
+        name: { type: string, maxLength: 80 }
+        date: { type: string, description: YYYY-MM-DD hoặc chuỗi rỗng }
+        wish: { type: string, maxLength: 100 }
+    EventPrintQuota:
+      type: object
+      properties:
+        mode: { type: string, enum: [mock, hardware] }
+        limit: { type: [integer, 'null'] }
+        printed: { type: integer }
+        reserved: { type: integer }
+        remaining: { type: [integer, 'null'] }
     SessionConfiguration:
       type: object
       description: Các trường bổ sung trong snapshot phiên; ui_step là bước tiếp tục đã lưu hoặc suy ra từ trạng thái job/REVIEW/FINALIZED.
@@ -102,6 +119,14 @@ components:
         capture_count: { type: integer, minimum: 1, maximum: 4 }
         configuration_locked: { type: boolean }
         ui_step: { type: integer, minimum: 1, maximum: 5 }
+        event:
+          type: object
+          properties:
+            name: { type: string }
+            color: { type: string }
+            category: { $ref: '#/components/schemas/EventCategory' }
+            frame: { $ref: '#/components/schemas/FrameText' }
+        print_quota: { $ref: '#/components/schemas/EventPrintQuota' }
         template_fallback: { type: boolean, description: Có trong response cấu hình khi chuyển phong cách dự phòng }
     Template:
       type: object
@@ -115,6 +140,8 @@ components:
         status: { type: string, enum: [draft, active, disabled] }
         hashes: { type: object, additionalProperties: { type: string } }
         preview_url: { type: string }
+        category: { type: string, enum: [wedding, birthday, other] }
+        text_slots: { type: object, description: Vùng chữ theo trường đối với frame có hỗ trợ }
         overlay_url: { type: string }
         background_url: { type: [string, 'null'] }
     Lut:
@@ -297,6 +324,64 @@ paths:
       responses:
         '200': { description: Object items chứa các định nghĩa layout 1181 × 1748 px }
 
+  /admin/settings:
+    get:
+      summary: Admin đọc cấu hình sự kiện, trạng thái khóa và hạn mức
+      security: [{ cookieAuth: [] }]
+      responses:
+        '200': { description: Cấu hình sự kiện, revision, hình ảnh nhận diện và tổng in }
+    post:
+      summary: Admin lưu cấu hình hoặc tạo sự kiện mới khi đã đóng phiên đang mở
+      security: [{ cookieAuth: [] }]
+      parameters:
+        - { $ref: '#/components/parameters/CsrfHeader' }
+        - { $ref: '#/components/parameters/IdempotencyKeyHeader' }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [id, revision]
+              properties:
+                id: { type: string }
+                revision: { type: integer, minimum: 1 }
+                new_event: { type: boolean }
+                name: { type: string, maxLength: 100 }
+                color: { type: string, pattern: '^#[0-9a-fA-F]{6}$' }
+                footer: { type: string, maxLength: 200 }
+                logo: { type: [string, 'null'], description: Data URL PNG/JPEG hoặc null để xóa }
+                banner: { type: [string, 'null'], description: Data URL PNG/JPEG hoặc null để xóa }
+                qr_ttl_hours: { type: integer, minimum: 1, maximum: 8760 }
+                category: { $ref: '#/components/schemas/EventCategory' }
+                frame: { $ref: '#/components/schemas/FrameText' }
+                print_limit: { type: [integer, 'null'], minimum: 1, maximum: 1000000 }
+      responses:
+        '200': { description: Cấu hình đã lưu }
+        '409': { description: Phiên đang mở hoặc cấu hình đã được cập nhật }
+        '422': { description: Cấu hình hoặc nội dung frame không hợp lệ }
+
+  /frame-text/preview:
+    post:
+      summary: Dựng lớp chữ PNG trong suốt cho template
+      security: [{ cookieAuth: [] }]
+      parameters:
+        - { $ref: '#/components/parameters/CsrfHeader' }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [template_id, template_version]
+              properties:
+                template_id: { type: string }
+                template_version: { type: string }
+                session_id: { type: string, format: uuid }
+                frame: { $ref: '#/components/schemas/FrameText', description: Chữ xem thử từ Admin khi không có session_id }
+      responses:
+        '200': { description: PNG data URL hoặc null khi không có lớp chữ }
+
   /templates:
     get:
       summary: Template đang active được phép chọn cho phiên mới
@@ -305,6 +390,16 @@ paths:
         - name: layout_id
           in: query
           schema: { type: string }
+        - name: session_id
+          in: query
+          schema: { type: string, format: uuid }
+        - name: category
+          in: query
+          description: Chủ đề dùng cho xem trước của Admin
+          schema: { $ref: '#/components/schemas/EventCategory' }
+        - name: personalized
+          in: query
+          schema: { type: string, enum: ['0', '1'] }
       responses:
         '200':
           description: Object items; phiên đã ghim vẫn dùng được bản disabled qua snapshot phiên
@@ -746,10 +841,11 @@ paths:
               properties:
                 revision: { type: integer }
                 final_asset_id: { type: string, format: uuid }
-                copies: { type: integer, enum: [1] }
+                copies: { type: integer, minimum: 1, maximum: 10 }
                 action: { type: string, enum: [print, reprint] }
       responses:
         '202': { description: Trả print_request_id }
+        '409': { description: Xung đột revision hoặc vượt số bản còn lại (PRINT_QUOTA_EXCEEDED) }
 
   /prints/{id}:
     get:
@@ -784,6 +880,7 @@ paths:
               properties:
                 revision: { type: integer }
                 outcome: { type: string, enum: [observed_completed, confirmed_not_printed] }
+                completed_copies: { type: integer, minimum: 0, maximum: 10, description: Số bản đã ra khi đối chiếu; mặc định theo kết quả }
                 note: { type: string }
       responses:
         '200': { description: Đã ghi nhận kết quả đối chiếu UNKNOWN }

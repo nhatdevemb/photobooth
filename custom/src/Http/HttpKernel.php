@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Photobooth\Operator\Http;
 
 use Photobooth\Operator\Auth\AuthService;
+use Photobooth\Operator\Event\EventSettings;
 use Photobooth\Operator\Container;
 use Photobooth\Operator\Share\ShareService;
 use Photobooth\Operator\Support\ApiException;
@@ -407,11 +408,46 @@ final class HttpKernel
             return $this->jsonResponse(200, $this->container->healthService->getHealthReport(), $requestId);
         }
 
+        if ($method === 'POST' && $route === '/health/beauty-test') {
+            return $this->jsonResponse(202, $this->container->beautyService->requestDiagnostic(), $requestId);
+        }
+
         if ($method === 'GET' && $route === '/layouts') {
             return $this->jsonResponse(200, ['items'=>$this->container->catalog->layouts()], $requestId);
         }
+        if ($route === '/admin/settings' && in_array($method, ['GET', 'POST'], true)) {
+            $this->container->authService->assertAdmin($authContext);
+            $settings = $method === 'GET' ? $this->container->events->view(($query['status'] ?? '') !== '1')
+                : $this->container->events->save($payload, $actorId, $headers['idempotency-key'] ?? '');
+            return $this->jsonResponse(200, $settings, $requestId);
+        }
+
+        if ($method === 'POST' && $route === '/frame-text/preview') {
+            $item = $this->container->catalog->resolve((string) ($payload['template_id'] ?? ''), (string) ($payload['template_version'] ?? ''));
+            if (isset($payload['session_id'])) {
+                $session = $this->container->sessionService->getSession((string) $payload['session_id']);
+                $frame = $session['event']['frame'];
+            } else {
+                $this->container->authService->assertAdmin($authContext);
+                $frame = EventSettings::frame($payload['frame'] ?? []);
+            }
+            $preview = isset($item['text_slots']) && EventSettings::hasFrameText($frame)
+                ? $this->container->renderer->frameText($frame, [$item['text_slots']], true) : ['url' => null];
+            return $this->jsonResponse(200, ['url' => $preview['url']], $requestId);
+        }
+
         if ($method === 'GET' && $route === '/templates') {
-            return $this->jsonResponse(200, ['items'=>$this->container->catalog->templates(isset($query['layout_id']) ? (string) $query['layout_id'] : null)], $requestId);
+            $layout = isset($query['layout_id']) ? (string) $query['layout_id'] : null;
+            if (isset($query['session_id'])) {
+                $event = $this->container->sessionService->getSession((string) $query['session_id'])['event'];
+                $templates = $this->container->catalog->eventTemplates($event['category'], EventSettings::hasFrameText($event['frame']), $layout);
+            } elseif (isset($query['category'])) {
+                $this->container->authService->assertAdmin($authContext);
+                $templates = $this->container->catalog->eventTemplates((string) $query['category'], ($query['personalized'] ?? '') === '1', $layout);
+            } else {
+                $templates = $this->container->catalog->eventTemplates('all', false, $layout);
+            }
+            return $this->jsonResponse(200, ['items' => $templates], $requestId);
         }
         if ($method === 'GET' && preg_match('#^/catalog/layouts/([a-z0-9-]+)/([0-9.]+)/preview\.jpg$#D', $route, $m) === 1) {
             $layout = $this->container->catalog->layout($m[1], $m[2]);
@@ -565,7 +601,8 @@ final class HttpKernel
                 $revision,
                 $lutId,
                 $templateId,
-                $idemKey
+                $idemKey,
+                ($payload['retry_lkmagic'] ?? false) === true
             );
             return $this->jsonResponse($res['status_code'], $res['body'], $requestId);
         }
@@ -650,7 +687,10 @@ final class HttpKernel
             $idemKey = $headers['idempotency-key'] ?? '';
             $revision = $this->extractRevision($payload);
             $finalAssetId = (string) ($payload['final_asset_id'] ?? '');
-            $copies = array_key_exists('copies', $payload) ? (int) $payload['copies'] : 1;
+            $copies = $payload['copies'] ?? 1;
+            if (!is_int($copies) || (array_key_exists('copies', $payload) && $payload['copies'] === null)) {
+                throw new ApiException('INVALID_COPIES', 'Số bản in phải là số nguyên từ 1 đến 10.', 422);
+            }
             $action = (string) ($payload['action'] ?? 'print');
 
             $res = $this->container->printService->createPrintRequest(
@@ -679,6 +719,10 @@ final class HttpKernel
             $revision = $this->extractRevision($payload);
             $outcome = (string) ($payload['outcome'] ?? '');
             $note = (string) ($payload['note'] ?? '');
+            $completedCopies = $payload['completed_copies'] ?? null;
+            if ($completedCopies !== null && !is_int($completedCopies)) {
+                throw new ApiException('INVALID_COPIES', 'Số bản thực tế phải là số nguyên.', 422);
+            }
 
             $res = $this->container->printService->resolveUnknownPrint(
                 $printId,
@@ -686,7 +730,8 @@ final class HttpKernel
                 $revision,
                 $outcome,
                 $note,
-                $idemKey
+                $idemKey,
+                $completedCopies
             );
             return $this->jsonResponse($res['status_code'], $res['body'], $requestId);
         }

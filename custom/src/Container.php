@@ -13,6 +13,8 @@ use Photobooth\Operator\Camera\Gphoto2CameraAdapter;
 use Photobooth\Operator\Camera\MockCameraAdapter;
 use Photobooth\Operator\Camera\DigiCamControlCameraAdapter;
 use Photobooth\Operator\Config\AppConfig;
+use Photobooth\Operator\Event\EventSettings;
+use Photobooth\Operator\Image\BeautyService;
 use Photobooth\Operator\Image\Renderer;
 use Photobooth\Operator\Jobs\WorkerRunner;
 use Photobooth\Operator\Maintenance\HealthService;
@@ -31,6 +33,7 @@ use Photobooth\Operator\Storage\MigrationRunner;
 final class Container
 {
     public readonly TemplateCatalog $catalog;
+    public readonly EventSettings $events;
     public readonly LutCatalog $luts;
     public readonly AppConfig $config;
     public readonly StructuredLogger $logger;
@@ -39,6 +42,7 @@ final class Container
     public readonly AssetStore $assetStore;
     public readonly AuthService $authService;
     public readonly Renderer $renderer;
+    public readonly BeautyService $beautyService;
     public readonly CameraAdapterInterface $cameraAdapter;
     public readonly PrintAdapterInterface $printAdapter;
     public readonly ShareService $shareService;
@@ -74,6 +78,7 @@ final class Container
         $this->assetStore = new AssetStore($this->config, $this->logger);
         $this->authService = new AuthService($this->db, $this->config);
         $this->renderer = new Renderer($this->config, $this->logger);
+        $this->beautyService = new BeautyService($this->db, $this->config, $this->assetStore, $this->renderer);
         $this->luts = new LutCatalog($this->config, $this->db, $this->renderer);
 
         $this->cameraAdapter = match ($this->config->cameraAdapter) {
@@ -87,6 +92,7 @@ final class Container
             ? new CupsPrintAdapter($this->config)
             : new MockPrintAdapter($this->config);
 
+        $this->events = new EventSettings($this->db, $this->catalog, $this->renderer, $this->printAdapter->getMode(), $this->config->shareTtlHours);
         $this->shareService = new ShareService($this->db, $this->config, $this->assetStore);
         $this->sessionService = new SessionService(
             $this->db,
@@ -117,7 +123,8 @@ final class Container
             $this->assetStore,
             $this->cameraAdapter,
             $this->printAdapter,
-            $this->maintenanceService
+            $this->maintenanceService,
+            $this->beautyService
         );
         $this->workerRunner = new WorkerRunner(
             $this->db,
@@ -128,7 +135,8 @@ final class Container
             $this->printService,
             $this->logger,
             $this->catalog,
-            $this->luts
+            $this->luts,
+            beauty: $this->beautyService
         );
     }
 }

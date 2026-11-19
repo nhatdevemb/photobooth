@@ -1,0 +1,47 @@
+{
+    "id": "party-strip-three",
+    "name": "Party",
+    "style": "party",
+    "version": "1.1.0",
+    "layout_id": "strip-three",
+    "layout_version": "1.0.0",
+    "overlay": "overlay.png",
+    "background": "background.png",
+    "preview": "preview.jpg",
+    "license": "Original project artwork; MIT",
+    "hashes": {
+        "overlay.png": "5cec3f554753e3521b5d40abb92f3ee8d4eaf3392ab0192b3b0321e473ff37a1",
+        "background.png": "b8e12bd7efa067b3f065a5053cfe76de0287db1878b16513dc8799043a0983ba",
+        "preview.jpg": "39354b8cc3a7367072cbad857617adcda7af941bd7616dbb4ac5635f46364bd2"
+    },
+    "category": "other",
+    "text_slots": {
+        "name": {
+            "x": 115,
+            "y": 2,
+            "width": 950,
+            "height": 30,
+            "size": 28,
+            "min_size": 16,
+            "color": "#282536"
+        },
+        "date": {
+            "x": 115,
+            "y": 1716,
+            "width": 174,
+            "height": 30,
+            "size": 21,
+            "min_size": 17,
+            "color": "#282536"
+        },
+        "wish": {
+            "x": 305,
+            "y": 1716,
+            "width": 760,
+            "height": 30,
+            "size": 23,
+            "min_size": 16,
+            "color": "#282536"
+        }
+    }
+}

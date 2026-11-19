@@ -1,0 +1,47 @@
+{
+    "id": "wedding-rose-grid",
+    "name": "Cưới · Nơ Hồng Phấn (2×2)",
+    "style": "wedding-rose",
+    "version": "1.1.0",
+    "layout_id": "grid-four",
+    "layout_version": "1.0.0",
+    "overlay": "overlay.png",
+    "background": "background.png",
+    "preview": "preview.jpg",
+    "license": "Original project artwork; MIT",
+    "hashes": {
+        "overlay.png": "346c9bab18b8236f8a11b86ad5a48537d4a713c39b01b720b42a40cbbd5b429d",
+        "background.png": "740f56fdb6d0dea1902e8ee37f3799dffdd15a7fe3e602b7409d27a95f036811",
+        "preview.jpg": "ce85613ee7b45685c85daa160889120c7adba97793018494ac9783646bfe70fa"
+    },
+    "category": "wedding",
+    "text_slots": {
+        "name": {
+            "x": 115,
+            "y": 2,
+            "width": 950,
+            "height": 30,
+            "size": 28,
+            "min_size": 16,
+            "color": "#592936"
+        },
+        "date": {
+            "x": 115,
+            "y": 1716,
+            "width": 174,
+            "height": 30,
+            "size": 21,
+            "min_size": 17,
+            "color": "#592936"
+        },
+        "wish": {
+            "x": 305,
+            "y": 1716,
+            "width": 760,
+            "height": 30,
+            "size": 23,
+            "min_size": 16,
+            "color": "#592936"
+        }
+    }
+}

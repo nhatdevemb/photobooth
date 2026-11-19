@@ -167,6 +167,73 @@ final class OperatorWorkflowTest extends TestCase
         return $this->apiRequest('GET', "/custom/api/sessions/{$id}")['json'];
     }
 
+    public function testEventSnapshotsAndPrintQuotaSurviveQueuedAndPartialPrints(): void
+    {
+        $settingsPath = '/custom/api/admin/settings';
+        self::assertSame(403, $this->apiRequest('GET', $settingsPath)['status']);
+        $settings = $this->apiRequest('GET', $settingsPath, null, $this->adminCookie)['json'];
+        $config = [
+            'id' => $settings['id'], 'revision' => $settings['revision'], 'print_limit' => 5,
+            'name' => 'Tiệc cưới Minh và Lan', 'category' => 'wedding',
+            'frame' => ['name' => 'Minh và Lan', 'date' => '2026-11-18', 'wish' => 'Trăm năm hạnh phúc'],
+        ];
+        $save = fn (array $body) => $this->apiRequest('POST', $settingsPath, $body, $this->adminCookie, $this->adminCsrf);
+        $saved = $save($config);
+        self::assertSame(200, $saved['status'], $saved['raw_body']);
+        $config['revision'] = $saved['json']['revision'];
+
+        $session = $this->createFinalizedSession();
+        $id = $session['id'];
+        self::assertSame($config['name'], $session['event']['name']);
+        self::assertSame('1.1.0', $session['template_version']);
+        self::assertSame('wedding', $session['template']['category']);
+        $locked = $save($config);
+        self::assertSame(409, $locked['status']);
+        self::assertSame('EVENT_SETTINGS_LOCKED', $locked['json']['error']['code']);
+
+        $path = "/custom/api/sessions/{$id}/prints";
+        $request = [
+            'revision' => $session['revision'], 'final_asset_id' => $session['current_final']['id'],
+            'copies' => 3, 'action' => 'print',
+        ];
+        $key = Uuid::v4();
+        $first = $this->apiRequest('POST', $path, $request, idempotencyKey: $key);
+        self::assertSame(202, $first['status'], $first['raw_body']);
+        self::assertSame($first['json'], $this->apiRequest('POST', $path, $request, idempotencyKey: $key)['json']);
+        $request['revision'] = $first['json']['revision'];
+        $request['action'] = 'reprint';
+        $blocked = $this->apiRequest('POST', $path, $request);
+        self::assertSame('PRINT_QUOTA_EXCEEDED', $blocked['json']['error']['code']);
+        $this->container->printService->processNextPendingPrint('post_submit_timeout');
+        $runtime = $this->createContainer();
+        $quota = fn () => $runtime->sessionService->getSession($id)['print_quota'];
+        self::assertSame(3, $quota()['reserved']);
+        self::assertSame(2, $quota()['remaining']);
+        $printId = $first['json']['print_request_id'];
+        $resolved = $this->apiRequest('POST', "/custom/api/prints/{$printId}/resolve", [
+            'revision' => $request['revision'], 'completed_copies' => 1,
+            'outcome' => 'observed_completed', 'note' => 'Xác nhận một bản đã in',
+        ], $this->adminCookie, $this->adminCsrf);
+        self::assertSame(200, $resolved['status'], $resolved['raw_body']);
+        self::assertSame(1, $quota()['printed']);
+        self::assertSame(4, $quota()['remaining']);
+
+        $request['revision'] = $resolved['json']['session_revision'];
+        $failed = $this->apiRequest('POST', $path, $request);
+        self::assertSame(202, $failed['status'], $failed['raw_body']);
+        $this->container->printService->processNextPendingPrint('pre_submit_fail');
+        self::assertSame(1, $quota()['printed']);
+        self::assertSame(4, $quota()['remaining']);
+
+        $closed = $this->apiRequest('POST', "/custom/api/sessions/{$id}/close", ['revision' => $failed['json']['revision']]);
+        self::assertSame(200, $closed['status'], $closed['raw_body']);
+        $new = $save(array_replace($config, ['new_event' => true, 'name' => 'Tiệc khác']));
+        self::assertSame(200, $new['status'], $new['raw_body']);
+        self::assertSame(0, $new['json']['quota']['printed']);
+        self::assertSame(1, $quota()['printed']);
+        self::assertSame($config['name'], $runtime->sessionService->getSession($id)['event']['name']);
+    }
+
     public function testRevokeCannotInvalidateRetakeOrRenderOwnership(): void
     {
         $session = $this->createFinalizedSession();
@@ -1071,11 +1138,11 @@ final class OperatorWorkflowTest extends TestCase
         $rev = (int) $finRes['json']['revision'];
         $finalAssetId = (string) $finRes['json']['final_asset_id'];
 
-        // TC-28: Copies != 1 rejected with 422 INVALID_COPIES
+        // TC-28: Copies above the supported range are rejected with 422 INVALID_COPIES
         $badCopies = $this->apiRequest('POST', "/custom/api/sessions/{$sessionId}/prints", [
             'revision' => $rev,
             'final_asset_id' => $finalAssetId,
-            'copies' => 2,
+            'copies' => 11,
             'action' => 'print',
         ]);
         self::assertSame(422, $badCopies['status']);

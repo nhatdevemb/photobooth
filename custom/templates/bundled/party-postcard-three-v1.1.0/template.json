@@ -1,0 +1,47 @@
+{
+    "id": "party-postcard-three",
+    "name": "Party",
+    "style": "party",
+    "version": "1.1.0",
+    "layout_id": "postcard-three",
+    "layout_version": "1.0.0",
+    "overlay": "overlay.png",
+    "background": "background.png",
+    "preview": "preview.jpg",
+    "license": "Original project artwork; MIT",
+    "hashes": {
+        "overlay.png": "2708ab7931b707eea1ea5d3469f5b7deb0b82e27d97ea4e8950cea3575642926",
+        "background.png": "b8e12bd7efa067b3f065a5053cfe76de0287db1878b16513dc8799043a0983ba",
+        "preview.jpg": "5cdeafced17cfaee5101576bb7c997c98ed4b6daa9e4b1c0c408d1dc80916fc6"
+    },
+    "category": "other",
+    "text_slots": {
+        "name": {
+            "x": 115,
+            "y": 2,
+            "width": 950,
+            "height": 30,
+            "size": 28,
+            "min_size": 16,
+            "color": "#282536"
+        },
+        "date": {
+            "x": 115,
+            "y": 1716,
+            "width": 174,
+            "height": 30,
+            "size": 21,
+            "min_size": 17,
+            "color": "#282536"
+        },
+        "wish": {
+            "x": 305,
+            "y": 1716,
+            "width": 760,
+            "height": 30,
+            "size": 23,
+            "min_size": 16,
+            "color": "#282536"
+        }
+    }
+}

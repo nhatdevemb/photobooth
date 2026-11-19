@@ -1,0 +1,47 @@
+{
+    "id": "party-single",
+    "name": "Party",
+    "style": "party",
+    "version": "1.1.0",
+    "layout_id": "single",
+    "layout_version": "1.0.0",
+    "overlay": "overlay.png",
+    "background": "background.png",
+    "preview": "preview.jpg",
+    "license": "Original project artwork; MIT",
+    "hashes": {
+        "overlay.png": "301f37afff476b434723e36ec6759ab8fc2948d6c283fed19d26d4fc9f48f1f6",
+        "background.png": "b8e12bd7efa067b3f065a5053cfe76de0287db1878b16513dc8799043a0983ba",
+        "preview.jpg": "bd370ad2f500b91c407ad0b800d994b0c98188d6cc1c74e073b181d8fff4bfd0"
+    },
+    "category": "other",
+    "text_slots": {
+        "name": {
+            "x": 115,
+            "y": 2,
+            "width": 950,
+            "height": 30,
+            "size": 28,
+            "min_size": 16,
+            "color": "#282536"
+        },
+        "date": {
+            "x": 115,
+            "y": 1716,
+            "width": 174,
+            "height": 30,
+            "size": 21,
+            "min_size": 17,
+            "color": "#282536"
+        },
+        "wish": {
+            "x": 305,
+            "y": 1716,
+            "width": 760,
+            "height": 30,
+            "size": 23,
+            "min_size": 16,
+            "color": "#282536"
+        }
+    }
+}

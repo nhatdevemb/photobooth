@@ -9,7 +9,7 @@ await access(path.join(root, 'custom/vendor/autoload.php'));
 if (!target.startsWith(desktop + path.sep)) throw new Error('Invalid staging path');
 await rm(target, { recursive: true, force: true });
 await mkdir(target, { recursive: true });
-for (const directory of ['src', 'public', 'python', 'models', 'presets', 'layouts', 'templates', 'migrations', 'bin', 'vendor']) {
+for (const directory of ['src', 'public', 'python', 'models', 'assets', 'presets', 'layouts', 'templates', 'migrations', 'bin', 'vendor']) {
     await cp(path.join(root, 'custom', directory), path.join(target, 'custom', directory), { recursive: true, filter: (source) => !/(?:^|[\\/])(?:__pycache__|\.pytest_cache)(?:[\\/]|$)|\.pyc$/.test(source) });
 }
 for (const file of ['composer.json', 'composer.lock', 'upstream.json']) await cp(path.join(root, 'custom', file), path.join(target, 'custom', file));

@@ -6,9 +6,11 @@ const browserMode = document.body.dataset.camera === 'browser';
 const dccMode = document.body.dataset.camera === 'digicamcontrol';
 const browserCamera = new BrowserCamera($('webcam-video'), $('webcam-status'), $('camera-badge'), $('webcam-device'), updateCropGuide, $('btn-webcam-mirror'), $('webcam-lut-canvas'));
 const lutCache = new Map();
+const frameLayerCache = new Map();
 let thumbLutCanvas = null, thumbLutRenderer = null;
 const state = {
     user: null, csrf: null, session: null, step: 1, view: 'workspace', busy: false,
+    settings: null, eventPreviews: [], copies: 1,
     layouts: [], templates: [], presets: [], share: null, previewKey: null,
     previewReady: false, renderError: '', job: null, history: [], cursor: null,
     detail: null, print: null, resolve: null, templatePreview: null, sampleGeneration: 0,
@@ -102,6 +104,7 @@ async function loadSession(id, restoreStep = false)
 {
     const session = await api('GET', `/sessions/${id}`);
     if (state.session?.id !== id) state.share = null;
+    if (state.session?.id !== id) state.copies = 1;
     state.session = session;
     if (restoreStep) state.step = session.ui_step;
     return session;
@@ -109,13 +112,13 @@ async function loadSession(id, restoreStep = false)
 
 async function enter()
 {
-    const [presets, layouts, templates, active] = await Promise.all([
-        api('GET', '/presets'), api('GET', '/layouts'), api('GET', '/templates'), api('GET', '/sessions/active'),
+    const [presets, layouts, active] = await Promise.all([
+        api('GET', '/presets'), api('GET', '/layouts'), api('GET', '/sessions/active'),
     ]);
     state.presets = presets.presets;
     state.layouts = layouts.items;
-    state.templates = templates.items;
     state.session = active.active_session;
+    await loadSessionTemplates();
     state.step = state.session?.ui_step || 1;
     state.view = 'workspace';
     render();
@@ -127,6 +130,13 @@ async function enter()
     }
 }
 
+async function loadSessionTemplates()
+{
+    frameLayerCache.clear();
+    state.copies = 1;
+    state.templates = state.session ? (await api('GET', '/templates?session_id=' + state.session.id)).items : [];
+}
+
 function signOut()
 {
     closeLutEditor();
@@ -136,6 +146,8 @@ function signOut()
     state.share = null;
     state.previewKey = null;
     state.print = null;
+    state.settings = null;
+    frameLayerCache.clear();
     document.querySelectorAll('.modal-backdrop').forEach((element) => { element.hidden = true; });
     render();
 }
@@ -163,8 +175,16 @@ function printAction(session, finalId)
     ) ? 'reprint' : 'print';
 }
 
-function syncLiveView(visible)
+function liveViewVisible()
 {
+    return Boolean(state.user) && state.view === 'workspace' && (!state.session || state.step !== 5);
+}
+
+function syncLiveView()
+{
+    const visible = liveViewVisible();
+    $('liveview-panel').hidden = !visible;
+    $('workspace-stage').classList.toggle('review-stage', Boolean(state.session) && state.step === 5);
     if (!visible) {
         state.cameraAttempted = false;
         if (browserMode && browserCamera.stream) browserCamera.stop();
@@ -175,7 +195,7 @@ function syncLiveView(visible)
     state.cameraAttempted = true;
     state.cameraStarting = (browserMode ? browserCamera.open($('webcam-device').value) : dccCamera.start())
         .then(() => {
-            if (!state.user || state.view !== 'workspace') {
+            if (!liveViewVisible()) {
                 if (browserMode) browserCamera.stop();
                 else dccCamera.stop();
                 return;
@@ -190,10 +210,13 @@ function syncLiveView(visible)
 function render()
 {
     const loggedIn = Boolean(state.user);
-    syncLiveView(loggedIn && state.view === 'workspace');
+    const session = state.session;
+    if (session?.configuration_locked && state.step === 1) state.step = 2;
+    if (session && !allCaptured() && state.step > 2) state.step = session.configuration_locked ? 2 : 1;
+    syncLiveView();
     $('login-view').hidden = loggedIn;
     $('auth-user-bar').hidden = !loggedIn;
-    for (const view of ['workspace', 'history', 'admin', 'luts']) $(view + '-view').hidden = !loggedIn || state.view !== view;
+    for (const view of ['workspace', 'history', 'admin', 'luts', 'settings']) $(view + '-view').hidden = !loggedIn || state.view !== view;
     $('wizard-nav').hidden = !loggedIn || state.view !== 'workspace' || !state.session;
     $('selection-preview-dock').hidden = !loggedIn || state.view !== 'workspace' || !state.session || ![3, 4].includes(state.step);
     if (!loggedIn) return;
@@ -201,9 +224,14 @@ function render()
     $('current-role-badge').textContent = state.user.role === 'admin' ? 'Quản trị viên' : 'Người vận hành';
     $('btn-nav-admin').hidden = state.user.role !== 'admin';
     $('btn-nav-luts').hidden = state.user.role !== 'admin';
+    $('btn-nav-settings').hidden = state.user.role !== 'admin';
+    $('btn-nav-settings').disabled = Boolean(session);
+    $('session-event-name').textContent = session?.event?.name || '';
+    $('session-event-name').hidden = !session?.event?.name;
+    $('event-settings-fields').disabled = state.busy || Boolean(session) || state.settings?.locked !== false;
+    $('settings-lock').hidden = !session && !state.settings?.locked;
     $('btn-import-luts').disabled = state.busy;
     updateLutButtons();
-    const session = state.session;
     $('empty-session').hidden = Boolean(session);
     $('btn-restart-session').hidden = !session;
     $('btn-restart-session').disabled = state.busy || Boolean(session?.active_job);
@@ -220,8 +248,6 @@ function render()
         $('btn-new-session').disabled = state.busy;
         return;
     }
-    if (session.configuration_locked && state.step === 1) state.step = 2;
-    if (!allCaptured() && state.step > 2) state.step = session.configuration_locked ? 2 : 1;
     const final = ['FINALIZED', 'CLOSED'].includes(session.state);
     document.querySelectorAll('[data-step]').forEach((button) => {
         const step = Number(button.dataset.step);
@@ -256,9 +282,9 @@ function renderSelection()
         if (!available.some((item) => item.id === session.selected_lut && item.version === session.lut_version)) available.unshift(session.lut);
         items = available.filter((item) => item.name.toLocaleLowerCase('vi').includes(state.lutQuery.toLocaleLowerCase('vi'))).map((preset) => ({ ...preset, image:preset.sample_url, attr:'data-lut-id', detail:`${preset.intensity}%${preset.readonly ? '' : ` · v${preset.version}`}`, selected:preset.id === session.selected_lut && preset.version === session.lut_version }));
     } else if (state.step === 1) {
-        items = state.layouts.map((layout) => ({ id: layout.id, name: layout.name, detail: `${layout.capture_count} ảnh`, image: layout.thumbnail, attr: 'data-layout-id', selected: layout.id === session.layout_id }));
+        items = state.layouts.filter((layout) => layout.id === session.layout_id || state.templates.some((template) => template.layout_id === layout.id)).map((layout) => ({ id: layout.id, name: layout.name, detail: `${layout.capture_count} ảnh`, image: layout.thumbnail, attr: 'data-layout-id', selected: layout.id === session.layout_id }));
     } else {
-        items = state.templates.filter((item) => item.layout_id === session.layout_id).map((item) => ({ ...item, image: item.preview_url, attr: 'data-template-id', selected: item.id === session.template_id && item.version === session.template_version }));
+        items = state.templates.filter((item) => item.layout_id === session.layout_id).map((item) => ({ ...item, image: item.preview_url, detail: item.text_slots ? '' : 'Khung cố định', attr: 'data-template-id', selected: item.id === session.template_id && item.version === session.template_version }));
     }
     $('selection-cards').className = `selection-cards ${state.step === 1 ? 'layout-cards' : state.step === 4 ? 'template-cards' : 'filter-cards'}`;
     $('selection-cards').innerHTML = items.map((item) => `<button type="button" class="choice-card ${item.selected ? 'selected' : ''}" ${item.attr}="${esc(item.id)}" ${item.version ? `data-version="${esc(item.version)}"` : ''} ${item.style ? `data-style="${esc(item.style)}"` : ''} aria-pressed="${Boolean(item.selected)}" ${state.busy ? 'disabled' : ''}><div class="choice-image"><img src="${esc(item.image)}" alt=""><span class="choice-check" aria-hidden="true">✓</span></div><strong>${esc(item.name)}</strong>${item.detail ? `<small>${esc(item.detail)}</small>` : ''}</button>`).join('');
@@ -293,7 +319,7 @@ function renderSelection()
             }
         }
     }
-    paintSample($('selection-preview'), layoutFor(), templateFor(), session.lut).catch(() => {
+    paintSample($('selection-preview'), layoutFor(), templateFor(), session.lut, session).catch(() => {
         if ([1, 3, 4].includes(state.step)) $('configuration-note').textContent = 'Không tải được ảnh mẫu. Hãy tải lại trang.';
     });
 }
@@ -315,18 +341,33 @@ function loadImage(url)
     });
 }
 
-async function paintSample(canvas, layout, template, lut = 'original')
+function previewLettering(template, session, frame)
+{
+    const text = session?.event?.frame || frame;
+    if (!template.text_slots || !text || !Object.values(text).some(Boolean)) return null;
+    const key = session ? `${session.id}:${template.id}:${template.version}` : null;
+    if (key && frameLayerCache.has(key)) return frameLayerCache.get(key);
+    const request = { template_id: template.id, template_version: template.version, ...(session ? { session_id: session.id } : { frame }) };
+    const pending = api('POST', '/frame-text/preview', request)
+        .then((result) => result.url ? loadImage(result.url) : null)
+        .catch((error) => { if (key) frameLayerCache.delete(key); throw error; });
+    if (key) frameLayerCache.set(key, pending);
+    return pending;
+}
+
+async function paintSample(canvas, layout, template, lut = 'original', session = null, frame = null)
 {
     if (!layout || !template) throw new Error('Chưa có template tương thích.');
     const generation = String(++state.sampleGeneration);
     canvas.dataset.generation = generation;
     const preset = typeof lut === 'string' ? state.presets.find((item) => item.id === lut) : lut;
     const captured = canvas === $('selection-preview') && allCaptured();
-    const [photos, overlay, background, cube] = await Promise.all([
+    const [photos, overlay, background, cube, lettering] = await Promise.all([
         captured ? Promise.all(state.session.slots.map((slot) => loadImage(slot.photo.url))) : loadImage(preset.sample_url).then((photo) => layout.slots.map(() => photo)),
         loadImage(template.overlay_url),
         template.background_url ? loadImage(template.background_url) : Promise.resolve(null),
         captured ? getCubeLut(state.session) : Promise.resolve(null),
+        previewLettering(template, session, frame),
     ]);
     if (cube) {
         const filterCanvas = document.createElement('canvas');
@@ -354,6 +395,7 @@ async function paintSample(canvas, layout, template, lut = 'original')
         context.drawImage(photo, (photo.width - width) / 2, (photo.height - height) / 2, width, height, slot.x, slot.y, slot.width, slot.height);
     }
     context.drawImage(overlay, 0, 0, 1181, 1748);
+    if (lettering) context.drawImage(lettering, 0, 0, 1181, 1748);
     return true;
 }
 
@@ -483,7 +525,8 @@ function fitBrowserPreview()
 async function waitJob(id)
 {
     const sessionId = state.session.id;
-    for (let attempt = 0; attempt < 240; attempt++) {
+    const limit = state.session.active_job?.type === 'render' ? 800 : 240;
+    for (let attempt = 0; attempt < limit; attempt++) {
         const job = await api('GET', `/jobs/${id}`);
         state.job = job;
         render();
@@ -532,12 +575,12 @@ async function capture(slot)
     await waitJob(job.job_id);
 }
 
-async function renderCollage()
+async function renderCollage(retryLkMagic = false)
 {
     state.renderError = '';
     state.previewReady = false;
     state.previewKey = null;
-    const job = await api('POST', `/sessions/${state.session.id}/render`, { revision: state.session.revision });
+    const job = await api('POST', `/sessions/${state.session.id}/render`, { revision: state.session.revision, retry_lkmagic: retryLkMagic });
     await loadSession(state.session.id);
     await waitJob(job.job_id);
 }
@@ -577,8 +620,9 @@ function renderReview()
     $('btn-review-retake').disabled = state.busy || session.print_summary.has_active || session.print_summary.has_unknown;
     $('btn-retry-render').hidden = Boolean(preview) || Boolean(session.active_job);
     $('btn-retry-render').disabled = state.busy;
-    $('btn-open-print-modal').textContent = final && printAction(session, final.id) === 'reprint' ? 'In lại · 1 bản' : 'In ảnh · 1 bản';
-    $('btn-open-print-modal').disabled = state.busy;
+    $('btn-retry-lkmagic').hidden = session.state !== 'REVIEW' || renderData?.beauty_mode !== 'fallback';
+    $('btn-retry-lkmagic').disabled = state.busy;
+    updatePrintControls(session);
     $('btn-finalize-session').hidden = Boolean(isFinal);
     $('btn-close-session').disabled = state.busy;
     renderShare();
@@ -593,6 +637,13 @@ function updateApproval()
     $('review-error').hidden = !state.renderError;
     $('review-error').textContent = state.renderError;
     $('render-status-text').textContent = session?.state === 'FINALIZED' ? 'Ảnh đã duyệt. In và QR dùng đúng ảnh này.' : state.renderError || (state.previewReady ? 'Kiểm tra ảnh rồi nhấn Duyệt ảnh và tạo QR.' : 'Đang chờ bản xem trước…');
+    if (session?.current_render?.beauty_mode === 'fallback') $('render-status-text').textContent += ' Bộ ảnh này dùng Beauty dự phòng (MediaPipe).';
+    if (!session?.current_render && session?.active_job && session.beauty?.enabled) {
+        const progress = state.job?.beauty_progress;
+        $('render-status-text').textContent = progress
+            ? progress.done === progress.total ? 'Đang ghép ảnh…' : 'Đang làm đẹp ' + progress.done + '/' + progress.total + ' ảnh…'
+            : 'Đang làm đẹp và ghép ảnh…';
+    }
     if (session?.current_render?.beauty_warnings?.length) $('render-status-text').textContent += ' ⚠ Beauty gặp lỗi ở một số ảnh; đã giữ ảnh nguồn và tiếp tục ghép. Kiểm tra kỹ trước khi duyệt.';
 }
 
@@ -618,45 +669,112 @@ function renderShare()
     }
 }
 
+function quotaLabel(quota)
+{
+    if (!quota) return '';
+    const mode = quota.mode === 'mock' ? 'In mô phỏng · ' : '';
+    const total = quota.limit === null ? quota.printed : quota.printed + '/' + quota.limit;
+    const pending = quota.reserved ? ' · Đang xử lý/đối chiếu ' + quota.reserved : '';
+    const remaining = quota.remaining === null ? '' : ' · Còn có thể in ' + quota.remaining;
+    return mode + 'Đã in ' + total + ' bản' + pending + remaining;
+}
+
+function maxCopies(quota)
+{
+    return Math.min(10, quota?.remaining ?? 10);
+}
+
+function validCopies(copies, quota)
+{
+    return Number.isInteger(copies) && copies >= 1 && copies <= maxCopies(quota);
+}
+
+function updatePrintControls(session)
+{
+    const quota = session.print_quota;
+    const max = maxCopies(quota);
+    const copies = state.copies;
+    const counter = $('print-quota');
+    counter.textContent = quotaLabel(quota);
+    counter.classList.toggle('alert', quota?.remaining != null && (quota.remaining <= 10 || quota.remaining <= quota.limit * 0.1));
+    const input = $('print-copies');
+    input.max = Math.max(1, max);
+    input.disabled = state.busy || !max;
+    if (document.activeElement !== input) input.value = copies || '';
+    $('print-minus').disabled = input.disabled || copies <= 1;
+    $('print-plus').disabled = input.disabled || copies >= max;
+    const final = session.current_final;
+    const action = final && printAction(session, final.id) === 'reprint' ? 'In lại' : 'In ảnh';
+    $('btn-open-print-modal').textContent = max ? action : 'Hết lượt in';
+    $('btn-open-print-modal').disabled = input.disabled || !validCopies(copies, quota);
+}
+
 function renderPrints(session)
 {
-    $('session-prints-list').innerHTML = session.print_summary.requests.length ? session.print_summary.requests.map((item) => `<div class="print-item"><span>${item.action === 'print' ? 'In' : 'In lại'} · 1 bản · <strong>${esc(item.status)}</strong></span>${item.status === 'UNKNOWN' && state.user.role === 'admin' ? `<button type="button" class="btn-resolve-print" data-print="${item.id}">Đối chiếu UNKNOWN</button>` : ''}</div>`).join('') : '<p class="muted">Chưa có lệnh in.</p>';
+    $('session-prints-list').innerHTML = session.print_summary.requests.length ? session.print_summary.requests.map((item) => `<div class="print-item"><span>${item.action === 'print' ? 'In' : 'In lại'} · ${item.copies} bản · <strong>${esc(item.status)}</strong>${item.status === 'COMPLETED' && item.completed_copies < item.copies ? ' · Hoàn tất ' + item.completed_copies + ' bản' : ''}</span>${item.status === 'UNKNOWN' && state.user.role === 'admin' ? `<button type="button" class="btn-resolve-print" data-print="${item.id}">Đối chiếu UNKNOWN</button>` : ''}</div>`).join('') : '<p class="muted">Chưa có lệnh in.</p>';
     $('session-prints-list').querySelectorAll('[data-print]').forEach((button) => button.addEventListener('click', () => openResolve(session, button.dataset.print)));
 }
 
-function openPrint(session = state.session, asset = session?.current_final)
+function updatePrintModal()
+{
+    const context = state.print;
+    if (!context) return;
+    const quota = context.session.print_quota;
+    $('modal-print-quota').textContent = quotaLabel(quota);
+    $('modal-print-copies').max = Math.max(1, maxCopies(quota));
+    $('modal-print-action-label').textContent = context.action === 'reprint' ? 'In lại' : 'In lần đầu';
+    $('modal-print-title').textContent = 'Xác nhận in' + (context.copies ? ' ' + context.copies + ' bản' : '');
+    $('btn-confirm-print-submit').disabled = !validCopies(context.copies, quota) || state.busy;
+}
+
+function openPrint(session = state.session, asset = session?.current_final, fromHistory = false)
 {
     if (!session || !asset || !['FINALIZED', 'CLOSED'].includes(session.state)) return;
-    state.print = { session, asset, key: uuid(), action: printAction(session, asset.id) };
+    const copies = fromHistory ? 1 : state.copies;
+    state.print = { session, asset, key: uuid(), action: fromHistory ? 'reprint' : printAction(session, asset.id), copies };
     $('modal-print-thumb').src = asset.url;
     $('modal-print-session-code').textContent = code(session.id);
-    $('modal-print-action-label').textContent = state.print.action === 'reprint' ? 'In lại (reprint) · 1 bản' : 'In lần đầu (print) · 1 bản';
+    $('modal-print-copies').value = copies;
+    $('modal-print-copies-wrap').hidden = !fromHistory;
     $('modal-print-unknown-warning').hidden = !session.print_summary.has_unknown;
     $('modal-print-confirm').hidden = false;
+    updatePrintModal();
 }
 
 async function submitPrint()
 {
     const context = state.print;
-    if (!context) return;
+    if (!context || !validCopies(context.copies, context.session.print_quota)) return;
     state.print = null;
     $('modal-print-confirm').hidden = true;
-    const result = await api('POST', `/sessions/${context.session.id}/prints`, { revision: context.session.revision, final_asset_id: context.asset.id, copies: 1, action: context.action }, context.key);
-    for (let attempt = 0; attempt < 60; attempt++) {
-        const print = await api('GET', `/prints/${result.print_request_id}`);
-        if (['COMPLETED', 'FAILED', 'UNKNOWN'].includes(print.status)) break;
-        await sleep(500);
+    const result = await api('POST', '/sessions/' + context.session.id + '/prints', {
+        revision: context.session.revision, final_asset_id: context.asset.id,
+        copies: context.copies, action: context.action,
+    }, context.key);
+    // Refresh as soon as the reservation is accepted. The worker may still be printing.
+    if (state.session?.id === context.session.id) {
+        await loadSession(context.session.id);
+        state.copies = 1;
     }
-    if (state.session?.id === context.session.id) await loadSession(context.session.id);
     if (state.view === 'history') await loadHistory();
-    toast('Đã cập nhật trạng thái yêu cầu in.');
+    toast('Đã gửi lệnh ' + (result.mode === 'mock' ? 'in mô phỏng.' : 'in.'));
+}
+
+function updateResolveCopies()
+{
+    $('resolve-copies-wrap').hidden = $('resolve-outcome').value !== 'observed_completed';
 }
 
 function openResolve(session, id)
 {
+    const request = session.print_summary.requests.find((item) => item.id === id);
     state.resolve = { session, id };
     $('resolve-print-id-display').textContent = id;
     $('resolve-note').value = '';
+    $('resolve-outcome').value = 'observed_completed';
+    $('resolve-copies').max = request.copies;
+    $('resolve-copies').value = request.copies;
+    updateResolveCopies();
     $('modal-resolve-unknown').hidden = false;
 }
 
@@ -693,6 +811,108 @@ async function openDetail(id)
     $('modal-history-detail').hidden = false;
 }
 
+function settingsFrame()
+{
+    return Object.fromEntries(['name', 'date', 'wish'].map((field) => [field, $('event-frame-' + field).value.trim()]));
+}
+
+function updateEventPreviews()
+{
+    const personalized = Object.values(settingsFrame()).some(Boolean);
+    const category = $('event-category').value;
+    const selector = $('event-preview-template');
+    const previous = selector.value;
+    state.eventPreviews = state.settingsCatalog[personalized ? 1 : 0]
+        .filter((item) => category === 'all' || item.category === category);
+    selector.replaceChildren(...state.eventPreviews.map((item) => new Option(item.name + (item.text_slots ? '' : ' · Khung cố định'), item.id)));
+    if (state.eventPreviews.some((item) => item.id === previous)) selector.value = previous;
+    $('btn-event-preview').disabled = !state.eventPreviews.length;
+    $('event-frame-preview').hidden = true;
+}
+
+function updateEventLimit()
+{
+    const unlimited = $('event-no-limit').checked;
+    const limit = $('event-print-limit');
+    limit.disabled = unlimited;
+    limit.required = !unlimited;
+}
+
+function showBrandImage(kind, url)
+{
+    const img = $('event-' + kind + '-preview');
+    img.hidden = !url;
+    if (url) img.src = url;
+    else img.removeAttribute('src');
+}
+
+function applySettings(settings)
+{
+    state.settings = settings;
+    const config = settings.configuration;
+    for (const field of ['name', 'footer', 'color', 'category']) $('event-' + field).value = config[field];
+    for (const field of ['name', 'date', 'wish']) $('event-frame-' + field).value = config.frame[field];
+    $('event-ttl').value = config.qr_ttl_hours;
+    $('event-no-limit').checked = settings.quota.limit === null;
+    $('event-print-limit').value = settings.quota.limit ?? '';
+    $('event-quota').textContent = quotaLabel(settings.quota);
+    for (const kind of ['logo', 'banner']) {
+        $('event-' + kind).value = '';
+        $('event-' + kind + '-clear').checked = false;
+        showBrandImage(kind, settings[kind + '_url']);
+    }
+    updateEventLimit();
+    updateEventPreviews();
+}
+
+async function loadSettings()
+{
+    const [settings, classic, personalized] = await Promise.all([
+        api('GET', '/admin/settings'),
+        api('GET', '/templates?category=all'),
+        api('GET', '/templates?category=all&personalized=1'),
+    ]);
+    state.settingsCatalog = [classic.items, personalized.items];
+    applySettings(settings);
+    state.view = 'settings';
+}
+
+function readBrandFile(file)
+{
+    if (file.size > 512 * 1024 || !['image/png', 'image/jpeg'].includes(file.type)) {
+        throw new Error('Logo và banner phải là PNG hoặc JPEG, tối đa 512 KiB.');
+    }
+    return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result);
+        reader.onerror = () => reject(new Error('Không đọc được ảnh sự kiện.'));
+        reader.readAsDataURL(file);
+    });
+}
+
+async function saveSettings(newEvent)
+{
+    const settings = state.settings;
+    const body = {
+        id: settings.id, revision: settings.revision, new_event: newEvent,
+        name: $('event-name').value, footer: $('event-footer').value, color: $('event-color').value,
+        category: $('event-category').value, qr_ttl_hours: $('event-ttl').valueAsNumber, frame: settingsFrame(),
+        print_limit: $('event-no-limit').checked ? null : $('event-print-limit').valueAsNumber,
+    };
+    for (const kind of ['logo', 'banner']) {
+        const file = $('event-' + kind).files[0];
+        if ($('event-' + kind + '-clear').checked) body[kind] = null;
+        else if (file) body[kind] = await readBrandFile(file);
+    }
+    try {
+        applySettings(await api('POST', '/admin/settings', body));
+        toast(newEvent ? 'Đã tạo sự kiện mới.' : 'Đã lưu cài đặt sự kiện.');
+    } catch (error) {
+        if (error.code === 'EVENT_SETTINGS_LOCKED') state.settings.locked = true;
+        throw error;
+    }
+}
+
 async function loadAdmin()
 {
     const result = await api('GET', '/admin/templates');
@@ -714,12 +934,50 @@ async function loadAdmin()
     })));
 }
 
+const beautyLabels = {
+    lkmagic_native: 'LK Magic native',
+    mediapipe: 'MediaPipe',
+    fallback: 'MediaPipe dự phòng',
+    off: 'Beauty tắt',
+    error: 'Beauty lỗi',
+    unknown: 'Chưa xác định',
+};
+
+function beautyHealth(result)
+{
+    const beauty = result.beauty_engine;
+    const labels = { ready: 'Sẵn sàng', starting: 'Đang khởi động', unavailable: 'Không kết nối được' };
+    const dateTime = (value) => value ? new Date(value).toLocaleString('vi-VN') : '';
+    const bridge = beauty.bridge;
+    $('health-lkmagic').textContent = 'LK Magic: ' + labels[bridge.status] + ' · ' + dateTime(bridge.checked_at);
+    const check = beauty.diagnostic;
+    diagnosticPending = ['queued', 'running'].includes(check?.status);
+    const checkLabel = {
+        queued: 'Đang chờ bộ xử lý',
+        running: 'Đang chạy',
+        passed: 'Đạt',
+        failed: 'Thất bại',
+    };
+    $('health-beauty-test').textContent = 'Ảnh thử: ' + (checkLabel[check?.status] || 'Chưa chạy')
+        + (check?.completed_at ? ' · ' + dateTime(check.completed_at) + ' · ' + (check.duration_ms / 1000).toFixed(1) + ' giây' : '')
+        + (check?.error ? ' · ' + check.error : '');
+    $('btn-beauty-test').disabled = diagnosticPending || diagnosticRequest;
+    const last = beauty.last_render;
+    $('health-last-beauty').textContent = 'Lần xuất gần nhất: ' + (last
+        ? beautyLabels[last.mode] + ' · ' + dateTime(last.completed_at)
+        : 'Chưa có lần xuất');
+}
+
+let diagnosticPending = false;
+let diagnosticRequest = false;
+
 async function health()
 {
     if (!state.user) return;
     try {
         const result = await api('GET', '/health');
         $('health-summary').textContent = `Worker: ${result.worker.status} · Camera: ${result.camera.camera_state} · Máy in: ${result.printer.queue_state} · Trống: ${result.disk.free_gib} GiB`;
+        beautyHealth(result);
         $('health-warnings').replaceChildren(...result.warnings.map((warning) => { const p = document.createElement('p'); p.textContent = warning; return p; }));
     } catch (error) {
         $('health-summary').textContent = error.message;
@@ -740,6 +998,7 @@ $('login-form').addEventListener('submit', (event) => {
 $('btn-logout').addEventListener('click', () => run(async () => { await api('POST', '/auth/logout', {}); signOut(); }));
 $('btn-new-session').addEventListener('click', () => run(async () => {
     state.session = await api('POST', '/sessions', {});
+    await loadSessionTemplates();
     state.step = 1;
     state.lutQuery = '';
     state.share = null;
@@ -749,6 +1008,7 @@ $('btn-restart-session').addEventListener('click', () => {
     if (!confirm('Bắt đầu phiên mới? Bộ ảnh hiện tại sẽ được giữ trong lịch sử; các lựa chọn mới chỉ áp dụng cho phiên mới.')) return;
     run(async () => {
         state.session = await api('POST', `/sessions/${state.session.id}/restart`, { revision: state.session.revision, confirm: true });
+        await loadSessionTemplates();
         state.step = 1;
         state.lutQuery = '';
         state.share = null;
@@ -763,6 +1023,7 @@ async function goStep(next)
     if (next >= 3 && !allCaptured()) return;
     if (next < 5) await configure({ ui_step: next });
     state.step = next;
+    render();
     if (next === 5 && !state.session.current_render) await renderCollage();
 }
 $('btn-next').addEventListener('click', () => run(() => goStep(state.step + 1)));
@@ -773,6 +1034,7 @@ $('btn-auto-capture-all').addEventListener('click', () => run(async () => {
         if (!state.session.slots.find((item) => item.slot === slot).photo) await capture(slot);
     }
 }));
+$('btn-retry-lkmagic').addEventListener('click', () => run(() => renderCollage(true)));
 $('btn-retry-render').addEventListener('click', () => run(renderCollage));
 $('btn-finalize-session').addEventListener('click', () => {
     if (!state.previewReady || state.session?.state !== 'REVIEW' || state.busy) return;
@@ -796,6 +1058,22 @@ $('btn-close-session').addEventListener('click', () => run(async () => {
     state.session = null;
     state.share = null;
 }));
+$('print-copies').addEventListener('input', () => {
+    state.copies = $('print-copies').valueAsNumber;
+    updatePrintControls(state.session);
+});
+for (const [id, delta] of [['print-minus', -1], ['print-plus', 1]]) {
+    $(id).addEventListener('click', () => {
+        state.copies = Math.max(1, Math.min(maxCopies(state.session.print_quota), (state.copies || 1) + delta));
+        updatePrintControls(state.session);
+    });
+}
+$('modal-print-copies').addEventListener('input', () => {
+    if (!state.print) return;
+    state.print.copies = $('modal-print-copies').valueAsNumber;
+    updatePrintModal();
+});
+$('resolve-outcome').addEventListener('change', updateResolveCopies);
 $('btn-open-print-modal').addEventListener('click', () => openPrint());
 $('btn-confirm-print-submit').addEventListener('click', () => run(submitPrint));
 $('btn-open-qr-modal').addEventListener('click', () => run(() => issueShare()));
@@ -808,7 +1086,12 @@ $('btn-resolve-unknown-submit').addEventListener('click', () => run(async () => 
     const context = state.resolve;
     const note = $('resolve-note').value.trim();
     if (!note) throw new Error('Vui lòng nhập ghi chú đối chiếu.');
-    await api('POST', `/prints/${context.id}/resolve`, { revision: context.session.revision, outcome: $('resolve-outcome').value, note });
+    const completed = $('resolve-outcome').value === 'observed_completed';
+    if (completed && !$('resolve-copies').reportValidity()) return;
+    await api('POST', '/prints/' + context.id + '/resolve', {
+        revision: context.session.revision, outcome: $('resolve-outcome').value, note,
+        completed_copies: completed ? $('resolve-copies').valueAsNumber : 0,
+    });
     $('modal-resolve-unknown').hidden = true;
     if (state.session?.id === context.session.id) await loadSession(context.session.id);
     if (state.view === 'history') { await loadHistory(); await openDetail(context.session.id); }
@@ -818,6 +1101,57 @@ $('btn-nav-history').addEventListener('click', () => run(async () => { state.vie
 $('btn-nav-admin').addEventListener('click', () => run(async () => { state.view = 'admin'; await loadAdmin(); }));
 $('btn-nav-luts').addEventListener('click', () => run(async () => { state.view = 'luts'; await loadLuts(); }));
 $('filter-search').addEventListener('input', () => { state.lutQuery = $('filter-search').value; renderSelection(); });
+$('btn-beauty-test').addEventListener('click', async () => {
+    if (diagnosticRequest || diagnosticPending) return;
+    diagnosticRequest = true;
+    $('btn-beauty-test').disabled = true;
+    try {
+        await api('POST', '/health/beauty-test', {});
+    } catch (error) {
+        toast(error.message, true);
+    } finally {
+        diagnosticRequest = false;
+        await health();
+        $('btn-beauty-test').disabled = diagnosticPending;
+    }
+});
+$('btn-nav-settings').addEventListener('click', () => run(loadSettings));
+$('event-no-limit').addEventListener('change', updateEventLimit);
+$('event-category').addEventListener('change', updateEventPreviews);
+$('event-preview-template').addEventListener('change', () => { $('event-frame-preview').hidden = true; });
+for (const field of ['name', 'date', 'wish']) $('event-frame-' + field).addEventListener('change', updateEventPreviews);
+$('btn-event-preview').addEventListener('click', () => run(async () => {
+    const template = state.eventPreviews[$('event-preview-template').selectedIndex];
+    if (!template) throw new Error('Chủ đề chưa có template đang hoạt động.');
+    const canvas = $('event-frame-preview');
+    await paintSample(canvas, state.layouts.find((layout) => layout.id === template.layout_id), template, 'original', null, settingsFrame());
+    canvas.hidden = false;
+}));
+$('event-settings-form').addEventListener('submit', (event) => {
+    event.preventDefault();
+    const newEvent = event.submitter?.id === 'btn-event-new';
+    if (newEvent && !confirm('Tạo sự kiện mới với cấu hình đang nhập và bộ đếm từ 0?')) return;
+    run(() => saveSettings(newEvent));
+});
+for (const kind of ['logo', 'banner']) {
+    $('event-' + kind).addEventListener('change', async (event) => {
+        const file = event.target.files[0];
+        if (!file) return;
+        try {
+            const url = await readBrandFile(file);
+            $('event-' + kind + '-clear').checked = false;
+            showBrandImage(kind, url);
+        } catch (error) {
+            event.target.value = '';
+            showBrandImage(kind, state.settings[kind + '_url']);
+            toast(error.message, true);
+        }
+    });
+    $('event-' + kind + '-clear').addEventListener('change', (event) => {
+        $('event-' + kind).value = '';
+        showBrandImage(kind, event.target.checked ? null : state.settings[kind + '_url']);
+    });
+}
 $('btn-nav-health').addEventListener('click', () => { $('health-panel').hidden = !$('health-panel').hidden; health(); });
 document.querySelectorAll('.beauty-preset-btn').forEach((button) => {
     button.addEventListener('click', () => run(async () => {
@@ -858,7 +1192,7 @@ $('btn-history-load-more').addEventListener('click', () => run(() => loadHistory
 $('btn-detail-reprint').addEventListener('click', () => {
     const asset = state.detail.final_assets.find((item) => item.id === $('history-final-select').value);
     $('modal-history-detail').hidden = true;
-    openPrint(state.detail, asset);
+    openPrint(state.detail, asset, true);
 });
 $('btn-detail-share').addEventListener('click', () => run(async () => {
     const session = state.detail;
@@ -1106,6 +1440,41 @@ async function checkAuthOnBoot()
     } catch { signOut(); }
 }
 setInterval(health, 5000);
+let refreshingEvent = false;
+setInterval(async () => {
+    if (!state.user || state.busy || refreshingEvent) return;
+    const current = state.session;
+    const print = $('modal-print-confirm').hidden ? null : state.print;
+    const target = print?.session || (state.view === 'workspace' && state.step === 5 && current?.current_final ? current : null);
+    const settings = state.view === 'settings' ? state.settings : null;
+    if (!target && !settings) return;
+    refreshingEvent = true;
+    try {
+        if (settings) {
+            const result = await api('GET', '/admin/settings?status=1');
+            if (settings !== state.settings || state.busy) return;
+            settings.locked = result.locked;
+            $('event-quota').textContent = quotaLabel(result.quota);
+            render();
+        } else {
+            const result = await api('GET', '/sessions/' + target.id);
+            if (state.busy) return;
+            if (current?.id === result.id && state.session?.id === result.id && state.session.revision <= result.revision) {
+                state.session = result;
+                if (state.step === 5) {
+                    updatePrintControls(result);
+                    if ($('modal-resolve-unknown').hidden) renderPrints(result);
+                }
+            }
+            if (print && state.print === print) {
+                print.session = result;
+                if (print.action === 'print') print.action = printAction(result, print.asset.id);
+                updatePrintModal();
+            }
+        }
+    } catch { /* The next refresh retries without interrupting the operator. */ }
+    finally { refreshingEvent = false; }
+}, 1800);
 let frame = 1;
 $('live-preview-img')?.addEventListener('load', () => {
     if (!browserMode && state.user && state.view === 'workspace') { syncCaptureLut(state.session); updateCropGuide(); }

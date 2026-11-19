@@ -1,8 +1,8 @@
 const form = document.getElementById('setup');
 const status = document.getElementById('status');
-window.boothSetup.info().then(({ saved, ips, dccExecutable, data }) => {
+window.boothSetup.info().then(({ saved, ips, dccExecutable, lkMagicExecutable, data }) => {
     document.getElementById('ips').replaceChildren(...ips.map((ip) => Object.assign(document.createElement('option'), { value: ip })));
-    for (const [key, value] of Object.entries({ lanIp: ips[0] || '', dccExecutable, ...saved })) if (form.elements.namedItem(key)) form.elements.namedItem(key).value = value;
+    for (const [key, value] of Object.entries({ lanIp: ips[0] || '', dccExecutable, lkMagicExecutable, ...saved })) if (form.elements.namedItem(key)) form.elements.namedItem(key).value = value;
     status.textContent = `Dữ liệu lưu tại ${data}`;
 });
 window.boothSetup.onStatus((text) => { status.textContent = text; });

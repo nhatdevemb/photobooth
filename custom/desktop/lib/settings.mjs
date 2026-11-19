@@ -19,7 +19,7 @@ export function validateSettings(input) {
     const password = String(input.password || '');
     if (username && !/^[A-Za-z0-9_.-]{3,64}$/.test(username)) throw new Error('Tên Admin dùng 3–64 ký tự chữ/số, dấu chấm, gạch dưới hoặc gạch ngang.');
     if (password && password.length < 12) throw new Error('Mật khẩu Admin cần ít nhất 12 ký tự.');
-    return { lanIp, operatorPort, guestPort, dccPort, cameraMode, cameraId, dccExecutable: String(input.dccExecutable || ''), username, password };
+    return { lanIp, operatorPort, guestPort, dccPort, cameraMode, cameraId, dccExecutable: String(input.dccExecutable || ''), lkMagicExecutable: String(input.lkMagicExecutable || '').trim().replace(/^"|"$/g, ''), username, password };
 }
 
 export function publicSettings(settings) {

@@ -130,40 +130,39 @@ def main():
     threading.Thread(target=lambda: (sys.stdin.read(), stopped.set()), daemon=True).start()
     log = (data / "logs/desktop-runtime.log").open("ab", buffering=0)
     children = []
+
+    def start_service(name, command, cwd, env=None):
+        child = subprocess.Popen(command, stdin=subprocess.DEVNULL, stdout=log, stderr=log,
+                                 cwd=cwd, env=env, creationflags=flags)
+        children.append((name, child))
+
+    def check_services():
+        for name, child in children:
+            code = child.poll()
+            if code is not None:
+                message = f"{name} đã dừng (PID {child.pid}, mã thoát {code})."
+                log.write((message + "\n").encode("utf-8"))
+                raise RuntimeError(message)
+
     for sock in sockets:
         sock.close()
     try:
+        # PHP normally exits after 500 FastCGI requests. Live view can reach this
+        # limit during a session, and this supervisor owns the worker lifetime.
+        cgi_env = {**os.environ, "PHP_FCGI_MAX_REQUESTS": "0"}
         for port in ports:
-            children.append(subprocess.Popen([str(runtime / "php/php-cgi.exe"), *php_options, "-b", f"127.0.0.1:{port}"],
-                                             stdin=subprocess.DEVNULL, stdout=log, stderr=log, cwd=runtime / "php", creationflags=flags))
+            start_service(f"PHP FastCGI :{port}",
+                          [str(runtime / "php/php-cgi.exe"), *php_options, "-b", f"127.0.0.1:{port}"],
+                          runtime / "php", env=cgi_env)
         config = data / "Caddyfile"
         config.write_text(caddy_config(project / "custom/public", settings, ports, data), encoding="utf-8")
-        children.append(subprocess.Popen([str(runtime / "caddy/caddy.exe"), "run", "--config", str(config), "--adapter", "caddyfile"],
-                                         stdin=subprocess.DEVNULL, stdout=log, stderr=log, cwd=project, creationflags=flags))
-        children.append(subprocess.Popen([str(php), *php_options, str(project / "custom/bin/worker.php")],
-                                         stdin=subprocess.DEVNULL, stdout=log, stderr=log, cwd=runtime / "php", creationflags=flags))
-        if os.getenv("PB_DESKTOP_TEST") != "1" and os.getenv("LKMAGIC_AUTO_START", "1") != "0" and not os.getenv("PB_SOAK_SESSIONS"):
-            lk_candidates = [
-                Path(os.getenv("LKMAGIC_EXECUTABLE", "")),
-                project.parent / "LK Magic-WIN" / "LK magic.exe",
-                Path(os.getenv("LOCALAPPDATA", "")) / "Programs" / "LK magic" / "LK magic.exe",
-            ]
-            for lk_exe in lk_candidates:
-                if lk_exe.name and lk_exe.is_file():
-                    lk_env = os.environ.copy()
-                    lk_env["LK_PHOTOBOOTH_BACKGROUND"] = "1"
-                    lk_env["LK_PHOTOBOOTH_PORT"] = os.getenv("LK_PHOTOBOOTH_PORT", "5520")
-                    try:
-                        subprocess.Popen([str(lk_exe)], cwd=str(lk_exe.parent), env=lk_env,
-                                         stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, creationflags=flags)
-                    except OSError:
-                        pass
-                    break
+        start_service("Caddy", [str(runtime / "caddy/caddy.exe"), "run", "--config", str(config), "--adapter", "caddyfile"], project)
+        start_service("Worker chụp/ghép/in", [str(php), *php_options, str(project / "custom/bin/worker.php")], runtime / "php")
+        start_service("Worker Beauty", [str(php), *php_options, str(project / "custom/bin/beauty-worker.php")], runtime / "php")
         opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))
         deadline = time.monotonic() + 20
         while time.monotonic() < deadline:
-            if any(child.poll() is not None for child in children):
-                raise RuntimeError("Dịch vụ không khởi động được. Xem logs/desktop-runtime.log.")
+            check_services()
             try:
                 with opener.open(f'http://127.0.0.1:{settings["operatorPort"]}/', timeout=1) as response:
                     if response.status == 200:
@@ -176,17 +175,16 @@ def main():
         maintenance = None
         next_maintenance = time.monotonic() + 300
         while not stopped.wait(0.25):
-            if any(child.poll() is not None for child in children):
-                raise RuntimeError("Một dịch vụ đã dừng; không tự gửi lại lệnh chụp.")
+            check_services()
             if time.monotonic() >= next_maintenance and (maintenance is None or maintenance.poll() is not None):
                 maintenance = subprocess.Popen([str(php), *php_options, str(project / "custom/bin/maintenance.php")],
                                                stdin=subprocess.DEVNULL, stdout=log, stderr=log, cwd=runtime / "php", creationflags=flags)
                 next_maintenance = time.monotonic() + 3600
     finally:
-        for child in reversed(children):
+        for _, child in reversed(children):
             if child.poll() is None:
                 child.terminate()
-        for child in children:
+        for _, child in children:
             try:
                 child.wait(timeout=3)
             except subprocess.TimeoutExpired:

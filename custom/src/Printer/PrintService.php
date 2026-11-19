@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Photobooth\Operator\Printer;
 
 use PDO;
+use Photobooth\Operator\Event\EventSettings;
 use Photobooth\Operator\Config\AppConfig;
 use Photobooth\Operator\Maintenance\StructuredLogger;
 use Photobooth\Operator\Session\IdempotencyService;
@@ -81,10 +82,10 @@ final class PrintService
             return ['status_code' => $replay['status_code'], 'body' => $replay['response']];
         }
 
-        if ($copies !== 1) {
+        if ($copies < 1 || $copies > 10) {
             throw new ApiException(
                 'INVALID_COPIES',
-                'Phiên bản MVP chỉ hỗ trợ in đúng 1 bản (copies=1) cho mỗi yêu cầu.',
+                'Mỗi yêu cầu in phải có từ 1 đến 10 bản.',
                 422
             );
         }
@@ -199,6 +200,12 @@ final class PrintService
             $unkStmt->execute([':sid' => $sessionId]);
             $unknownCount = (int) $unkStmt->fetchColumn();
 
+            $mode = $this->adapter->getMode();
+            $quota = EventSettings::quota($pdo, $session['event_id'], $mode);
+            if ($quota['remaining'] !== null && $copies > $quota['remaining']) {
+                throw new ApiException('PRINT_QUOTA_EXCEEDED', 'Còn có thể in ' . $quota['remaining'] . ' bản.', 409, $quota);
+            }
+
             $newRevision = $currentRev + 1;
             $nowIso = Clock::nowIso();
             $printRequestId = Uuid::v4();
@@ -208,13 +215,14 @@ final class PrintService
 
             $pdo->prepare(
                 'INSERT INTO print_requests
-                 (id, session_id, final_asset_id, copies, action, status, created_by, created_at, updated_at, next_poll_at)
-                 VALUES (:id, :sid, :fid, :copies, :action, :status, :uid, :now, :now, :now)'
+                 (id, session_id, final_asset_id, copies, action, status, created_by, created_at, updated_at, next_poll_at, adapter_mode)
+                 VALUES (:id, :sid, :fid, :copies, :action, :status, :uid, :now, :now, :now, :mode)'
             )->execute([
                 ':id' => $printRequestId,
                 ':sid' => $sessionId,
                 ':fid' => $finalAssetId,
                 ':copies' => $copies,
+                ':mode' => $mode,
                 ':action' => $action,
                 ':status' => 'PENDING',
                 ':uid' => $actorId,
@@ -294,7 +302,8 @@ final class PrintService
         int $expectedRevision,
         string $outcome,
         string $note,
-        string $idempotencyKey
+        string $idempotencyKey,
+        ?int $completedCopies = null
     ): array {
         if (!Uuid::isValid($printRequestId)) {
             throw new ApiException('NOT_FOUND', 'Không tìm thấy yêu cầu in.', 404);
@@ -306,6 +315,7 @@ final class PrintService
             'print_request_id' => $printRequestId,
             'outcome' => $outcome,
             'note' => $noteTrimmed,
+            ...($completedCopies === null ? [] : ['completed_copies' => $completedCopies]),
         ]);
 
         $replay = IdempotencyService::checkReplay(
@@ -337,6 +347,7 @@ final class PrintService
             $expectedRevision,
             $outcome,
             $noteTrimmed,
+            $completedCopies,
             $idemKey,
             $payloadHash
         ): array {
@@ -373,7 +384,12 @@ final class PrintService
                 );
             }
 
-            $newStatus = $outcome === 'observed_completed' ? 'COMPLETED' : 'FAILED';
+            $observed = $outcome === 'observed_completed';
+            $actual = $completedCopies ?? ($observed ? (int) $pr['copies'] : 0);
+            if (($observed && ($actual < 1 || $actual > (int) $pr['copies'])) || (!$observed && $actual !== 0)) {
+                throw new ApiException('INVALID_COPIES', 'Số bản thực tế phải khớp kết quả đối chiếu.', 422);
+            }
+            $newStatus = $observed ? 'COMPLETED' : 'FAILED';
             $newRevision = $currentRev + 1;
             $nowIso = Clock::nowIso();
 
@@ -383,6 +399,7 @@ final class PrintService
             $pdo->prepare(
                 'UPDATE print_requests
                  SET status = :st,
+                     completed_copies = :actual,
                      resolved_by = :uid,
                      resolution_outcome = :out,
                      resolution_note = :note,
@@ -392,6 +409,7 @@ final class PrintService
                  WHERE id = :id'
             )->execute([
                 ':st' => $newStatus,
+                ':actual' => $actual,
                 ':uid' => $adminUserId,
                 ':out' => $outcome,
                 ':note' => $noteTrimmed,
@@ -776,9 +794,10 @@ final class PrintService
             'session_id' => (string) $row['session_id'],
             'final_asset_id' => (string) $row['final_asset_id'],
             'copies' => (int) $row['copies'],
+            'completed_copies' => $row['status'] === 'COMPLETED' ? (int) ($row['completed_copies'] ?? $row['copies']) : 0,
             'action' => (string) $row['action'],
             'status' => (string) $row['status'],
-            'mode' => $this->adapter->getMode(),
+            'mode' => $row['adapter_mode'],
             'adapter_job_id' => $row['adapter_job_id'] !== null ? (string) $row['adapter_job_id'] : null,
             'error_code' => $row['error_code'] !== null ? (string) $row['error_code'] : null,
             'reason' => $row['error_message'] !== null ? (string) $row['error_message'] : null,

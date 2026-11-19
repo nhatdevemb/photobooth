@@ -1,0 +1,47 @@
+{
+    "id": "wedding-burgundy-single",
+    "name": "Cưới · Nơ Rượu Vang (Đơn)",
+    "style": "wedding-burgundy",
+    "version": "1.1.0",
+    "layout_id": "single",
+    "layout_version": "1.0.0",
+    "overlay": "overlay.png",
+    "background": "background.png",
+    "preview": "preview.jpg",
+    "license": "Original project artwork; MIT",
+    "hashes": {
+        "overlay.png": "8179867c490722bbb0c727295de7c1a11cf0d814c324e993d260c0dace1adc0f",
+        "background.png": "0756835fb643d7b5978fc61d2bc0e15d2c0b754b8ece1eddc5ebcbc146f5bbf7",
+        "preview.jpg": "99468102f970a976f5ef9c52ed0c763aa2ddc5902a3e5c0768850f24f27e3e71"
+    },
+    "category": "wedding",
+    "text_slots": {
+        "name": {
+            "x": 115,
+            "y": 2,
+            "width": 950,
+            "height": 30,
+            "size": 28,
+            "min_size": 16,
+            "color": "#592936"
+        },
+        "date": {
+            "x": 115,
+            "y": 1716,
+            "width": 174,
+            "height": 30,
+            "size": 21,
+            "min_size": 17,
+            "color": "#592936"
+        },
+        "wish": {
+            "x": 305,
+            "y": 1716,
+            "width": 760,
+            "height": 30,
+            "size": 23,
+            "min_size": 16,
+            "color": "#592936"
+        }
+    }
+}

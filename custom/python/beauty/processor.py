@@ -6,19 +6,18 @@ from __future__ import annotations
 
 import sys
 import time
-from typing import Any, Dict, List, Optional, Tuple, Union
+from typing import TYPE_CHECKING, Any, Dict, Optional, Tuple, Union
 
-import cv2
 import numpy as np
 from PIL import Image
 
 from .config import BeautyConfig, resolve_beauty_config
-from .face_detector import FaceData, FaceLandmarkerDetector
 from .lkmagic_bridge import retouch_via_lkmagic
-from .skin_mask import SkinMaskGenerator
-from .skin_smoothing import apply_skin_smoothing
-from .skin_brightening import apply_skin_brightening
-from .skin_tone import apply_skin_tone_evening
+
+
+if TYPE_CHECKING:
+    from .face_detector import FaceLandmarkerDetector
+    from .skin_mask import SkinMaskGenerator
 
 
 class BeautyProcessor:
@@ -39,6 +38,9 @@ class BeautyProcessor:
         self._closed = False
 
     def _ensure_models(self, cfg: BeautyConfig) -> None:
+        from .face_detector import FaceLandmarkerDetector
+        from .skin_mask import SkinMaskGenerator
+
         if self._detector is None:
             self._detector = FaceLandmarkerDetector.from_config(cfg)
         if self._mask_gen is None:
@@ -98,6 +100,10 @@ class BeautyProcessor:
                         f"[beauty_processor] LK Magic native bridge unavailable ({lk_exc}); falling back to local MediaPipe.\n"
                     )
 
+            from .skin_smoothing import apply_skin_smoothing
+            from .skin_brightening import apply_skin_brightening
+            from .skin_tone import apply_skin_tone_evening
+
             self._ensure_models(cfg)
             orig_h, orig_w = image_rgb.shape[:2]
 
@@ -105,7 +111,7 @@ class BeautyProcessor:
             if not faces:
                 duration_ms = int((time.monotonic_ns() - start_ns) // 1_000_000)
                 stats = {
-                    "status": "no_faces_detected",
+                    "status": "no_faces_detected", "engine": "mediapipe",
                     "preset": cfg.preset,
                     "faces_detected": 0,
                     "duration_ms": duration_ms,
@@ -118,7 +124,7 @@ class BeautyProcessor:
             if float(skin_mask.max()) <= 1e-4:
                 duration_ms = int((time.monotonic_ns() - start_ns) // 1_000_000)
                 stats = {
-                    "status": "empty_skin_mask",
+                    "status": "empty_skin_mask", "engine": "mediapipe",
                     "preset": cfg.preset,
                     "faces_detected": len(faces),
                     "duration_ms": duration_ms,
@@ -161,7 +167,7 @@ class BeautyProcessor:
 
             duration_ms = int((time.monotonic_ns() - start_ns) // 1_000_000)
             stats = {
-                "status": "success",
+                "status": "success", "engine": "mediapipe",
                 "preset": cfg.preset,
                 "faces_detected": len(faces),
                 "smooth": round(cfg.smooth, 4),

@@ -6,6 +6,7 @@ namespace Photobooth\Operator\Maintenance;
 
 use Photobooth\Operator\Camera\CameraAdapterInterface;
 use Photobooth\Operator\Config\AppConfig;
+use Photobooth\Operator\Image\BeautyService;
 use Photobooth\Operator\Printer\PrintAdapterInterface;
 use Photobooth\Operator\Storage\AssetStore;
 use Photobooth\Operator\Storage\Database;
@@ -29,7 +30,8 @@ final class HealthService
         AssetStore $assetStore,
         CameraAdapterInterface $camera,
         PrintAdapterInterface $printer,
-        MaintenanceService $maintenance
+        MaintenanceService $maintenance,
+        private BeautyService $beauty
     ) {
         $this->db = $db;
         $this->config = $config;
@@ -181,6 +183,7 @@ final class HealthService
                 'mode' => $this->config->beautyEngine,
                 'lkmagic_bridge_url' => $this->config->lkmagicBridgeUrl,
                 'face_slim_enabled' => false,
+                ...$this->beauty->health(),
             ],
             'warnings' => $warnings,
         ];

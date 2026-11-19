@@ -1,0 +1,47 @@
+{
+    "id": "wedding-rose-postcard",
+    "name": "Cưới · Hồng Phấn (Postcard)",
+    "style": "wedding-rose",
+    "version": "1.1.0",
+    "layout_id": "postcard-three",
+    "layout_version": "1.0.0",
+    "overlay": "overlay.png",
+    "background": "background.png",
+    "preview": "preview.jpg",
+    "license": "Original project artwork; MIT",
+    "hashes": {
+        "overlay.png": "3d51dfe3875ba59bf75e4933fb2b68fd90a5f47daf638cb3d79c8dfc1cd705ec",
+        "background.png": "e658000542b7bdd5ea5ab142a64e2210dfa3f7215104b18439e8b97d5dd7722c",
+        "preview.jpg": "e2777425ce5ebe1616142d19c0490dbf9a3a40a07c26268d74c65143fde914b6"
+    },
+    "category": "wedding",
+    "text_slots": {
+        "name": {
+            "x": 115,
+            "y": 2,
+            "width": 950,
+            "height": 30,
+            "size": 28,
+            "min_size": 16,
+            "color": "#592936"
+        },
+        "date": {
+            "x": 115,
+            "y": 1716,
+            "width": 174,
+            "height": 30,
+            "size": 21,
+            "min_size": 17,
+            "color": "#592936"
+        },
+        "wish": {
+            "x": 305,
+            "y": 1716,
+            "width": 760,
+            "height": 30,
+            "size": 23,
+            "min_size": 16,
+            "color": "#592936"
+        }
+    }
+}

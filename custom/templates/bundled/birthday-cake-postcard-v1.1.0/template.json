@@ -1,0 +1,47 @@
+{
+    "id": "birthday-cake-postcard",
+    "name": "Sinh nhật · Bánh Kem Nến (Postcard)",
+    "style": "birthday-cake",
+    "version": "1.1.0",
+    "layout_id": "postcard-three",
+    "layout_version": "1.0.0",
+    "overlay": "overlay.png",
+    "background": "background.png",
+    "preview": "preview.jpg",
+    "license": "Original project artwork; MIT",
+    "hashes": {
+        "overlay.png": "e1c188f19fc240215c1d4024a127a0ce5a303f3495884600d232970f42c1bd6b",
+        "background.png": "b4042383c2ae75f2868c57ec0d4b83bb85d4e3c19467c570ed38ea0c536f705b",
+        "preview.jpg": "691d14f2792b67a5b350d49ae5634738129b056a73082183d6c71b18c3d6f5a1"
+    },
+    "category": "birthday",
+    "text_slots": {
+        "name": {
+            "x": 115,
+            "y": 2,
+            "width": 950,
+            "height": 30,
+            "size": 28,
+            "min_size": 16,
+            "color": "#572849"
+        },
+        "date": {
+            "x": 115,
+            "y": 1716,
+            "width": 174,
+            "height": 30,
+            "size": 21,
+            "min_size": 17,
+            "color": "#572849"
+        },
+        "wish": {
+            "x": 305,
+            "y": 1716,
+            "width": 760,
+            "height": 30,
+            "size": 23,
+            "min_size": 16,
+            "color": "#572849"
+        }
+    }
+}

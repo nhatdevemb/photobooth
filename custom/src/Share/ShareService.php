@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Photobooth\Operator\Share;
 
 use PDO;
+use Photobooth\Operator\Event\EventSettings;
 use Photobooth\Operator\Config\AppConfig;
 use Photobooth\Operator\Storage\AssetStore;
 use Photobooth\Operator\Storage\AuditLogger;
@@ -132,7 +133,7 @@ final class ShareService
 
         $stmt = $pdo->prepare(
             'SELECT st.id AS share_id, st.session_id, st.final_asset_id, st.token_hash, st.expires_at, st.revoked_at,
-                    s.deleted_at AS session_deleted_at, s.expires_at AS session_expires_at,
+                    s.event_configuration, s.deleted_at AS session_deleted_at, s.expires_at AS session_expires_at,
                     fa.path AS final_path, fa.sha256, fa.bytes, fa.width, fa.height
              FROM share_tokens st
              JOIN sessions s ON s.id = st.session_id
@@ -182,6 +183,7 @@ final class ShareService
         }
 
         return [
+            'event' => EventSettings::snapshot($row['event_configuration']),
             'share_id' => (string) $row['share_id'],
             'session_id' => (string) $row['session_id'],
             'final_asset_id' => (string) $row['final_asset_id'],
@@ -210,6 +212,18 @@ final class ShareService
         $dims = (int) $resolved['width'] . ' × ' . (int) $resolved['height'] . ' px';
         $sizeKb = number_format(((int) $resolved['bytes']) / 1024, 1);
 
+        $event = $resolved['event'];
+        $heading = htmlspecialchars($event['name'] ?: 'Ảnh kỷ niệm của bạn', ENT_QUOTES, 'UTF-8');
+        $footer = htmlspecialchars($event['footer'], ENT_QUOTES, 'UTF-8');
+        $accent = $event['color'];
+        $brand = '';
+        foreach (['logo', 'banner'] as $kind) {
+            $image = EventSettings::brandImage($this->db->pdo(), $event[$kind]);
+            if ($image !== null) {
+                $brand .= '<img class="event-' . $kind . '" src="' . htmlspecialchars($image, ENT_QUOTES, 'UTF-8') . '" alt="">';
+            }
+        }
+
         return <<<HTML
 <!DOCTYPE html>
 <html lang="vi">
@@ -218,14 +232,14 @@ final class ShareService
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="referrer" content="no-referrer">
     <meta name="robots" content="noindex,nofollow">
-    <title>Tải Ảnh Photobooth</title>
+    <title>{$heading}</title>
     <style>
         :root {
             --bg: #0f172a;
             --card: #1e293b;
             --text: #f8fafc;
             --muted: #94a3b8;
-            --accent: #3b82f6;
+            --accent: {$accent};
             --accent-hover: #2563eb;
         }
         * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -281,7 +295,9 @@ final class ShareService
             border-radius: 10px;
             transition: background 0.15s ease;
         }
-        .btn-download:hover { background: var(--accent-hover); }
+        .btn-download:hover { filter: brightness(0.9); }
+        .event-logo { display: block; width: auto; max-width: 40%; max-height: 64px; margin: 0 0 12px; }
+        .event-banner { display: block; width: 100%; max-height: 160px; object-fit: contain; margin-bottom: 12px; }
         .meta {
             margin-top: 14px;
             font-size: 0.78rem;
@@ -292,7 +308,8 @@ final class ShareService
 </head>
 <body>
     <main class="viewer-card">
-        <h1>Ảnh kỷ niệm của bạn</h1>
+        {$brand}
+        <h1>{$heading}</h1>
         <p class="sub">Nhấn nút bên dưới để lưu ảnh chất lượng gốc về điện thoại</p>
         <div class="photo-frame">
             <img src="{$inlineImgPath}" alt="Ảnh Photobooth hoàn thiện">
@@ -300,7 +317,8 @@ final class ShareService
         <a class="btn-download" href="{$downloadPath}" download="photobooth-photo.jpg">Tải ảnh JPEG chất lượng cao ({$sizeKb} KB)</a>
         <div class="meta">
             Độ phân giải: {$dims} (sRGB 300 DPI)<br>
-            Hạn tải: {$expiresLocal}
+            Hạn tải: {$expiresLocal}<br>
+            {$footer}
         </div>
     </main>
 </body>

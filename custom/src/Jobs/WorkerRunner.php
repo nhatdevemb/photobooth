@@ -10,6 +10,7 @@ use Photobooth\Operator\Catalog\LutCatalog;
 use Photobooth\Operator\Camera\CameraAdapterInterface;
 use Photobooth\Operator\Camera\BrowserCameraAdapter;
 use Photobooth\Operator\Config\AppConfig;
+use Photobooth\Operator\Image\BeautyService;
 use Photobooth\Operator\Image\Renderer;
 use Photobooth\Operator\Maintenance\StructuredLogger;
 use Photobooth\Operator\Printer\PrintService;
@@ -51,6 +52,8 @@ final class WorkerRunner
     /** @var resource|null */
     private $lockHandle = null;
 
+    private BeautyService $beauty;
+
     public function __construct(
         Database $db,
         AppConfig $config,
@@ -61,9 +64,11 @@ final class WorkerRunner
         StructuredLogger $logger,
         TemplateCatalog $catalog,
         LutCatalog $luts,
-        ?string $workerId = null
+        ?string $workerId = null,
+        ?BeautyService $beauty = null
     )
     {
+        $this->beauty = $beauty ?? new BeautyService($db, $config, $assetStore, $renderer);
         $this->catalog = $catalog;
         $this->luts = $luts;
         $this->db = $db;
@@ -625,6 +630,13 @@ final class WorkerRunner
                 'output_preview_path' => $pendingPreview,
             ];
 
+            $beauty = $manifestData['beauty_config'];
+            if ($manifestData['beauty_preset'] !== 'off' && ($beauty === null
+                || ($beauty['smooth'] || $beauty['brighten'] || $beauty['tone']))) {
+                $manifestData['beauty_cache_dir'] = $this->beauty->cacheDir($sessionId);
+                $manifestData['retry_lkmagic'] = $payload['retry_lkmagic'] ?? false;
+                $manifestData['beauty_progress_key'] = BeautyService::progressKey($manifestData);
+            }
             $renderResult = $this->renderer->renderFromManifest($pendingDir, $manifestData, $jobId);
             $this->updateJobProgress($jobId, 'publishing', 85);
 
@@ -728,6 +740,7 @@ final class WorkerRunner
                     'duration_ms' => (int) ($renderResult['duration_ms'] ?? 0),
                     'preview_url' => '/custom/api/assets/' . $renderId . '?variant=preview',
                     'beauty_audit' => $renderResult['beauty_audit'] ?? [],
+                    'beauty_fallback' => $renderResult['beauty_fallback'] ?? null,
                 ], JSON_UNESCAPED_SLASHES) ?: '{}';
 
                 $txPdo->prepare(

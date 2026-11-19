@@ -8,17 +8,15 @@ export class DccCamera {
     }
 
     async start() {
+        if (this.stopping) await this.stopping;
         if (this.active) return;
         if (this.starting) return this.starting;
         const generation = ++this.generation;
         this.starting = (async () => {
             await this.api('POST', '/camera/preview/start', {});
-            if (generation !== this.generation) {
-                await this.api('POST', '/camera/preview/stop', {});
-                return;
-            }
+            if (generation !== this.generation) return;
             this.active = true;
-            this.status.textContent = 'Live view R10 luôn bật, cả lúc đếm ngược. JPEG gốc được nhận riêng khi chụp.';
+            this.status.textContent = 'Live view R10 bật cả lúc đếm ngược. JPEG gốc được nhận riêng khi chụp.';
             this.badge.textContent = '● Canon qua digiCamControl';
             this.loop(generation);
         })();
@@ -27,6 +25,7 @@ export class DccCamera {
     }
 
     async stop() {
+        if (this.stopping) return this.stopping;
         if (!this.active && !this.starting) return;
         this.active = false;
         this.generation++;
@@ -35,8 +34,13 @@ export class DccCamera {
         if (this.objectUrl) URL.revokeObjectURL(this.objectUrl);
         this.objectUrl = null;
         this.badge.textContent = 'Live view đã tắt';
-        try { await this.api('POST', '/camera/preview/stop', {}); }
-        catch (error) { this.status.textContent = error.message; }
+        this.stopping = (async () => {
+            // Finish any pending start before sending the stop command.
+            await this.starting?.catch(() => {});
+            await this.api('POST', '/camera/preview/stop', {});
+        })().catch((error) => { this.status.textContent = error.message; });
+        try { await this.stopping; }
+        finally { this.stopping = null; }
     }
 
     async loop(generation) {

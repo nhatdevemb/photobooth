@@ -18,6 +18,8 @@ Contract (Section 7.2 & 7.3 of implementation-plan.md):
 
 from __future__ import annotations
 
+from dataclasses import replace
+from contextlib import suppress
 import hashlib
 import io
 import json
@@ -332,6 +334,176 @@ def grade_rgb_image(image: Image.Image, lut: Optional[CubeLut], intensity: int =
     return Image.fromarray(np.clip(blended, 0, 255).astype(np.uint8))
 
 
+
+def beauty_config_for(manifest):
+    preset = manifest.get("beauty_preset")
+    overrides = manifest.get("beauty_config")
+    if preset is None and overrides is None:
+        return resolve_beauty_config("off")
+    return resolve_beauty_config(preset, overrides if isinstance(overrides, dict) else None)
+
+
+def load_source(manifest, photo):
+    path = Path(photo["path"])
+    img, digest, raw = validate_and_load_jpeg(
+        path,
+        max_jpeg_bytes=int(manifest.get("max_jpeg_bytes", DEFAULT_MAX_JPEG_BYTES)),
+        max_image_pixels=int(manifest.get("max_image_pixels", DEFAULT_MAX_IMAGE_PIXELS)),
+    )
+    if photo.get("sha256") and digest != photo["sha256"]:
+        raise PipelineError("SOURCE_HASH_MISMATCH", f"Slot {photo['slot']} SHA-256 mismatch")
+    normalized, icc = normalize_orientation_and_srgb(img, raw, int(photo["slot"]))
+    return normalized, digest, icc
+
+
+def write_cache_json(path, data):
+    atomic_write_bytes(path, json.dumps(data).encode("utf-8"))
+
+
+def read_cache_json(path):
+    try:
+        return json.loads(path.read_bytes())
+    except (OSError, ValueError):
+        return None
+
+
+def cache_key(value):
+    return hashlib.sha256(json.dumps(value, sort_keys=True).encode("utf-8")).hexdigest()
+
+
+def prepared_beauty(manifest, cfg, photos):
+    """Prepare one engine-consistent batch and reuse lossless per-photo results."""
+    folder = Path(manifest["beauty_cache_dir"])
+    folder.mkdir(parents=True, exist_ok=True)
+    settings = [PIPELINE_VERSION, cfg.to_dict(), cfg.lkmagic_url, "original-resolution"]
+    hashes = [p["sha256"] for p in photos]
+    settings_key = cache_key(settings)
+    batch = cache_key([settings_key, hashes])
+    marker = folder / "batch.json"
+    cached_batch = read_cache_json(marker)
+    native_retry = manifest.get("retry_lkmagic", False)
+    use_fallback = (
+        cfg.engine == "auto" and not native_retry and isinstance(cached_batch, dict)
+        and cached_batch.get("settings") == settings_key and cached_batch.get("fallback")
+    )
+    engines = ["mediapipe"] if cfg.engine == "mediapipe" or use_fallback else ["lkmagic"]
+    if cfg.engine == "auto" and engines == ["lkmagic"]:
+        engines.append("mediapipe")
+
+    failure = cached_batch.get("fallback") if use_fallback else None
+    for engine in engines:
+        results = {}
+        report_beauty_progress(manifest, folder, 0, len(photos))
+        try:
+            from beauty import BeautyProcessor
+            from beauty.lkmagic_bridge import check_lkmagic_health
+            actual = "lkmagic_native" if engine == "lkmagic" else engine
+            engine_cfg = replace(cfg, engine=engine, auto_start_lkmagic=False, lkmagic_timeout_sec=25)
+            with BeautyProcessor(engine_cfg) as processor:
+                for photo in photos:
+                    if not still_wanted(manifest, hashes):
+                        return None, None, "Đã thay đổi lựa chọn Beauty."
+                    slot = int(photo["slot"])
+                    key = cache_key([settings, photo["sha256"], actual])
+                    meta = folder / f"{key}.json"
+                    pixels = folder / f"{key}.png"
+                    entry = read_cache_json(meta)
+                    hit = False
+                    if isinstance(entry, dict):
+                        try:
+                            hit = sha256_file(pixels) == entry["pixels_sha256"]
+                        except (KeyError, OSError):
+                            pass
+                    if not hit:
+                        if engine == "lkmagic" and not results:
+                            status = check_lkmagic_health(cfg.lkmagic_url)
+                            if not (status.get("ok") and status.get("ready")):
+                                raise RuntimeError("LK Magic chưa sẵn sàng.")
+                        normalized, digest, icc = load_source(manifest, photo)
+                        adjusted, stats = processor.process(normalized)
+                        if stats["status"] == "error_fallback":
+                            raise RuntimeError(stats.get("error") or "Beauty thất bại.")
+                        if sha256_file(Path(photo["path"])) != digest:
+                            raise PipelineError("ORIGINAL_MUTATED", f"Original photo in slot {slot} was modified")
+                        pixels_tmp = pixels.with_suffix(".tmp")
+                        try:
+                            adjusted.save(pixels_tmp, format="PNG", compress_level=1)
+                            os.replace(pixels_tmp, pixels)
+                        finally:
+                            pixels_tmp.unlink(missing_ok=True)
+                        entry = {"stats": stats, "icc_status": icc, "pixels_sha256": sha256_file(pixels)}
+                        write_cache_json(meta, entry)
+                    os.utime(meta)
+                    results[slot] = (pixels, entry["icc_status"], {
+                        **entry["stats"], "engine": actual, "cache_hit": hit,
+                        "duration_ms": 0 if hit else entry["stats"]["duration_ms"],
+                    })
+                    report_beauty_progress(manifest, folder, len(results), len(photos))
+            fallback = failure if engine == "mediapipe" else None
+            write_cache_json(marker, {"batch": batch, "settings": settings_key, "fallback": fallback})
+            prune_beauty_cache(folder)
+            return results, fallback, None
+        except (ImportError, OSError, RuntimeError, ValueError) as exc:
+            failure = f"{engine}: {exc}"[:360]
+            log_err(failure)
+            if native_retry:
+                break
+
+    prune_beauty_cache(folder)
+    return None, None, failure
+
+
+def report_beauty_progress(manifest, folder, done, total):
+    if key := manifest.get("beauty_progress_key"):
+        with suppress(OSError):
+            write_cache_json(folder / "progress.json", {"key": key, "done": done, "total": total})
+
+
+def still_wanted(manifest, hashes):
+    """Stop pre-retouch between photos if the operator changed the snapshot."""
+    if "beauty_session_id" not in manifest:
+        return True
+    import sqlite3
+    with sqlite3.connect(Path(manifest["database_path"]).resolve().as_uri() + "?mode=ro", uri=True) as db:
+        row = db.execute("SELECT state, ui_step, deleted_at, beauty_preset, beauty_smooth, "
+                         "beauty_brighten, beauty_tone FROM sessions WHERE id=?",
+                         (manifest["beauty_session_id"],)).fetchone()
+        if not row or row[2] or row[:2] not in (("CAPTURED", 4), ("REVIEW", 4), ("RENDERING", 5)):
+            return False
+        values = manifest["beauty_config"]
+        if row[3:] != (manifest["beauty_preset"], values["smooth"], values["brighten"], values["tone"]):
+            return False
+        sources = db.execute("SELECT p.sha256 FROM session_slots ss JOIN photos p "
+                             "ON p.id=ss.current_photo_id WHERE ss.session_id=? ORDER BY ss.slot",
+                             (manifest["beauty_session_id"],))
+        return [source[0] for source in sources] == hashes
+
+
+def prune_beauty_cache(folder):
+    entries = sorted(folder.glob("*.json"), key=lambda p: p.stat().st_mtime_ns, reverse=True)
+    for entry in [p for p in entries if p.stem not in ("batch", "progress")][12:]:
+        entry.unlink(missing_ok=True)
+        entry.with_suffix(".png").unlink(missing_ok=True)
+
+
+def run_beauty_task(manifest):
+    cfg = beauty_config_for(manifest)
+    if manifest.get("task") == "check_lkmagic":
+        import tempfile
+        from beauty.lkmagic_bridge import retouch_via_lkmagic
+        with tempfile.TemporaryDirectory(prefix="pb-beauty-check-") as tmp:
+            image, _, _ = load_source(manifest, manifest["photos"][0])
+            _, audit = retouch_via_lkmagic(
+                np.asarray(image), replace(cfg, auto_start_lkmagic=False, lkmagic_timeout_sec=25), Path(tmp)
+            )
+        return {"status": "ok", "audit": audit}
+    photos = manifest["photos"]
+    if not cfg.is_active() or not still_wanted(manifest, [p["sha256"] for p in photos]):
+        return {"status": "ok", "skipped": True}
+    results, fallback, error = prepared_beauty(manifest, cfg, photos)
+    return {"status": "ok", "prepared": bool(results), "fallback": fallback, "error": error}
+
+
 def run_render_from_manifest(manifest: Dict[str, Any]) -> Dict[str, Any]:
     start_ns = time.monotonic_ns()
 
@@ -415,19 +587,19 @@ def run_render_from_manifest(manifest: Dict[str, Any]) -> Dict[str, Any]:
     if len(photos_input) != len(expected_slots) or sorted(photos_by_slot.keys()) != expected_slots:
         raise PipelineError("MISSING_PHOTOS", "Photos must match the layout slots exactly")
 
-    raw_beauty_preset = manifest.get("beauty_preset")
-    raw_beauty_config = manifest.get("beauty_config")
-    if raw_beauty_preset is None and raw_beauty_config is None:
-        beauty_cfg = resolve_beauty_config("off")
-    else:
-        beauty_cfg = resolve_beauty_config(
-            preset_name=raw_beauty_preset,
-            overrides=raw_beauty_config if isinstance(raw_beauty_config, dict) else None,
+    beauty_cfg = beauty_config_for(manifest)
+    prepared = fallback_reason = beauty_error = None
+    use_cache = beauty_cfg.is_active() and bool(manifest.get("beauty_cache_dir"))
+    if use_cache:
+        prepared, fallback_reason, beauty_error = prepared_beauty(
+            manifest, beauty_cfg, [photos_by_slot[slot] for slot in expected_slots]
         )
+        if beauty_error and manifest.get("retry_lkmagic"):
+            raise PipelineError("LK_MAGIC_RETOUCH_FAILED", beauty_error)
 
     beauty_processor = None
-    beauty_load_error = None
-    if beauty_cfg.is_active():
+    beauty_load_error = beauty_error
+    if beauty_cfg.is_active() and not use_cache:
         try:
             from beauty import BeautyProcessor
             beauty_processor = BeautyProcessor(beauty_cfg)
@@ -445,29 +617,31 @@ def run_render_from_manifest(manifest: Dict[str, Any]) -> Dict[str, Any]:
             slot_info = photos_by_slot[slot_num]
             photo_file = Path(slot_info["path"])
 
-            img, file_hash, raw_bytes = validate_and_load_jpeg(
-                photo_file,
-                max_jpeg_bytes=max_jpeg_bytes,
-                max_image_pixels=max_image_pixels,
-            )
-            expected_hash = slot_info.get("sha256")
-            if expected_hash and expected_hash != file_hash:
-                raise PipelineError(
-                    "SOURCE_HASH_MISMATCH",
-                    f"Slot {slot_num} SHA-256 mismatch before render",
-                )
-            photo_hashes.append(file_hash)
-
-            normalized_img, icc_status = normalize_orientation_and_srgb(img, raw_bytes, slot_num)
-            icc_audit.append({"slot": slot_num, "icc_status": icc_status})
-
-            # Beauty Retouch: applied after sRGB normalization and before 3D LUT
-            if beauty_processor is not None and beauty_cfg.is_active():
-                retouched_img, b_stats = beauty_processor.process(normalized_img, beauty_cfg)
+            if prepared is not None:
+                pixels, icc_status, b_stats = prepared[slot_num]
+                file_hash = sha256_file(photo_file)
+                if file_hash != slot_info["sha256"]:
+                    raise PipelineError("SOURCE_HASH_MISMATCH", f"Slot {slot_num} SHA-256 mismatch before render")
+                with Image.open(pixels) as cached:
+                    cached.load()
+                    retouched_img = cached.copy()
                 beauty_audit.append({"slot": slot_num, **b_stats})
             else:
-                retouched_img = normalized_img
-                beauty_audit.append({"slot": slot_num, "status": "error_fallback" if beauty_load_error else "bypassed", "preset": beauty_cfg.preset, "error": beauty_load_error})
+                normalized_img, file_hash, icc_status = load_source(manifest, slot_info)
+                if beauty_processor is not None:
+                    retouched_img, b_stats = beauty_processor.process(normalized_img, beauty_cfg)
+                    beauty_audit.append({"slot": slot_num, **b_stats})
+                else:
+                    retouched_img = normalized_img
+                    beauty_audit.append({
+                        "slot": slot_num,
+                        "status": "error_fallback" if beauty_load_error else "bypassed",
+                        "preset": beauty_cfg.preset,
+                        "error": beauty_load_error,
+                    })
+
+            photo_hashes.append(file_hash)
+            icc_audit.append({"slot": slot_num, "icc_status": icc_status})
 
             # Step 5: Apply 3D LUT BEFORE cropping/resizing into the collage slot
             processed_img = grade_rgb_image(retouched_img, cube_lut, lut_intensity)
@@ -495,6 +669,12 @@ def run_render_from_manifest(manifest: Dict[str, Any]) -> Dict[str, Any]:
             if overlay.size != (canvas_w, canvas_h) or overlay.mode != "RGBA":
                 raise PipelineError("INVALID_TEMPLATE", "Overlay must be RGBA 1181x1748")
             canvas = Image.alpha_composite(canvas.convert("RGBA"), overlay).convert("RGB")
+
+    if template.get("text_slots") and any(template.get("frame_text", {}).values()):
+        from frame_text import frame_layer
+
+        lettering = frame_layer((canvas_w, canvas_h), template["text_slots"], template["frame_text"])
+        canvas = Image.alpha_composite(canvas.convert("RGBA"), lettering).convert("RGB")
 
     encoder_spec = template.get("encoder", {})
     quality = int(encoder_spec.get("quality", 95))
@@ -570,6 +750,7 @@ def run_render_from_manifest(manifest: Dict[str, Any]) -> Dict[str, Any]:
         "beauty_preset": beauty_cfg.preset,
         "beauty_config": beauty_cfg.to_dict(),
         "beauty_audit": beauty_audit,
+        "beauty_fallback": fallback_reason,
         "pipeline_version": PIPELINE_VERSION,
         "input_signature": input_signature,
         "source_photo_hashes": photo_hashes,
@@ -630,7 +811,7 @@ def main(argv: List[str]) -> int:
 
     try:
         manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
-        result = run_render_from_manifest(manifest)
+        result = run_beauty_task(manifest) if manifest.get("task") else run_render_from_manifest(manifest)
         sys.stdout.write(json.dumps(result) + "\n")
         return 0
     except PipelineError as exc:

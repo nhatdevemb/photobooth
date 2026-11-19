@@ -1,0 +1,2 @@
+NASA portrait of Eileen Collins, from the scikit-image astronaut dataset. Public domain.
+https://scikit-image.org/docs/0.25.x/api/skimage.data.html#skimage.data.astronaut

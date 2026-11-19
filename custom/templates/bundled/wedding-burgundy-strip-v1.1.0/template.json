@@ -1,0 +1,47 @@
+{
+    "id": "wedding-burgundy-strip",
+    "name": "Cưới · Nơ Rượu Vang (Dải 3)",
+    "style": "wedding-burgundy",
+    "version": "1.1.0",
+    "layout_id": "strip-three",
+    "layout_version": "1.0.0",
+    "overlay": "overlay.png",
+    "background": "background.png",
+    "preview": "preview.jpg",
+    "license": "Original project artwork; MIT",
+    "hashes": {
+        "overlay.png": "72887b5c1fe21367d213e7557d68283d55515f3f012334e54f2996a101fd83c2",
+        "background.png": "a058cf4c6a1e031108c36c8afae25444709c2c5f831031706aa0267db560034f",
+        "preview.jpg": "6f1d3675784ec34a34451b77d2a6fcf71581be57fe95687ab5ecd244fbcf08bf"
+    },
+    "category": "wedding",
+    "text_slots": {
+        "name": {
+            "x": 115,
+            "y": 2,
+            "width": 950,
+            "height": 30,
+            "size": 28,
+            "min_size": 16,
+            "color": "#592936"
+        },
+        "date": {
+            "x": 115,
+            "y": 1716,
+            "width": 174,
+            "height": 30,
+            "size": 21,
+            "min_size": 17,
+            "color": "#592936"
+        },
+        "wish": {
+            "x": 305,
+            "y": 1716,
+            "width": 760,
+            "height": 30,
+            "size": 23,
+            "min_size": 16,
+            "color": "#592936"
+        }
+    }
+}

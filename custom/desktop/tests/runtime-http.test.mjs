@@ -36,7 +36,7 @@ test('Windows FastCGI + worker + DCC HTTP: four layouts, retake, immutable JPEG,
     const data = await mkdtemp(path.join(cache, 'http-e2e-Thử-'));
     const fixture = await readFile(path.join(project, 'custom/tests/fixtures/slot-1-v1.jpg'));
     const settings = {};
-    let last = '-', triggers = 0;
+    let last = '-', triggers = 0, nextFixture = fixture;
     const dcc = httpServer(async (request, response) => {
         try {
             const url = new URL(request.url, 'http://127.0.0.1');
@@ -52,18 +52,44 @@ test('Windows FastCGI + worker + DCC HTTP: four layouts, retake, immutable JPEG,
             else if (q.slc === 'capture') {
                 triggers++;
                 last = settings['session.filenametemplate'] + '.jpg';
-                await writeFile(path.join(settings['session.folder'], last), fixture);
+                await writeFile(path.join(settings['session.folder'], last), nextFixture);
             }
             response.end(body);
         } catch (error) { response.statusCode = 500; response.end(error.message); }
     });
     await new Promise((resolve) => dcc.listen(0, '127.0.0.1', resolve));
+    let bridgeReady = false, bridgeFailsAt = 0, retouches = 0;
+    const bridge = httpServer(async (request, response) => {
+        response.setHeader('Content-Type', 'application/json');
+        if (request.url === '/api/v1/health') {
+            response.end(JSON.stringify({ ok: true, ready: bridgeReady }));
+            return;
+        }
+        try {
+            let body = '';
+            for await (const chunk of request) body += chunk;
+            const { input_path, output_path } = JSON.parse(body);
+            retouches++;
+            await delay(300);
+            if (retouches === bridgeFailsAt) {
+                response.end(JSON.stringify({ ok: false, error: 'TEST_NATIVE_EXPORT_FAILED' }));
+                return;
+            }
+            await writeFile(output_path, await readFile(input_path));
+            response.end(JSON.stringify({ ok: true, method: 'test-copy' }));
+        } catch (error) {
+            response.statusCode = 500;
+            response.end(JSON.stringify({ ok: false, error: error.message }));
+        }
+    });
+    await new Promise((resolve) => bridge.listen(0, '127.0.0.1', resolve));
+    t.after(() => new Promise((resolve) => bridge.close(resolve)));
     const operatorPort = await port(), guestPort = await port();
     const origin = `http://127.0.0.1:${operatorPort}`;
     const guest = `http://127.0.0.1:${guestPort}`;
     const child = spawn(python, [path.join(desktop, 'supervisor.py')], {
         cwd: project, windowsHide: true, stdio: ['pipe', 'pipe', 'pipe'],
-        env: { ...process.env, TEMP: cache, TMP: cache, MPLCONFIGDIR: path.join(cache, 'matplotlib'), DATA_DIR: data, DATABASE_PATH: path.join(data, 'db/photobooth.sqlite'), PYTHON_BIN: python, CAMERA_ADAPTER: 'digicamcontrol', PRINTER_ADAPTER: 'mock', COUNTDOWN_SECONDS: '0', DCC_BASE_URL: `http://127.0.0.1:${dcc.address().port}`, DCC_CAMERA_ID: '1234567890', SHARE_BASE_URL: `http://192.168.1.50:${guestPort}`, TRUSTED_HOSTS: '127.0.0.1,localhost,192.168.1.50', SHARE_SIGNING_KEY: randomUUID() + randomUUID() },
+        env: { ...process.env, TEMP: cache, TMP: cache, PHP_FCGI_MAX_REQUESTS: '1', MPLCONFIGDIR: path.join(cache, 'matplotlib'), DATA_DIR: data, DATABASE_PATH: path.join(data, 'db/photobooth.sqlite'), PYTHON_BIN: python, BEAUTY_ENGINE: 'auto', LKMAGIC_AUTO_START: '0', LKMAGIC_BRIDGE_URL: 'http://127.0.0.1:' + bridge.address().port, CAMERA_ADAPTER: 'digicamcontrol', PRINTER_ADAPTER: 'mock', COUNTDOWN_SECONDS: '0', DCC_BASE_URL: `http://127.0.0.1:${dcc.address().port}`, DCC_CAMERA_ID: '1234567890', SHARE_BASE_URL: `http://192.168.1.50:${guestPort}`, TRUSTED_HOSTS: '127.0.0.1,localhost,192.168.1.50', SHARE_SIGNING_KEY: randomUUID() + randomUUID() },
     });
     let output = '';
     child.stdout.on('data', (bytes) => { output += bytes.toString(); });
@@ -106,7 +132,73 @@ test('Windows FastCGI + worker + DCC HTTP: four layouts, retake, immutable JPEG,
         }
         assert.fail('Job timeout');
     };
-    let expectedTriggers = 0;
+    const waitFor = async (read, ready, message) => {
+        for (let i = 0; i < 300; i++) {
+            const result = await read();
+            if (ready(result)) return result;
+            await delay(100);
+        }
+        assert.fail(message);
+    };
+    const beautyHealth = async () => (await api('GET', '/health')).beauty_engine;
+    assert.equal((await beautyHealth()).bridge.status, 'starting');
+    bridgeReady = true;
+    await waitFor(beautyHealth, (health) => health.bridge.status === 'ready', 'Bridge never became ready');
+    await api('POST', '/health/beauty-test', {}, randomUUID(), 202);
+    await waitFor(beautyHealth, (health) => health.diagnostic?.status === 'passed', 'Native test failed');
+    assert.equal(retouches, 1);
+    const sample = await readFile(path.join(project, 'custom/assets/beauty-check.jpg'));
+    nextFixture = sample;
+    let beautySession = await api('POST', '/sessions', {}, randomUUID(), 201);
+    const beautyId = beautySession.id;
+    const configureBeauty = async (changes) => {
+        beautySession = await api('POST', '/sessions/' + beautyId + '/configuration', { revision: beautySession.revision, ...changes });
+    };
+    await configureBeauty({ layout_id: 'strip-three', beauty_preset: 'natural' });
+    for (let slot = 1; slot <= 3; slot++) {
+        if (slot > 1) nextFixture = await readFile(path.join(project, 'custom/tests/fixtures/slot-' + slot + '-v1.jpg'));
+        await api('POST', '/sessions/' + beautyId + '/slots/' + slot + '/capture', { revision: beautySession.revision }, randomUUID(), 202);
+        beautySession = await finish(beautyId);
+    }
+    nextFixture = fixture;
+    bridgeFailsAt = retouches + 2;
+    await configureBeauty({ ui_step: 4 });
+    const cacheDir = path.join(data, 'beauty/sessions', beautyId);
+    const batch = async () => readFile(path.join(cacheDir, 'batch.json'), 'utf8').then(JSON.parse, () => ({}));
+    await waitFor(batch, (value) => Boolean(value.fallback), 'Background Beauty never completed');
+    assert.equal(retouches, 3);
+    const firstRender = await api('POST', '/sessions/' + beautyId + '/render', { revision: beautySession.revision }, randomUUID(), 202);
+    beautySession = await finish(beautyId);
+    const firstResult = (await api('GET', '/jobs/' + firstRender.job_id)).result;
+    assert.equal(beautySession.current_render.beauty_mode, 'fallback');
+    assert.equal(firstResult.beauty_audit.length, 3);
+    assert.ok(firstResult.beauty_audit.every((item) => item.engine === 'mediapipe' && item.cache_hit));
+    assert.equal(retouches, 3);
+    assert.equal((await beautyHealth()).last_render.mode, 'fallback');
+
+    const retry = await api('POST', '/sessions/' + beautyId + '/render', { revision: beautySession.revision, retry_lkmagic: true }, randomUUID(), 202);
+    beautySession = await finish(beautyId);
+    const retryResult = (await api('GET', '/jobs/' + retry.job_id)).result;
+    assert.ok(retryResult.beauty_audit.every((item) => item.engine === 'lkmagic_native'));
+    assert.equal(retouches, 5, 'Retry reused successful native photos');
+    const retryHash = beautySession.current_render.sha256;
+    const rebuild = await api('POST', '/sessions/' + beautyId + '/render', { revision: beautySession.revision }, randomUUID(), 202);
+    beautySession = await finish(beautyId);
+    assert.equal(beautySession.current_render.sha256, retryHash);
+    assert.ok((await api('GET', '/jobs/' + rebuild.job_id)).result.beauty_audit.every((item) => item.cache_hit));
+    assert.equal(retouches, 5);
+    const beautyFinal = await api('POST', '/sessions/' + beautyId + '/finalize',
+        { revision: beautySession.revision, render_id: beautySession.current_render.id }, randomUUID(), 201);
+    await api('POST', '/sessions/' + beautyId + '/close', { revision: beautyFinal.revision });
+    await waitFor(() => access(cacheDir).then(() => false, () => true), Boolean, 'Closed session cache remained');
+
+    bridgeFailsAt = retouches + 1;
+    await api('POST', '/health/beauty-test', {}, randomUUID(), 202);
+    const failedCheck = await waitFor(beautyHealth, (health) => health.diagnostic?.status === 'failed', 'Export failure was not reported');
+    assert.equal(failedCheck.bridge.status, 'ready');
+    assert.match(failedCheck.diagnostic.error, /TEST_NATIVE_EXPORT_FAILED/);
+
+    let expectedTriggers = 3;
     const layouts = ['single', 'strip-three', 'postcard-three', 'grid-four'];
     const sessionCount = Number(process.env.PB_SOAK_SESSIONS || 4);
     assert.ok(Number.isInteger(sessionCount) && sessionCount >= 4 && sessionCount <= 100);

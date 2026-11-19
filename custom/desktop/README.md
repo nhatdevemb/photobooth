@@ -4,12 +4,12 @@ Bản thử 0.1.1 chạy Operator Edition trong Electron, dùng PHP/Python/Caddy
 
 ## Cài và mở app
 
-1. Chạy `dist/Photobooth-Setup-0.1.1-x64.exe` từ Explorer, cài cho tài khoản Windows hiện tại và mở shortcut **Photobooth Operator**. Không cần cài Electron, PHP, Python, Node, Canon SDK hoặc Visual Studio Build Tools để dùng app.
+1. Chạy `dist/<version>/Photobooth-Setup-<version>-x64.exe` từ Explorer, cài cho tài khoản Windows hiện tại và mở shortcut **Photobooth Operator**. Không cần cài Electron, PHP, Python, Node, Canon SDK hoặc Visual Studio Build Tools để dùng app.
 2. Lần đầu chọn **Ảnh mô phỏng để thử app**, chọn IP LAN của laptop và hai cổng khác nhau (mặc định operator 8080, guest 8081). Tạo Admin với mật khẩu ít nhất 12 ký tự.
 3. Bấm **Khởi động Photobooth**, đăng nhập và chạy luồng Bố cục → Chụp ảnh → Filter/Beauty → Template → Duyệt/QR. Lệnh in là mô phỏng, không ra giấy.
 4. Dữ liệu lưu ở `%LOCALAPPDATA%\PhotoboothOperator\data`, tách khỏi thư mục cài. Nâng cấp bằng bộ cài mới giữ dữ liệu; gỡ app không tự xóa ảnh. Menu **Photobooth → Cấu hình / khởi động lại** quay về thiết lập; tài khoản đã tạo không bị đặt lại mật khẩu.
 
-Bộ cài thử chưa ký chứng thư phát hành. Windows có thể hiện cảnh báo nhà phát hành chưa xác định. Chỉ dùng artifact do chính lần build này tạo và đối chiếu SHA-256 trong `dist/SHA256SUMS.txt`.
+Bộ cài thử chưa ký chứng thư phát hành. Windows có thể hiện cảnh báo nhà phát hành chưa xác định. Chỉ dùng artifact do chính lần build này tạo và đối chiếu SHA-256 trong `dist/<version>/SHA256SUMS.txt`.
 
 ## Kết nối R10 khi có thiết bị
 
@@ -22,6 +22,14 @@ Bộ cài thử chưa ký chứng thư phát hành. Windows có thể hiện c�
 Nếu timeout/mất USB, kiểm tra tình trạng thiết bị và tạo thao tác chụp mới. App không tự gửi lại màn trập khi không biết lệnh trước đã chụp hay chưa; retake lỗi giữ ảnh cũ. JPEG trong DATA_DIR được giữ nguyên byte trước khi áp Beauty/LUT và ghép template.
 
 Ngày 17/11/2026 đã kiểm thử một ảnh bằng R10 thật: live view cập nhật trong từng nhịp 3–2–1, nhận JPEG, chọn filter/template sau chụp và tạo QR. Đây là smoke test trên thiết bị, chưa thay thế nghiệm thu 100 lần chụp, đo FPS dài hạn và kiểm tra rút USB. Khi màn trập mở/đang tải JPEG, máy ảnh có thể tạm ngắt live view; app giữ khung cuối rồi tiếp tục khi thiết bị trả hình.
+
+## Kiểm tra Beauty trước sự kiện
+
+1. Trong màn hình thiết lập Windows, nhập đường dẫn **LK magic.exe** nếu LK Magic nằm ngoài thư mục cài đặt được dò tự động. Có thể mở lại thiết lập qua **Cấu hình / khởi động lại**.
+2. Sau khi đăng nhập, mở **Trạng thái hệ thống**. Kiểm tra trạng thái LK Magic và bấm **Chạy thử Beauty**. Ảnh mẫu được xử lý trên máy bằng LK Magic. Kết quả xuất thử và engine của bộ ảnh gần nhất hiển thị riêng.
+3. Beauty bắt đầu khi lưu lựa chọn ở bước **Filter và Beauty** rồi chuyển sang **Template**. Khi LK Magic lỗi ở chế độ tự động, cả bộ dùng MediaPipe. Có thể chọn **Thử lại với LK Magic** trước khi duyệt ảnh.
+
+Bản 0.1.2 xử lý ở độ phân giải nguồn và lưu kết quả Beauty không mất dữ liệu theo phiên để dùng khi đổi filter/template. Bản in giữ thông số 1181 × 1748, 300 DPI. Người dùng bản chạy ngoài Electron có thể chạy `php custom/bin/beauty-worker.php` song song với worker chụp/in để bật xử lý Beauty ngầm và tác vụ ảnh thử.
 
 ## Wi-Fi và cổng mạng
 
@@ -39,8 +47,15 @@ npm ci --ignore-scripts
 npm run prepare:runtime
 node scripts/fetch-electron.mjs
 npm test
-npm run dist
 ```
+
+Sau khi chuẩn bị môi trường một lần, chạy lệnh sau trong `custom/desktop` để tạo bộ cài và mã SHA-256. Phiên bản được đọc từ `package.json`.
+
+```powershell
+npm.cmd run build:windows
+```
+
+Bộ cài và `SHA256SUMS.txt` nằm trong `dist/<version>/`. Build lại cùng phiên bản sẽ ghi lại bộ cài ở thư mục đó. Có thể đặt `PB_BUILD_OUTPUT` để chọn thư mục đầu ra khác.
 
 `prepare:runtime` tải PHP/Python/Caddy và QR theo `runtime-lock.json`, kiểm checksum, cài wheel theo `requirements-windows.lock`, cài Composer dependencies. Runtime/cache không được commit. `dist` chỉ stage tài nguyên ứng dụng và runtime, không copy `.env`, tài khoản, SQLite hoặc ảnh sự kiện. Python/QR/Composer/Caddy/Electron giữ license đi kèm.
 

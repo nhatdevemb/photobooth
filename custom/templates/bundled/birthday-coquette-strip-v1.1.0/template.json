@@ -1,0 +1,47 @@
+{
+    "id": "birthday-coquette-strip",
+    "name": "Sinh nhật · Nơ Kem Dâu (Dải 3)",
+    "style": "birthday-coquette",
+    "version": "1.1.0",
+    "layout_id": "strip-three",
+    "layout_version": "1.0.0",
+    "overlay": "overlay.png",
+    "background": "background.png",
+    "preview": "preview.jpg",
+    "license": "Original project artwork; MIT",
+    "hashes": {
+        "overlay.png": "c9588c3f3ff411f41ce242eb9b3a8ce701b0a00ce783e96f7b46f22d3f70f79e",
+        "background.png": "10041cf31440b953227001f6052087d4791f8b2854a478291967378e60ccb51d",
+        "preview.jpg": "ab36f3c33326f53af8325257729cf3d70bc8c93887889df03497b4444ff94899"
+    },
+    "category": "birthday",
+    "text_slots": {
+        "name": {
+            "x": 115,
+            "y": 2,
+            "width": 950,
+            "height": 30,
+            "size": 28,
+            "min_size": 16,
+            "color": "#572849"
+        },
+        "date": {
+            "x": 115,
+            "y": 1716,
+            "width": 174,
+            "height": 30,
+            "size": 21,
+            "min_size": 17,
+            "color": "#572849"
+        },
+        "wish": {
+            "x": 305,
+            "y": 1716,
+            "width": 760,
+            "height": 30,
+            "size": 23,
+            "min_size": 16,
+            "color": "#572849"
+        }
+    }
+}

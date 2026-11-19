@@ -32,6 +32,7 @@ const sessionCycle = process.env.PB_TEST_SESSION_CYCLE === '1';
 test(sessionCycle ? 'packaged app finishes print/QR/close and starts a clean second session with live view' : 'live view streams through 3-2-1 and layout/capture/filter/template/review without duplicate shutters', { timeout: sessionCycle ? 180000 : 120000 }, async (t) => {
     if (process.platform !== 'win32') return t.skip('Windows desktop integration');
     const real = process.env.PB_REAL_DCC === '1';
+    const beauty = process.env.PB_TEST_BEAUTY === '1';
     assert.ok(!sessionCycle || !real, 'The repeated session test uses simulated DCC only');
     const cache = path.join(desktop, '.cache');
     await mkdir(cache, { recursive: true });
@@ -67,7 +68,7 @@ test(sessionCycle ? 'packaged app finishes print/QR/close and starts a clean sec
     const app = await electron.launch({
         executablePath: packaged || path.join(desktop, 'node_modules/electron/dist/electron.exe'),
         args: [...(packaged ? [] : [desktop]), '--disable-gpu'],
-        env: { ...process.env, PB_DESKTOP_TEST: '1', PB_DESKTOP_DATA_DIR: path.join(base, 'data'), TEMP: cache, TMP: cache, COUNTDOWN_SECONDS: '3' },
+        env: { ...process.env, PB_DESKTOP_TEST: '1', ...(beauty ? { BEAUTY_ENGINE: 'mediapipe' } : {}), PB_DESKTOP_DATA_DIR: path.join(base, 'data'), TEMP: cache, TMP: cache, COUNTDOWN_SECONDS: '3' },
     });
     t.after(() => app.close().catch(() => {}));
     if (real) {
@@ -100,7 +101,35 @@ test(sessionCycle ? 'packaged app finishes print/QR/close and starts a clean sec
     await page.locator('#btn-login-submit').click();
     await eventually(() => frames >= 3, 'Auto live view did not start');
     if (!real) assert.equal(previewStarts, 1);
+    if (beauty) {
+        await page.locator('#btn-nav-health').click();
+        await eventually(() => page.locator('#health-lkmagic').textContent().then((text) => text.includes('LK Magic')), 'Bridge status missing');
+        assert.equal(await page.locator('#btn-beauty-test').isVisible(), true);
+        await page.locator('#btn-nav-health').click();
+    }
     await page.setViewportSize({ width: 1366, height: 768 });
+    const settingsSave = async (name, category, logo, newEvent = false) => {
+        await page.locator('#btn-nav-settings').click();
+        await page.locator('#event-name').fill(name);
+        await page.locator('#event-category').selectOption(category);
+        await page.locator('#event-frame-name').fill(name);
+        await page.locator('#event-frame-date').fill('2026-11-18');
+        await page.locator('#event-frame-wish').fill('Chúc mừng ngày đặc biệt');
+        await page.locator('#event-logo').setInputFiles(path.join(project, 'custom/public/assets/mock-preview', logo));
+        if (await page.locator('#event-no-limit').isChecked()) await page.locator('#event-no-limit').uncheck();
+        await page.locator('#event-print-limit').fill('5');
+        await page.locator('#btn-event-preview').click();
+        await page.locator('#event-frame-preview').waitFor();
+        const saved = page.waitForResponse((r) => r.url().endsWith('/admin/settings') && r.request().method() === 'POST');
+        if (newEvent) page.once('dialog', (dialog) => dialog.accept());
+        await page.locator(newEvent ? '#btn-event-new' : '#btn-event-save').click();
+        const result = await saved;
+        assert.equal(result.status(), 200, await result.text());
+        const settings = await result.json();
+        await page.locator('#btn-nav-workspace').click();
+        return settings;
+    };
+    const firstEvent = sessionCycle ? await settingsSave('Minh và Lan', 'wedding', 'frame-1.jpg') : null;
     await page.locator('#btn-new-session').click();
     await page.locator('[data-layout-id=single]').click();
     assert.equal(await page.locator('#btn-next').evaluate((button) => button.getBoundingClientRect().bottom <= innerHeight), true, 'Layout footer below viewport');
@@ -123,19 +152,31 @@ test(sessionCycle ? 'packaged app finishes print/QR/close and starts a clean sec
     if (!real) assert.ok(previewStarts >= 2, 'Live view was not resumed after shutter');
     await page.locator('#btn-next').click();
     await page.locator('[data-lut-id=film-400]').click();
-    await page.locator('[data-beauty-preset=off]').click();
+    await page.locator(beauty ? '[data-beauty-preset=natural]' : '[data-beauty-preset=off]').click();
     assert.equal(await page.locator('#btn-next').evaluate((button) => button.getBoundingClientRect().bottom <= innerHeight), true, 'Filter footer below viewport');
     await page.reload();
     await eventually(() => page.locator('[data-step="3"]').getAttribute('aria-current').then(Boolean), 'Reload did not restore filter step');
     await page.locator('#btn-next').click();
-    await page.locator('[data-template-id=cute-single]').click();
+    await page.locator(sessionCycle ? '[data-template-id=wedding-burgundy-single]' : '[data-template-id=cute-single]').click();
+    if (sessionCycle) {
+        assert.equal(await page.locator('[data-template-id=cute-single]').count(), 0);
+        assert.equal(await page.locator('#btn-nav-settings').isDisabled(), true);
+    }
     assert.equal(await page.locator('#live-preview-img').isVisible(), true);
     assert.equal(await page.locator('#btn-next').evaluate((button) => button.getBoundingClientRect().bottom <= innerHeight), true, 'Template footer below viewport');
-    await page.locator('#btn-next').click();
-    await eventually(() => page.locator('#btn-finalize-session').isEnabled(), 'Review did not load');
-    const beforeFrames = frames;
-    await eventually(() => frames >= beforeFrames + 3, 'Live view stopped at review');
+    const enterReview = async () => {
+        const stopped = page.waitForResponse((res) => res.url().endsWith('/camera/preview/stop'));
+        await page.locator('#btn-next').click();
+        assert.equal((await stopped).status(), 200, 'Could not stop live view at review');
+        assert.equal(await page.locator('#liveview-panel').isHidden(), true);
+        await eventually(() => page.locator('#btn-finalize-session').isEnabled(), 'Review did not load');
+    };
+    await enterReview();
+    const reviewFrames = frames;
+    await page.locator('[data-step="4"]').click();
+    await eventually(() => frames >= reviewFrames + 3, 'Live view did not resume at template selection');
     assert.equal(await page.locator('#live-preview-img').isVisible(), true);
+    await enterReview();
     for (const size of [{ width: 1366, height: 768 }, { width: 1920, height: 1080 }, { width: 390, height: 844 }]) {
         await page.setViewportSize(size);
         const overflow = await page.evaluate(() => ({ viewport:innerWidth, width:document.documentElement.scrollWidth, elements:[...document.querySelectorAll('body *')].filter((e) => { const r=e.getBoundingClientRect();return r.width>0 && (r.right>innerWidth+1 || r.left < -1); }).map((e)=>({id:e.id,tag:e.tagName,class:e.className,width:e.getBoundingClientRect().width,right:e.getBoundingClientRect().right})).slice(0,20) }));
@@ -144,12 +185,18 @@ test(sessionCycle ? 'packaged app finishes print/QR/close and starts a clean sec
     await page.setViewportSize({ width: 1366, height: 768 });
     await app.evaluate(({ BrowserWindow }) => { BrowserWindow.getAllWindows()[0].show(); });
     await page.screenshot({ path: path.join(base, 'review-liveview.png'), fullPage: true });
+    const finalResponse = page.waitForResponse((res) => res.request().method() === 'POST' && res.url().endsWith('/finalize'));
     await page.locator('#btn-finalize-session').click();
+    const approved = await finalResponse;
+    assert.equal(approved.status(), 201, await approved.text());
     await eventually(() => page.locator('#modal-qr-img').isVisible(), 'QR not created');
+    assert.equal(await page.locator('#liveview-panel').isHidden(), true);
+    const qrFrames = frames;
     assert.equal(shutters, 1);
     if (sessionCycle) {
         const active = () => page.evaluate(async () => (await (await fetch('/custom/api/sessions/active')).json()).active_session);
         const first = await active();
+        if (beauty) assert.equal(first.current_render.beauty_mode, 'mediapipe');
         const firstQr = await page.locator('#modal-qr-url').textContent();
         const firstQrImage = await page.locator('#modal-qr-img').getAttribute('src');
         const download = async (url) => {
@@ -157,10 +204,23 @@ test(sessionCycle ? 'packaged app finishes print/QR/close and starts a clean sec
             assert.equal(response.status, 200, 'Closed session QR must still download');
             return createHash('sha256').update(Buffer.from(await response.arrayBuffer())).digest('hex');
         };
+        const guestHtml = async (url) => {
+            const response = await fetch('http://127.0.0.1:' + guestPort + new URL(url).pathname);
+            assert.equal(response.status, 200);
+            return response.text();
+        };
         assert.equal(await download(firstQr), first.current_final.sha256);
+        assert.ok((await guestHtml(firstQr)).includes(firstEvent.logo_url));
+        await page.locator('#print-plus').click();
+        await page.locator('#print-plus').click();
         await page.locator('#btn-open-print-modal').click();
+        assert.equal(await page.locator('#modal-print-title').textContent(), 'Xác nhận in 3 bản');
+        assert.equal(await page.locator('#liveview-panel').isHidden(), true);
         await page.locator('#btn-confirm-print-submit').click();
         await eventually(() => page.locator('#session-prints-list').textContent().then((text) => text.includes('COMPLETED')), 'First simulated print did not complete');
+        assert.equal(frames, qrFrames, 'QR or printing restarted live view');
+        assert.ok((await page.locator('#print-quota').textContent()).includes('Đã in 3/5'));
+        assert.equal((await active()).print_quota.remaining, 2);
         await page.locator('#btn-close-session').click();
         await eventually(() => page.locator('#btn-new-session').isVisible(), 'Cannot create a session after finishing');
         assert.equal(await active(), null);
@@ -169,6 +229,11 @@ test(sessionCycle ? 'packaged app finishes print/QR/close and starts a clean sec
         const beforeNew = frames;
         await eventually(() => frames >= beforeNew + 3, 'Live view stopped between sessions');
         assert.equal(await download(firstQr), first.current_final.sha256);
+        const nextEvent = await settingsSave('Sinh nhật Bé Na', 'birthday', 'frame-2.jpg', true);
+        assert.notEqual(nextEvent.id, firstEvent.id);
+        assert.equal(nextEvent.quota.printed, 0);
+        const oldHtml = await guestHtml(firstQr);
+        assert.ok(oldHtml.includes(firstEvent.logo_url) && oldHtml.includes('Minh và Lan'));
         await page.locator('#btn-new-session').click();
         await eventually(() => page.locator('[data-step="1"]').getAttribute('aria-current').then(Boolean), 'New session did not return to layout selection');
         const second = await active();
@@ -197,9 +262,9 @@ test(sessionCycle ? 'packaged app finishes print/QR/close and starts a clean sec
         assert.notEqual(captured.slots[0].photo.id, first.slots[0].photo.id);
         await page.locator('#btn-next').click();
         await page.locator('[data-lut-id=original]').click();
-        await page.locator('[data-beauty-preset=off]').click();
+        await page.locator(beauty ? '[data-beauty-preset=natural]' : '[data-beauty-preset=off]').click();
         await page.locator('#btn-next').click();
-        await page.locator('[data-template-id=minimal-single]').click();
+        await page.locator('[data-template-id=birthday-gala-single]').click();
         await page.locator('#btn-next').click();
         await eventually(() => page.locator('#btn-finalize-session').isEnabled(), 'Second review did not load');
         assert.equal(await page.locator('#modal-qr-img').isVisible(), false, 'Old QR appeared before approving the second session');
@@ -211,13 +276,16 @@ test(sessionCycle ? 'packaged app finishes print/QR/close and starts a clean sec
         await page.locator('#btn-confirm-print-submit').click();
         await eventually(() => page.locator('#session-prints-list').textContent().then((text) => text.includes('COMPLETED')), 'Second simulated print did not complete');
         const finishedSecond = await active();
-        assert.equal(await download(await page.locator('#modal-qr-url').textContent()), finishedSecond.current_final.sha256);
+        const secondQr = await page.locator('#modal-qr-url').textContent();
+        assert.equal(await download(secondQr), finishedSecond.current_final.sha256);
+        const nextHtml = await guestHtml(secondQr);
+        assert.ok(nextHtml.includes(nextEvent.logo_url) && nextHtml.includes('Sinh nhật Bé Na'));
         await page.locator('#btn-close-session').click();
         await eventually(() => page.locator('#btn-new-session').isVisible(), 'Second session could not close');
         assert.equal(await active(), null);
         assert.equal(await download(firstQr), first.current_final.sha256);
         assert.equal(shutters, 2, 'Two sessions should have exactly two captures');
-        console.log('Verified two complete sessions: capture, style, approve, QR download, simulated print, close; clean defaults and moving live view between sessions.');
+        console.log('Verified two events with personalized frames, QR branding snapshots, multi-copy mock printing and live view.');
     }
     assert.deepEqual(errors, []);
     console.log(`Verified ${real ? 'REAL R10' : 'simulated DCC'} moving frames during 3-2-1; ${frames} frames, ${shutters} shutter. Screenshot: ${base}`);

@@ -1,0 +1,47 @@
+{
+    "id": "party-grid-four",
+    "name": "Party",
+    "style": "party",
+    "version": "1.1.0",
+    "layout_id": "grid-four",
+    "layout_version": "1.0.0",
+    "overlay": "overlay.png",
+    "background": "background.png",
+    "preview": "preview.jpg",
+    "license": "Original project artwork; MIT",
+    "hashes": {
+        "overlay.png": "177fca71da951317a9ef6e71bd1067b7802e0cb97d9661d4d73d7705b403639a",
+        "background.png": "b8e12bd7efa067b3f065a5053cfe76de0287db1878b16513dc8799043a0983ba",
+        "preview.jpg": "480c7e5d82d0932fbb74862bff5f6a60b99b1159ad8b1a388499a858d8e93828"
+    },
+    "category": "other",
+    "text_slots": {
+        "name": {
+            "x": 115,
+            "y": 2,
+            "width": 950,
+            "height": 30,
+            "size": 28,
+            "min_size": 16,
+            "color": "#282536"
+        },
+        "date": {
+            "x": 115,
+            "y": 1716,
+            "width": 174,
+            "height": 30,
+            "size": 21,
+            "min_size": 17,
+            "color": "#282536"
+        },
+        "wish": {
+            "x": 305,
+            "y": 1716,
+            "width": 760,
+            "height": 30,
+            "size": 23,
+            "min_size": 16,
+            "color": "#282536"
+        }
+    }
+}

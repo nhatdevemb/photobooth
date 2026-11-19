@@ -82,9 +82,32 @@ final class TemplateCatalog
         return $result;
     }
 
+    public function eventTemplates(string $category, bool $personalized, ?string $layoutId = null): array
+    {
+        $items = [];
+        foreach ($this->templates($layoutId) as $item) {
+            if ((!$personalized && isset($item['text_slots'])) || ($category !== 'all' && $item['category'] !== $category)) {
+                continue;
+            }
+            $previous = $items[$item['id']] ?? null;
+            $preferred = isset($item['text_slots']) === $personalized;
+            if ($previous === null || ($preferred && isset($previous['text_slots']) !== $personalized)
+                || ($preferred === (isset($previous['text_slots']) === $personalized)
+                    && version_compare($item['version'], $previous['version'], '>'))) {
+                $items[$item['id']] = $item;
+            }
+        }
+        return array_values($items);
+    }
+
     private function publicItem(array $item): array
     {
         unset($item['_directory']);
+        $item['category'] = $item['category'] ?? match (true) {
+            str_starts_with($item['id'], 'wedding-') => 'wedding',
+            str_starts_with($item['id'], 'birthday-') => 'birthday',
+            default => 'other',
+        };
         $base = '/custom/api/catalog/templates/' . $item['id'] . '/' . $item['version'] . '/';
         $item['preview_url'] = $base . 'preview.jpg';
         $item['overlay_url'] = $base . 'overlay.png';
@@ -145,6 +168,9 @@ final class TemplateCatalog
         $layout['overlay_path'] = $item['_directory'] . '/overlay.png';
         $layout['background_path'] = isset($item['background']) ? $item['_directory'] . '/background.png' : null;
         $layout['resource_hashes'] = $item['hashes'];
+        if (isset($item['text_slots'])) {
+            $layout['text_slots'] = $item['text_slots'];
+        }
         return $layout;
     }
 

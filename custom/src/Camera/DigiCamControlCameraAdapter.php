@@ -54,7 +54,7 @@ final class DigiCamControlCameraAdapter implements CameraAdapterInterface
 
     public function stopPreview(): void
     {
-        $lock = $this->lock();
+        $lock = $this->lock(waitSeconds: 2.5);
         try {
             @unlink($this->config->dataDir . '/dcc/preview-enabled');
             $this->client->preview(false, $this->client->selectCamera());

@@ -1,0 +1,47 @@
+{
+    "id": "vertical-three-v1",
+    "name": "Tối giản",
+    "style": "minimal",
+    "version": "1.1.0",
+    "layout_id": "postcard-three",
+    "layout_version": "1.0.0",
+    "overlay": "overlay.png",
+    "background": "background.png",
+    "preview": "preview.jpg",
+    "license": "Original project artwork; MIT",
+    "hashes": {
+        "overlay.png": "f8ebe7579772d65463a13b90ccdee37c6cbea23490b7d5f3892f00508af035eb",
+        "background.png": "8f81dc984b212224fdb4700a5c001c9d31d569979c5581f8d935356402582056",
+        "preview.jpg": "2c43119839e158f9ccb3ed81d27cda7a7efee965dc838e44814200340cc6c12a"
+    },
+    "category": "other",
+    "text_slots": {
+        "name": {
+            "x": 115,
+            "y": 2,
+            "width": 950,
+            "height": 30,
+            "size": 28,
+            "min_size": 16,
+            "color": "#282536"
+        },
+        "date": {
+            "x": 115,
+            "y": 1716,
+            "width": 174,
+            "height": 30,
+            "size": 21,
+            "min_size": 17,
+            "color": "#282536"
+        },
+        "wish": {
+            "x": 305,
+            "y": 1716,
+            "width": 760,
+            "height": 30,
+            "size": 23,
+            "min_size": 16,
+            "color": "#282536"
+        }
+    }
+}

@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace Photobooth\Operator\Session;
 
 use PDO;
+use Photobooth\Operator\Event\EventSettings;
+use Photobooth\Operator\Image\BeautyService;
 use Photobooth\Operator\Catalog\TemplateCatalog;
 use Photobooth\Operator\Catalog\LutCatalog;
 use Photobooth\Operator\Camera\BrowserCameraAdapter;
@@ -94,16 +96,16 @@ final class SessionService
                 );
             }
 
-            try {
-                $defaultTemplate = $this->catalog->resolve($this->config->defaultTemplate, null, true);
-            } catch (ApiException $e) {
-                $available = $this->catalog->templates('postcard-three');
-                $available = $available !== [] ? $available : $this->catalog->templates();
-                if ($available === []) {
-                    throw $e;
-                }
-                $defaultTemplate = $available[0];
+            $event = EventSettings::current($pdo);
+            $eventConfig = EventSettings::snapshot($event['configuration']);
+            $eventConfig['qr_ttl_hours'] ??= $this->config->shareTtlHours;
+            $available = $this->catalog->eventTemplates($eventConfig['category'], EventSettings::hasFrameText($eventConfig['frame']));
+            if ($available === []) {
+                throw new ApiException('NO_EVENT_TEMPLATES', 'Chủ đề sự kiện chưa có template đang hoạt động.', 422);
             }
+            $byId = array_column($available, null, 'id');
+            $defaultTemplate = $byId[$this->config->defaultTemplate]
+                ?? (array_values(array_filter($available, static fn ($item) => $item['layout_id'] === 'postcard-three'))[0] ?? $available[0]);
             $defaultLayout = $this->catalog->layout($defaultTemplate['layout_id'], $defaultTemplate['layout_version']);
             try {
                 $defaultLut = $this->luts->resolve($this->config->defaultLut, null, true);
@@ -118,10 +120,12 @@ final class SessionService
 
             $pdo->prepare(
                 'INSERT INTO sessions
-                 (id, state, pre_job_state, revision, selected_lut, template_id, created_by, created_at, updated_at, layout_id, layout_version, template_version, capture_count, lut_version, lut_intensity, lut_sha256, beauty_preset, beauty_smooth, beauty_brighten, beauty_tone)
-                 VALUES (:id, :state, NULL, 1, :lut, :tpl, :uid, :now, :now, :layout, :lv, :tv, :count, :lutv, :luti, :luts, :bpreset, :bsmooth, :bbrighten, :btone)'
+                 (id, state, pre_job_state, revision, selected_lut, template_id, created_by, created_at, updated_at, layout_id, layout_version, template_version, capture_count, lut_version, lut_intensity, lut_sha256, beauty_preset, beauty_smooth, beauty_brighten, beauty_tone, event_id, event_configuration)
+                 VALUES (:id, :state, NULL, 1, :lut, :tpl, :uid, :now, :now, :layout, :lv, :tv, :count, :lutv, :luti, :luts, :bpreset, :bsmooth, :bbrighten, :btone, :event, :event_config)'
             )->execute([
                 ':id' => $sessionId,
+                ':event' => $event['id'],
+                ':event_config' => json_encode($eventConfig, JSON_THROW_ON_ERROR),
                 ':state' => 'NEW',
                 ':lut' => $defaultLut['id'],
                 ':lutv' => $defaultLut['version'],
@@ -231,16 +235,26 @@ final class SessionService
             if (isset($payload['lut_intensity']) && $payload['lut_intensity'] !== $lutInfo['intensity']) {
                 throw new ApiException('INVALID_INPUT', 'Cường độ filter do Admin quản lý.', 422);
             }
+            $event = EventSettings::snapshot($session['event_configuration']);
+            $personalized = EventSettings::hasFrameText($event['frame']);
             $fallback = false;
             if (isset($payload['template_id'])) {
                 if ($payload['template_id'] === $session['template_id'] && (!isset($payload['template_version']) || $payload['template_version'] === $session['template_version'])) {
                     $template = $this->catalog->resolve($session['template_id'], $session['template_version']);
                 } else {
-                    $template = $this->catalog->resolve($payload['template_id'], $payload['template_version'] ?? null, true);
+                    $choices = array_column($this->catalog->eventTemplates($event['category'], $personalized, $layoutId), null, 'id');
+                    $version = $payload['template_version'] ?? ($choices[$payload['template_id']]['version'] ?? null);
+                    $template = $this->catalog->resolve($payload['template_id'], $version, true);
+                    if ($event['category'] !== 'all' && $template['category'] !== $event['category']) {
+                        throw new ApiException('TEMPLATE_CATEGORY_MISMATCH', 'Template không thuộc chủ đề sự kiện.', 422);
+                    }
+                    if ($personalized && isset($choices[$template['id']]['text_slots']) && !isset($template['text_slots'])) {
+                        throw new ApiException('INVALID_TEMPLATE', 'Hãy chọn phiên bản template hỗ trợ chữ sự kiện.', 422);
+                    }
                 }
             } elseif ($layoutId !== $session['layout_id']) {
                 $previous = $this->catalog->resolve($session['template_id'], $session['template_version']);
-                $choices = $this->catalog->templates($layoutId);
+                $choices = $this->catalog->eventTemplates($event['category'], $personalized, $layoutId);
                 $template = null;
                 foreach ($choices as $candidate) {
                     if ($candidate['style'] === $previous['style']) {
@@ -653,7 +667,8 @@ final class SessionService
         int $expectedRevision,
         string $lutId,
         string $templateId,
-        string $idempotencyKey
+        string $idempotencyKey,
+        bool $retryLkMagic = false
     ): array
     {
         if (!Uuid::isValid($sessionId)) {
@@ -665,6 +680,7 @@ final class SessionService
             'session_id' => $sessionId,
             'lut_id' => $lutId,
             'template_id' => $templateId,
+            ...($retryLkMagic ? ['retry_lkmagic' => true] : []),
         ]);
 
         $replay = IdempotencyService::checkReplay(
@@ -688,7 +704,8 @@ final class SessionService
             $lutId,
             $templateId,
             $idemKey,
-            $payloadHash
+            $payloadHash,
+            $retryLkMagic
         ): array {
             $replayTx = IdempotencyService::checkReplay($pdo, $actorId, 'session.render', $idemKey, $payloadHash);
             if ($replayTx !== null) {
@@ -702,7 +719,10 @@ final class SessionService
             if ($lutId !== $session['selected_lut'] || $templateId !== $session['template_id']) {
                 throw new ApiException('CONFIGURATION_LOCKED', 'Không thể đổi filter hoặc template sau khi bắt đầu chụp.', 409);
             }
-            $renderTemplate = $this->catalog->renderSnapshot($session['template_id'], $session['template_version']);
+            if ($retryLkMagic && ($this->config->beautyEngine === 'mediapipe' || $session['beauty_preset'] === 'off')) {
+                throw new ApiException('INVALID_BEAUTY_CONFIG', 'Phiên này không dùng LK Magic.', 422);
+            }
+            $renderTemplate = $this->renderTemplate($session);
             $state = (string) $session['state'];
             if (!in_array($state, ['CAPTURED', 'REVIEW'], true)) {
                 if ($state === 'NEW') {
@@ -767,6 +787,7 @@ final class SessionService
             $nowIso = Clock::nowIso();
 
             $jobPayload = [
+                'retry_lkmagic' => $retryLkMagic,
                 'lut_id' => $lutId,
                 'lut_version' => (string) ($presetInfo['version'] ?? '1.0.0'),
                 'lut_file' => $presetInfo['file'] ?? null,
@@ -965,7 +986,7 @@ final class SessionService
             if (isset($renderPayload['lut_snapshot']) && $renderPayload['lut_snapshot'] != ['id'=>$pinnedLut['id'], 'version'=>$pinnedLut['version'], 'sha256'=>$pinnedLut['sha256'], 'intensity'=>$pinnedLut['intensity']]) {
                 throw new ApiException('INVALID_STATE', 'Filter hoặc cường độ không khớp snapshot render.', 422);
             }
-            if (isset($renderPayload['template']) && $renderPayload['template'] != $this->catalog->renderSnapshot($session['template_id'], $session['template_version'])) {
+            if (isset($renderPayload['template']) && $renderPayload['template'] != $this->renderTemplate($session)) {
                 throw new ApiException('INVALID_STATE', 'Tài nguyên bố cục không khớp snapshot render.', 422);
             }
 
@@ -1463,7 +1484,7 @@ final class SessionService
 
             $nowUnix = Clock::nowUnix();
             $nowIso = Clock::fromUnixIso($nowUnix);
-            $ttlExpiresUnix = $nowUnix + ($this->config->shareTtlHours * 3600);
+            $ttlExpiresUnix = $nowUnix + ((EventSettings::snapshot($session['event_configuration'])['qr_ttl_hours'] ?? $this->config->shareTtlHours) * 3600);
 
             if ($session['expires_at'] !== null) {
                 $sessionExpiresUnix = Clock::toUnix((string) $session['expires_at']);
@@ -1767,7 +1788,19 @@ final class SessionService
             throw new ApiException('NOT_FOUND', 'Không tìm thấy tác vụ.', 404);
         }
 
+        $beautyProgress = null;
+        if ($row['type'] === 'render' && in_array($row['status'], ['QUEUED', 'RUNNING'], true)) {
+            $snapshot = json_decode((string) $row['payload'], true) ?: [];
+            $path = $this->config->dataDir . '/beauty/sessions/' . $row['session_id'] . '/progress.json';
+            if (isset($snapshot['beauty_config'], $snapshot['photos']) && is_file($path)) {
+                $progress = json_decode((string) @file_get_contents($path), true);
+                if (($progress['key'] ?? null) === BeautyService::progressKey($snapshot)) {
+                    $beautyProgress = ['done' => $progress['done'], 'total' => $progress['total']];
+                }
+            }
+        }
         return [
+            'beauty_progress' => $beautyProgress,
             'id' => (string) $row['id'],
             'session_id' => (string) $row['session_id'],
             'type' => (string) $row['type'],
@@ -1855,6 +1888,15 @@ final class SessionService
     /**
      * @return array<string, mixed>
      */
+    private function renderTemplate(array $session): array
+    {
+        $template = $this->catalog->renderSnapshot($session['template_id'], $session['template_version']);
+        if (isset($template['text_slots'])) {
+            $template['frame_text'] = EventSettings::snapshot($session['event_configuration'])['frame'];
+        }
+        return $template;
+    }
+
     private function buildSessionView(PDO $pdo, string $sessionId): array
     {
         $stmt = $pdo->prepare('SELECT * FROM sessions WHERE id = :id AND deleted_at IS NULL');
@@ -1924,6 +1966,7 @@ final class SessionService
                     'preview_url' => '/custom/api/assets/' . $rid . '?variant=preview',
                     'print_url' => '/custom/api/assets/' . $rid . '?variant=print',
                     'created_at' => (string) $rRow['created_at'],
+                    'beauty_mode' => BeautyService::renderMode($renderResult),
                     'beauty_warnings' => array_values(array_filter($renderResult['beauty_audit'] ?? [], static fn (array $item): bool => ($item['status'] ?? '') === 'error_fallback')),
                 ];
             }
@@ -1989,6 +2032,7 @@ final class SessionService
                 'id' => (string) $pRow['id'],
                 'final_asset_id' => (string) $pRow['final_asset_id'],
                 'copies' => (int) $pRow['copies'],
+                'completed_copies' => $st === 'COMPLETED' ? (int) ($pRow['completed_copies'] ?? $pRow['copies']) : 0,
                 'action' => (string) $pRow['action'],
                 'status' => $st,
                 'adapter_job_id' => $pRow['adapter_job_id'],
@@ -2048,6 +2092,8 @@ final class SessionService
             'layout_version' => (string) $session['layout_version'],
             'capture_count' => (int) $session['capture_count'],
             'configuration_locked' => (bool) $session['configuration_locked'],
+            'event' => array_intersect_key(EventSettings::snapshot($session['event_configuration']), array_flip(['name', 'category', 'frame', 'color'])),
+            'print_quota' => EventSettings::quota($pdo, $session['event_id'], $this->config->printerAdapter),
             'ui_step' => in_array($session['state'], ['RENDERING','FINALIZED','CLOSED'], true) ? 5 : (int) $session['ui_step'],
             'slots' => $slots,
             'current_render' => $currentRender,

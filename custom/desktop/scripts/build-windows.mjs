@@ -25,4 +25,8 @@ if (process.platform === 'win32') {
         return this.parseDependenciesTree(stdout);
     };
 }
-await build({ targets: Platform.WINDOWS.createTarget(['nsis'], Arch.x64) });
+const output = process.env.PB_BUILD_OUTPUT;
+await build({
+    targets: Platform.WINDOWS.createTarget(['nsis'], Arch.x64),
+    ...(output ? { config: { directories: { output } } } : {}),
+});

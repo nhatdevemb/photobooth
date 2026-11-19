@@ -1,6 +1,6 @@
 import { app, BrowserWindow, ipcMain, dialog, Menu } from 'electron';
 import { spawn } from 'node:child_process';
-import { readFile, writeFile, mkdir, access } from 'node:fs/promises';
+import { readFile, writeFile, mkdir, access, stat } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import os from 'node:os';
@@ -19,7 +19,12 @@ if (process.env.PB_DESKTOP_DATA_DIR) {
     app.setPath('crashDumps', path.join(path.dirname(data), 'electron-crashes'));
 }
 const setupUrl = pathToFileURL(path.join(directory, 'setup.html')).href;
-const lkmagicPort = Number(process.env.LK_PHOTOBOOTH_PORT || 5520);
+const lkmagicUrl = new URL(process.env.LKMAGIC_BRIDGE_URL || ('http://127.0.0.1:' + (process.env.LK_PHOTOBOOTH_PORT || 5520)));
+if (lkmagicUrl.protocol !== 'http:' || !['127.0.0.1', '[::1]', 'localhost'].includes(lkmagicUrl.hostname)
+    || lkmagicUrl.username || lkmagicUrl.password || lkmagicUrl.pathname !== '/' || lkmagicUrl.search || lkmagicUrl.hash) {
+    throw new Error('LKMAGIC_BRIDGE_URL phải trỏ đến bridge HTTP trên máy.');
+}
+const lkmagicPort = lkmagicUrl.port || '80';
 let window, supervisor, ownedDcc, ownedLkMagic = false, stopping = false, ready = false;
 
 if (!app.requestSingleInstanceLock()) app.quit();
@@ -45,14 +50,18 @@ async function resolveRuntime() {
     }
     return path.join(resources, 'runtime');
 }
-async function findLkMagicExecutable() {
+async function findLkMagicExecutable(configured = '') {
     const candidates = [
+        configured,
         process.env.LKMAGIC_EXECUTABLE,
+        path.resolve(project, 'LK Magic-WIN', 'LK magic.exe'),
         path.resolve(project, '..', 'LK Magic-WIN', 'LK magic.exe'),
+        path.join(path.dirname(app.getPath('exe')), 'LK Magic-WIN', 'LK magic.exe'),
         path.join(app.getPath('appData'), '..', 'Local', 'Programs', 'LK magic', 'LK magic.exe'),
     ].filter(Boolean);
     for (const candidate of candidates) {
-        if (await exists(candidate)) return candidate;
+        if (path.isAbsolute(candidate) && path.basename(candidate).toLowerCase() === 'lk magic.exe'
+            && await stat(candidate).then((info) => info.isFile()).catch(() => false)) return candidate;
     }
     return '';
 }
@@ -95,7 +104,7 @@ ipcMain.handle('setup:info', async (event) => {
     assertSetup(event);
     const ips = Object.values(os.networkInterfaces()).flat().filter((nic) => nic && !nic.internal && nic.family === 'IPv4').map((nic) => nic.address);
     const executable = 'C:\\Program Files (x86)\\digiCamControl\\CameraControl.exe';
-    return { saved: await loadSettings(), ips, dccExecutable: await exists(executable) ? executable : '', data, packaged: app.isPackaged };
+    return { saved: await loadSettings(), ips, lkMagicExecutable: await findLkMagicExecutable(), dccExecutable: await exists(executable) ? executable : '', data, packaged: app.isPackaged };
 });
 
 ipcMain.handle('setup:launch', async (event, input) => {
@@ -119,9 +128,15 @@ ipcMain.handle('setup:launch', async (event, input) => {
             }
         }
         if (process.env.PB_DESKTOP_TEST !== '1' && process.env.LKMAGIC_AUTO_START !== '0') {
-            const lkRunning = await fetch(`http://127.0.0.1:${lkmagicPort}/api/v1/health`, { signal: AbortSignal.timeout(1000) }).then((r) => r.ok).catch(() => false);
+            const lkRunning = await fetch(new URL('/api/v1/health', lkmagicUrl), { signal: AbortSignal.timeout(1000) })
+                .then((response) => response.ok ? response.json() : null)
+                .then((health) => health?.ok === true && typeof health.ready === 'boolean')
+                .catch(() => false);
             if (!lkRunning) {
-                const lkExe = await findLkMagicExecutable();
+                const lkExe = await findLkMagicExecutable(settings.lkMagicExecutable);
+                if (settings.lkMagicExecutable && lkExe !== settings.lkMagicExecutable) {
+                    throw new Error('Chọn đường dẫn đến LK magic.exe hoặc để trống.');
+                }
                 if (lkExe) {
                     const lkProc = spawn(lkExe, [], {
                         cwd: path.dirname(lkExe),
@@ -138,13 +153,13 @@ ipcMain.handle('setup:launch', async (event, input) => {
         let secret;
         if (await exists(secretFile)) secret = JSON.parse(await readFile(secretFile, 'utf8')).signingKey;
         else { secret = randomBytes(32).toString('hex'); await writeFile(secretFile, JSON.stringify({ signingKey: secret }), { mode: 0o600, flag: 'wx' }); }
-        const env = { ...process.env, DATA_DIR: data.replaceAll('\\', '/'), DATABASE_PATH: path.join(data, 'db/photobooth.sqlite').replaceAll('\\', '/'), PYTHON_BIN: python, MPLCONFIGDIR: path.join(data, 'cache/matplotlib'), CAMERA_ADAPTER: settings.cameraMode, PRINTER_ADAPTER: 'mock', DCC_BASE_URL: `http://127.0.0.1:${settings.dccPort}`, DCC_CAMERA_ID: settings.cameraId, SHARE_BASE_URL: `http://${settings.lanIp}:${settings.guestPort}`, SHARE_SIGNING_KEY: secret, TRUSTED_HOSTS: `127.0.0.1,localhost,${settings.lanIp}`, APP_ENV: 'production', APP_VERSION: app.getVersion(), OPERATOR_BIND: `127.0.0.1:${settings.operatorPort}`, GUEST_BIND: `0.0.0.0:${settings.guestPort}` };
+        const env = { ...process.env, LKMAGIC_BRIDGE_URL: lkmagicUrl.origin, LKMAGIC_AUTO_START: '0', DATA_DIR: data.replaceAll('\\', '/'), DATABASE_PATH: path.join(data, 'db/photobooth.sqlite').replaceAll('\\', '/'), PYTHON_BIN: python, MPLCONFIGDIR: path.join(data, 'cache/matplotlib'), CAMERA_ADAPTER: settings.cameraMode, PRINTER_ADAPTER: 'mock', DCC_BASE_URL: `http://127.0.0.1:${settings.dccPort}`, DCC_CAMERA_ID: settings.cameraId, SHARE_BASE_URL: `http://${settings.lanIp}:${settings.guestPort}`, SHARE_SIGNING_KEY: secret, TRUSTED_HOSTS: `127.0.0.1,localhost,${settings.lanIp}`, APP_ENV: 'production', APP_VERSION: app.getVersion(), OPERATOR_BIND: `127.0.0.1:${settings.operatorPort}`, GUEST_BIND: `0.0.0.0:${settings.guestPort}` };
         window.operatorPort = settings.operatorPort;
         await new Promise((resolve, reject) => {
             const supervisorScript = app.isPackaged ? path.join(resources, 'app.asar.unpacked', 'supervisor.py') : path.join(directory, 'supervisor.py');
             const child = spawn(python, [supervisorScript], { windowsHide: true, stdio: ['pipe', 'pipe', 'pipe'], env });
             supervisor = child;
-            let buffer = '', errors = '';
+            let buffer = '', errors = '', runtimeError = '';
             const timeout = setTimeout(() => { child.stdin.end(); reject(new Error('Khởi động quá 60 giây. Xem logs/desktop-runtime.log.')); }, 60000);
             child.stderr.on('data', (bytes) => { errors = (errors + bytes.toString()).slice(-3000); });
             child.on('error', (error) => { clearTimeout(timeout); reject(error); });
@@ -157,14 +172,26 @@ ipcMain.handle('setup:launch', async (event, input) => {
                         const message = JSON.parse(line);
                         window.webContents.send('setup:status', message.message || message.status);
                         if (message.status === 'ready') { clearTimeout(timeout); resolve(); }
-                        if (message.status === 'error') { clearTimeout(timeout); reject(new Error(message.message)); }
+                        if (message.status === 'error') {
+                            runtimeError = message.message || '';
+                            clearTimeout(timeout);
+                            reject(new Error(runtimeError));
+                        }
                     } catch (error) { if (error instanceof SyntaxError) continue; reject(error); }
                 }
             });
-            child.on('exit', (code) => {
-                clearTimeout(timeout); supervisor = null;
-                if (!ready) reject(new Error(errors || `Dịch vụ kết thúc (${code}). Xem logs/desktop-runtime.log.`));
-                else if (!stopping) { ready = false; window.loadURL(setupUrl); dialog.showErrorBox('Dịch vụ đã dừng', 'Không tự chụp lại. Kiểm tra cấu hình và khởi động lại để phục hồi phiên.'); }
+            child.on('close', (code) => {
+                clearTimeout(timeout);
+                if (supervisor !== child) return;
+                supervisor = null;
+                const reason = runtimeError || 'Tiến trình giám sát kết thúc (mã thoát ' + code + ').';
+                if (!ready) {
+                    reject(new Error(runtimeError || errors || reason));
+                } else if (!stopping) {
+                    ready = false;
+                    window.loadURL(setupUrl);
+                    dialog.showErrorBox('Dịch vụ đã dừng', reason + '\nXem logs/desktop-runtime.log và khởi động lại để phục hồi phiên.');
+                }
             });
             child.stdin.write(JSON.stringify({ project, runtime, data, settings, account: { username: settings.username, password: settings.password } }) + '\n');
         });
@@ -180,7 +207,7 @@ async function stopRuntime() {
     const child = supervisor;
     if (ownedLkMagic) {
         ownedLkMagic = false;
-        await fetch(`http://127.0.0.1:${lkmagicPort}/api/v1/shutdown`, { method: 'POST', signal: AbortSignal.timeout(2000) }).catch(() => {});
+        await fetch(new URL('/api/v1/shutdown', lkmagicUrl), { method: 'POST', signal: AbortSignal.timeout(2000) }).catch(() => {});
     }
     if (!child) { if (ownedDcc) { ownedDcc.kill(); ownedDcc = null; } return; }
     await new Promise((resolve) => {

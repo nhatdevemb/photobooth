@@ -1,0 +1,47 @@
+{
+    "id": "cute-postcard-three",
+    "name": "Cute",
+    "style": "cute",
+    "version": "1.1.0",
+    "layout_id": "postcard-three",
+    "layout_version": "1.0.0",
+    "overlay": "overlay.png",
+    "background": "background.png",
+    "preview": "preview.jpg",
+    "license": "Original project artwork; MIT",
+    "hashes": {
+        "overlay.png": "fbf6f29fa7dcf001dabd5bdc032474522ee14524d193749d456344ff67e7cda7",
+        "background.png": "4b88c17a7b1dc49d8a07459fb235885d701fb14530f967664990c8847b18af5c",
+        "preview.jpg": "cc6fc94adc779b0d8c2f892ed7562236bda2437594cc3aba556313bf648c3b99"
+    },
+    "category": "other",
+    "text_slots": {
+        "name": {
+            "x": 115,
+            "y": 2,
+            "width": 950,
+            "height": 30,
+            "size": 28,
+            "min_size": 16,
+            "color": "#282536"
+        },
+        "date": {
+            "x": 115,
+            "y": 1716,
+            "width": 174,
+            "height": 30,
+            "size": 21,
+            "min_size": 17,
+            "color": "#282536"
+        },
+        "wish": {
+            "x": 305,
+            "y": 1716,
+            "width": 760,
+            "height": 30,
+            "size": 23,
+            "min_size": 16,
+            "color": "#282536"
+        }
+    }
+}

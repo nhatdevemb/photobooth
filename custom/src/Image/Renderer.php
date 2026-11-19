@@ -87,7 +87,8 @@ final class Renderer
         $scriptPath = $this->config->customRoot . '/python/render_pipeline.py';
         $cmd = [$this->config->pythonBin, $scriptPath, $manifestPath];
 
-        $result = $this->runPythonCommand($cmd, $this->config->renderTimeoutSeconds, $jobId);
+        $run = fn () => $this->runPythonCommand($cmd, $this->config->renderTimeoutSeconds, $jobId);
+        $result = isset($manifestData['beauty_cache_dir']) ? $this->withBeautyLock($run) : $run();
         if (($result['status'] ?? '') !== 'ok') {
             $code = (string) ($result['code'] ?? 'RENDER_FAILED');
             $msg = match ($code) {
@@ -96,12 +97,82 @@ final class Renderer
                 'CORRUPT_JPEG', 'INVALID_JPEG' => 'Ảnh nguồn bị hỏng định dạng JPEG.',
                 'MISSING_PHOTOS', 'MISSING_PHOTO_FILE' => 'Thiếu tệp ảnh nguồn cho một hoặc nhiều slot.',
                 'SOURCE_HASH_MISMATCH' => 'Mã kiểm tra SHA-256 của ảnh gốc không khớp.',
+                'LK_MAGIC_RETOUCH_FAILED' => 'LK Magic xử lý thất bại. Bạn có thể dựng lại với chế độ Beauty tự động.',
                 default => 'Xử lý ảnh và ghép khung thất bại.',
             };
             throw new ApiException($code, $msg, 422);
         }
 
         return $result;
+    }
+
+    public function withBeautyLock(callable $operation, bool $blocking = true): mixed
+    {
+        $dir = $this->config->dataDir . '/beauty';
+        if (!is_dir($dir)) {
+            @mkdir($dir, 0750, true);
+        }
+        $lock = fopen($dir . '/processing.lock', 'c');
+        if ($lock === false) {
+            throw new ApiException('BEAUTY_STORAGE', 'Không mở được vùng xử lý Beauty.', 500);
+        }
+        try {
+            if (!flock($lock, LOCK_EX | ($blocking ? 0 : LOCK_NB))) {
+                if ($blocking) {
+                    throw new ApiException('BEAUTY_STORAGE', 'Không khóa được vùng xử lý Beauty.', 500);
+                }
+                return null;
+            }
+            return $operation();
+        } finally {
+            fclose($lock);
+        }
+    }
+
+    public function runBeautyTask(array $manifestData): array
+    {
+        $dir = $this->config->dataDir . '/beauty';
+        $file = tempnam($dir, 'manifest-');
+        if ($file === false) {
+            throw new ApiException('BEAUTY_STORAGE', 'Không tạo được tệp xử lý Beauty.', 500);
+        }
+        try {
+            $manifestData['max_jpeg_bytes'] = $this->config->maxJpegBytes;
+            $manifestData['max_image_pixels'] = $this->config->maxImagePixels;
+            if (file_put_contents($file, json_encode($manifestData, JSON_THROW_ON_ERROR)) === false) {
+                throw new ApiException('BEAUTY_STORAGE', 'Không ghi được tệp xử lý Beauty.', 500);
+            }
+            return $this->runPythonCommand(
+                [$this->config->pythonBin, $this->config->customRoot . '/python/render_pipeline.py', $file],
+                $this->config->renderTimeoutSeconds
+            );
+        } finally {
+            @unlink($file);
+        }
+    }
+
+    public function frameText(array $fields, array $slots, bool $preview = false): array
+    {
+        $file = tempnam($this->config->dataDir, 'frame-');
+        if ($file === false) {
+            throw new ApiException('STORAGE_ERROR', 'Không tạo được tệp xem trước frame.', 500);
+        }
+        try {
+            $input = json_encode(['fields' => $fields, 'slots' => $slots, 'preview' => $preview], JSON_THROW_ON_ERROR);
+            if (file_put_contents($file, $input) === false) {
+                throw new ApiException('STORAGE_ERROR', 'Không ghi được tệp xem trước frame.', 500);
+            }
+            $result = $this->runPythonCommand(
+                [$this->config->pythonBin, $this->config->customRoot . '/python/frame_text.py', $file],
+                $this->config->renderTimeoutSeconds
+            );
+            if (($result['status'] ?? '') !== 'ok') {
+                throw new ApiException('INVALID_FRAME_TEXT', $result['message'] ?? 'Không dựng được chữ trên frame.', 422);
+            }
+            return $result;
+        } finally {
+            @unlink($file);
+        }
     }
 
     public function previewLut(string $filePath, string $outputPath, int $intensity): array
