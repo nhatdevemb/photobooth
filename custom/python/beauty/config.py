@@ -24,6 +24,7 @@ class BeautyConfig:
     enabled: bool = True
     engine: str = "auto"        # "auto" | "lkmagic" | "mediapipe"
     lkmagic_url: str = "http://127.0.0.1:5520"
+    lkmagic_executable: Optional[str] = None
     lkmagic_timeout_sec: float = 35.0
     auto_start_lkmagic: bool = True
     face_slim: bool = False     # Strictly disabled (no face/body reshaping)
@@ -124,6 +125,7 @@ def resolve_beauty_config(
     enabled = canonical_name != "off"
     engine = os.getenv("BEAUTY_ENGINE", "auto").strip().lower() or "auto"
     lkmagic_url = os.getenv("LKMAGIC_BRIDGE_URL", "http://127.0.0.1:5520").strip() or "http://127.0.0.1:5520"
+    lkmagic_executable: Optional[str] = os.getenv("LKMAGIC_EXECUTABLE", "").strip() or None
     auto_start_lkmagic = (
         "PYTEST_CURRENT_TEST" not in os.environ
         and os.getenv("LKMAGIC_AUTO_START", "1").strip().lower() not in ("0", "false", "no", "off")
@@ -147,6 +149,8 @@ def resolve_beauty_config(
             engine = str(overrides["engine"]).strip().lower()
         if "lkmagic_url" in overrides and overrides["lkmagic_url"]:
             lkmagic_url = str(overrides["lkmagic_url"]).strip()
+        if "lkmagic_executable" in overrides:
+            lkmagic_executable = str(overrides["lkmagic_executable"]).strip() or None
         if "auto_start_lkmagic" in overrides:
             auto_start_lkmagic = bool(overrides["auto_start_lkmagic"])
 
@@ -161,6 +165,7 @@ def resolve_beauty_config(
         enabled=enabled,
         engine=engine,
         lkmagic_url=lkmagic_url,
+        lkmagic_executable=lkmagic_executable,
         auto_start_lkmagic=auto_start_lkmagic,
         face_slim=False,
     )

@@ -25,6 +25,7 @@ use Photobooth\Operator\Printer\MockPrintAdapter;
 use Photobooth\Operator\Printer\PrintAdapterInterface;
 use Photobooth\Operator\Printer\PrintService;
 use Photobooth\Operator\Session\SessionService;
+use Photobooth\Operator\Share\GuestRateLimiter;
 use Photobooth\Operator\Share\ShareService;
 use Photobooth\Operator\Storage\AssetStore;
 use Photobooth\Operator\Storage\Database;
@@ -46,6 +47,7 @@ final class Container
     public readonly CameraAdapterInterface $cameraAdapter;
     public readonly PrintAdapterInterface $printAdapter;
     public readonly ShareService $shareService;
+    public readonly GuestRateLimiter $guestRateLimiter;
     public readonly SessionService $sessionService;
     public readonly PrintService $printService;
     public readonly MaintenanceService $maintenanceService;
@@ -94,6 +96,7 @@ final class Container
 
         $this->events = new EventSettings($this->db, $this->catalog, $this->renderer, $this->printAdapter->getMode(), $this->config->shareTtlHours);
         $this->shareService = new ShareService($this->db, $this->config, $this->assetStore);
+        $this->guestRateLimiter = new GuestRateLimiter($this->config);
         $this->sessionService = new SessionService(
             $this->db,
             $this->config,
@@ -114,7 +117,8 @@ final class Container
             $this->db,
             $this->config,
             $this->assetStore,
-            $this->logger
+            $this->logger,
+            $this->guestRateLimiter
         );
         $this->healthService = new HealthService(
             $this->db,

@@ -20,6 +20,8 @@ final class LutCatalog
     private AppConfig $config;
     private Database $db;
     private Renderer $renderer;
+    /** @var ?list<array<string, mixed>> */
+    private ?array $bundledPresetsCache = null;
 
     public function __construct(AppConfig $config, Database $db, Renderer $renderer)
     {
@@ -28,8 +30,14 @@ final class LutCatalog
         $this->renderer = $renderer;
     }
 
-    private function records(): array
+    /**
+     * @return list<array<string, mixed>>
+     */
+    private function bundledRecords(): array
     {
+        if ($this->bundledPresetsCache !== null) {
+            return $this->bundledPresetsCache;
+        }
         $items = [];
         $names = ['original'=>'Gốc', 'korean-soft'=>'Hàn Quốc', 'film-400'=>'Film', 'vintage-fade'=>'Vintage'];
         foreach ($this->config->getPresetsMap() as $preset) {
@@ -41,6 +49,13 @@ final class LutCatalog
             $preset['sample_url'] = '/custom/assets/samples/' . $preset['id'] . '.jpg';
             $items[] = $preset;
         }
+        $this->bundledPresetsCache = $items;
+        return $items;
+    }
+
+    private function records(): array
+    {
+        $items = $this->bundledRecords();
         foreach ($this->db->pdo()->query('SELECT * FROM lut_catalog ORDER BY created_at,id,version')->fetchAll() as $item) {
             $item['readonly'] = false;
             $item['intensity'] = (int) $item['intensity'];
@@ -64,7 +79,12 @@ final class LutCatalog
         return array_values(array_map(fn (array $item): array => $this->present($item), array_filter($this->records(), static fn (array $item): bool => $admin || $item['status'] === 'active')));
     }
 
-    public function resolve(string $id, ?string $version = null, bool $active = false): array
+    /**
+     * Lookup LUT metadata without hashing the .cube file on disk.
+     *
+     * @return array<string, mixed>
+     */
+    private function lookupRecord(string $id, ?string $version = null, bool $active = false): array
     {
         if (!preg_match('/^[a-z0-9][a-z0-9-]{0,63}$/D', $id) || ($version !== null && !preg_match('/^\d{1,3}\.\d{1,3}\.\d{1,3}$/D', $version))) {
             throw new ApiException('INVALID_LUT', 'ID hoặc phiên bản filter không hợp lệ.', 422);
@@ -74,7 +94,12 @@ final class LutCatalog
         if ($choices === []) {
             throw new ApiException('INVALID_LUT', 'Filter không tồn tại hoặc chưa được kích hoạt.', 422);
         }
-        $item = $choices[0];
+        return $choices[0];
+    }
+
+    public function resolve(string $id, ?string $version = null, bool $active = false): array
+    {
+        $item = $this->lookupRecord($id, $version, $active);
         $path = $this->filePath($item);
         if ($path !== null && (!is_file($path) || !hash_equals($item['sha256'], hash_file('sha256', $path) ?: ''))) {
             throw new ApiException('INTEGRITY_ERROR', 'File LUT đã bị thay đổi.', 409);
@@ -84,7 +109,21 @@ final class LutCatalog
 
     public function describe(string $id, string $version): array
     {
-        return $this->present($this->resolve($id, $version));
+        return $this->present($this->lookupRecord($id, $version));
+    }
+
+    /**
+     * Build a public metadata map keyed by "id@version" with a single DB read and zero .cube disk hashes.
+     *
+     * @return array<string, array<string, mixed>>
+     */
+    public function describeMap(): array
+    {
+        $map = [];
+        foreach ($this->records() as $item) {
+            $map[$item['id'] . '@' . $item['version']] = $this->present($item);
+        }
+        return $map;
     }
 
     public function filePath(array $item): ?string

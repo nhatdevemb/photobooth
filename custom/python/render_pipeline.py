@@ -18,16 +18,20 @@ Contract (Section 7.2 & 7.3 of implementation-plan.md):
 
 from __future__ import annotations
 
+import atexit
 from dataclasses import replace
-from contextlib import suppress
+from contextlib import closing, suppress
+from functools import lru_cache
 import hashlib
 import io
 import json
 import os
+import secrets
 import sys
+import threading
 import time
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Callable, Dict, List, Optional, Tuple, Union
 
 import numpy as np
 from PIL import Image, ImageCms, ImageOps, UnidentifiedImageError
@@ -40,6 +44,7 @@ DEFAULT_MAX_JPEG_BYTES = 50 * 1024 * 1024  # 50 MiB
 DEFAULT_MAX_IMAGE_PIXELS = 60_000_000      # 60 MP
 
 Image.MAX_IMAGE_PIXELS = DEFAULT_MAX_IMAGE_PIXELS
+_PIL_LIMIT_LOCK = threading.Lock()
 
 
 class PipelineError(Exception):
@@ -73,15 +78,42 @@ def fsync_directory(dir_path: Path) -> None:
         pass
 
 
-def atomic_write_bytes(target_path: Path, data: bytes) -> None:
-    target_path.parent.mkdir(parents=True, exist_ok=True)
-    tmp_path = target_path.with_name(f".{target_path.name}.tmp.{os.getpid()}")
+def atomic_write_bytes(target_path: Path, data: bytes, *, require_existing_parent: bool = False) -> None:
+    if require_existing_parent:
+        if not target_path.parent.is_dir():
+            raise PipelineError("RENDER_CANCELLED", f"Target directory removed before write: {target_path.parent.name}")
+    else:
+        target_path.parent.mkdir(parents=True, exist_ok=True)
+    tmp_path = target_path.with_name(
+        f".{target_path.name}.tmp.{os.getpid()}.{threading.get_ident()}.{secrets.token_hex(6)}"
+    )
     try:
-        with tmp_path.open("wb") as f:
-            f.write(data)
-            f.flush()
-            os.fsync(f.fileno())
-        os.replace(str(tmp_path), str(target_path))
+        try:
+            with tmp_path.open("wb") as f:
+                f.write(data)
+                f.flush()
+                os.fsync(f.fileno())
+        except FileNotFoundError as exc:
+            if require_existing_parent:
+                raise PipelineError("RENDER_CANCELLED", f"Target directory removed during write: {target_path.parent.name}") from exc
+            raise
+
+        if require_existing_parent and not target_path.parent.is_dir():
+            raise PipelineError("RENDER_CANCELLED", f"Target directory removed before commit: {target_path.parent.name}")
+
+        for attempt in range(3):
+            try:
+                os.replace(str(tmp_path), str(target_path))
+                break
+            except PermissionError:
+                if os.name == "nt" and attempt < 2:
+                    time.sleep(0.005)
+                    continue
+                raise
+            except FileNotFoundError as exc:
+                if require_existing_parent:
+                    raise PipelineError("RENDER_CANCELLED", f"Target directory removed before replace: {target_path.parent.name}") from exc
+                raise
         fsync_directory(target_path.parent)
     finally:
         if tmp_path.exists():
@@ -150,23 +182,24 @@ def validate_and_load_jpeg(
         raise PipelineError("INVALID_JPEG", f"File is not a valid JPEG: {path.name}")
 
     try:
-        old_max = Image.MAX_IMAGE_PIXELS
-        Image.MAX_IMAGE_PIXELS = max_image_pixels
-        try:
-            img = Image.open(io.BytesIO(raw_bytes))
-            # Canon mirrorless cameras (e.g., EOS R10) embed an MPF preview inside .jpg files,
-            # which Pillow opens as MPO (a multi-picture JPEG container); accept both JPEG and MPO.
-            if img.format not in ("JPEG", "MPO"):
-                raise PipelineError("INVALID_JPEG", f"Image format is {img.format}, expected JPEG")
-            width, height = img.size
-            if width <= 0 or height <= 0 or (width * height) > max_image_pixels:
-                raise PipelineError(
-                    "IMAGE_PIXELS_EXCEEDED",
-                    f"Image dimensions {width}x{height} exceed pixel limit {max_image_pixels}",
-                )
-            img.load()
-        finally:
-            Image.MAX_IMAGE_PIXELS = old_max
+        with _PIL_LIMIT_LOCK:
+            old_max = Image.MAX_IMAGE_PIXELS
+            Image.MAX_IMAGE_PIXELS = max_image_pixels
+            try:
+                img = Image.open(io.BytesIO(raw_bytes))
+                # Canon mirrorless cameras (e.g., EOS R10) embed an MPF preview inside .jpg files,
+                # which Pillow opens as MPO (a multi-picture JPEG container); accept both JPEG and MPO.
+                if img.format not in ("JPEG", "MPO"):
+                    raise PipelineError("INVALID_JPEG", f"Image format is {img.format}, expected JPEG")
+                width, height = img.size
+                if width <= 0 or height <= 0 or (width * height) > max_image_pixels:
+                    raise PipelineError(
+                        "IMAGE_PIXELS_EXCEEDED",
+                        f"Image dimensions {width}x{height} exceed pixel limit {max_image_pixels}",
+                    )
+                img.load()
+            finally:
+                Image.MAX_IMAGE_PIXELS = old_max
     except PipelineError:
         raise
     except Image.DecompressionBombError as exc:
@@ -256,12 +289,40 @@ def center_crop_and_resize(img: Image.Image, target_w: int, target_h: int) -> Im
     return img
 
 
+@lru_cache(maxsize=1)
 def get_srgb_icc_bytes() -> bytes:
     raw = bytearray(ImageCms.ImageCmsProfile(ImageCms.createProfile("sRGB")).tobytes())
     # Normalize ICC header creation date/time (bytes 24..36: 2026-01-01 00:00:00 UTC)
     # so output JPEG bytes and SHA-256 are 100% deterministic across invocations.
     raw[24:36] = b"\x07\xea\x00\x01\x00\x01\x00\x00\x00\x00\x00\x00"
     return bytes(raw)
+
+
+@lru_cache(maxsize=16)
+def _parse_cube_cached_by_hash(
+    resolved_path: str,
+    file_sha256: str,
+    expected_size: int,
+    require_unit_domain: bool,
+) -> CubeLut:
+    lut = parse_cube_file(resolved_path, expected_size=expected_size, require_unit_domain=require_unit_domain)
+    if lut.sha256 != file_sha256:
+        raise LutParseError("LUT file changed while loading")
+    return lut
+
+
+def load_cube_lut_cached(
+    lut_path: str | Path,
+    expected_size: int = 33,
+    require_unit_domain: bool = True,
+) -> CubeLut:
+    path = Path(lut_path)
+    if not path.is_file():
+        raise LutParseError(f"LUT file does not exist: {path}")
+    if path.stat().st_size > 5 * 1024 * 1024:
+        return parse_cube_file(path, expected_size=expected_size, require_unit_domain=require_unit_domain)
+    digest = sha256_file(path)
+    return _parse_cube_cached_by_hash(str(path.resolve()), digest, expected_size, require_unit_domain)
 
 
 def encode_jpeg_bytes(
@@ -335,12 +396,134 @@ def grade_rgb_image(image: Image.Image, lut: Optional[CubeLut], intensity: int =
 
 
 
+_DAEMON_MODE: bool = False
+_CACHE_LOCK = threading.RLock()
+_WARM_BEAUTY_LOCK = threading.Lock()
+_WARM_BEAUTY_PROCESSOR: Optional[Any] = None
+_WARM_BEAUTY_MODEL_KEY: Optional[Tuple[Optional[str], Optional[str], int]] = None
+# folder_str -> {entry_key -> (pil_rgb_image, icc_status, stats_dict, touched_ns)}
+_BEAUTY_RAM_CACHE: Dict[str, Dict[str, Tuple[Image.Image, str, Dict[str, Any], int]]] = {}
+_MAX_RAM_SESSION_FOLDERS = 2
+_MAX_RAM_ENTRIES_PER_SESSION = 12
+
+
+def close_warm_beauty_processor() -> None:
+    global _WARM_BEAUTY_PROCESSOR, _WARM_BEAUTY_MODEL_KEY
+    with _WARM_BEAUTY_LOCK:
+        if _WARM_BEAUTY_PROCESSOR is not None:
+            with suppress(Exception):
+                _WARM_BEAUTY_PROCESSOR.close()
+            _WARM_BEAUTY_PROCESSOR = None
+            _WARM_BEAUTY_MODEL_KEY = None
+
+
+atexit.register(close_warm_beauty_processor)
+
+
+def enable_daemon_runtime(enabled: bool = True) -> None:
+    """Enable warm MediaPipe model reuse and in-RAM Beauty cache inside image_daemon.py."""
+    global _DAEMON_MODE
+    with _CACHE_LOCK:
+        _DAEMON_MODE = enabled
+        if not enabled:
+            _BEAUTY_RAM_CACHE.clear()
+    if not enabled:
+        close_warm_beauty_processor()
+
+
+def get_ram_cache_stats() -> Dict[str, int]:
+    with _CACHE_LOCK:
+        _prune_ram_beauty_sessions_unlocked()
+        return {
+            "sessions": len(_BEAUTY_RAM_CACHE),
+            "entries": sum(len(items) for items in _BEAUTY_RAM_CACHE.values()),
+        }
+
+
+def _prune_ram_beauty_sessions_unlocked() -> None:
+    stale_folders = [f for f in list(_BEAUTY_RAM_CACHE.keys()) if not Path(f).is_dir()]
+    for folder_key in stale_folders:
+        _BEAUTY_RAM_CACHE.pop(folder_key, None)
+    while len(_BEAUTY_RAM_CACHE) > _MAX_RAM_SESSION_FOLDERS:
+        oldest_folder = min(
+            _BEAUTY_RAM_CACHE.keys(),
+            key=lambda f: max((entry[3] for entry in _BEAUTY_RAM_CACHE[f].values()), default=0),
+        )
+        _BEAUTY_RAM_CACHE.pop(oldest_folder, None)
+
+
+def _store_ram_beauty_entry(folder: Path, key: str, image: Image.Image, icc_status: str, stats: Dict[str, Any]) -> None:
+    folder_key = str(folder.resolve())
+    with _CACHE_LOCK:
+        _prune_ram_beauty_sessions_unlocked()
+        bucket = _BEAUTY_RAM_CACHE.setdefault(folder_key, {})
+        bucket[key] = (image.copy(), icc_status, dict(stats), time.monotonic_ns())
+        if len(bucket) > _MAX_RAM_ENTRIES_PER_SESSION:
+            sorted_keys = sorted(bucket.keys(), key=lambda k: bucket[k][3], reverse=True)
+            for drop_key in sorted_keys[_MAX_RAM_ENTRIES_PER_SESSION:]:
+                bucket.pop(drop_key, None)
+        _prune_ram_beauty_sessions_unlocked()
+
+
+def _load_ram_beauty_entry(folder: Path, key: str) -> Optional[Tuple[Image.Image, str, Dict[str, Any]]]:
+    folder_key = str(folder.resolve())
+    with _CACHE_LOCK:
+        _prune_ram_beauty_sessions_unlocked()
+        bucket = _BEAUTY_RAM_CACHE.get(folder_key)
+        if not bucket or key not in bucket:
+            return None
+        img, icc_status, stats, _ = bucket[key]
+        bucket[key] = (img, icc_status, stats, time.monotonic_ns())
+        return img.copy(), icc_status, dict(stats)
+
+
+def _process_with_warm_beauty(image: Image.Image, cfg: Any) -> Tuple[Image.Image, Dict[str, Any]]:
+    global _WARM_BEAUTY_PROCESSOR, _WARM_BEAUTY_MODEL_KEY
+    from beauty import BeautyProcessor
+
+    model_key = (cfg.face_model_path, cfg.segmenter_model_path, cfg.max_faces)
+    with _WARM_BEAUTY_LOCK:
+        if _WARM_BEAUTY_PROCESSOR is None or _WARM_BEAUTY_MODEL_KEY != model_key:
+            if _WARM_BEAUTY_PROCESSOR is not None:
+                _WARM_BEAUTY_PROCESSOR.close()
+            _WARM_BEAUTY_PROCESSOR = BeautyProcessor(cfg)
+            _WARM_BEAUTY_MODEL_KEY = model_key
+        out_img, stats = _WARM_BEAUTY_PROCESSOR.process(image, cfg)
+        return out_img, stats
+
+
+def _check_execution_active(
+    deadline_mono: Optional[float] = None,
+    cancel_check: Optional[Callable[[], bool]] = None,
+    required_dir: Optional[Path] = None,
+) -> None:
+    if deadline_mono is not None and time.monotonic() >= deadline_mono:
+        raise PipelineError("RENDER_TIMEOUT", "Render deadline exceeded")
+    if cancel_check is not None and cancel_check():
+        raise PipelineError("RENDER_TIMEOUT", "Client disconnected before completion")
+    if required_dir is not None and not required_dir.is_dir():
+        raise PipelineError("RENDER_CANCELLED", "Render output directory removed")
+
+
 def beauty_config_for(manifest):
     preset = manifest.get("beauty_preset")
-    overrides = manifest.get("beauty_config")
-    if preset is None and overrides is None:
+    raw_overrides = manifest.get("beauty_config")
+    runtime_env = manifest.get("runtime_env")
+    merged_overrides: Dict[str, Any] = {}
+    if isinstance(runtime_env, dict):
+        if runtime_env.get("beauty_engine"):
+            merged_overrides["engine"] = runtime_env["beauty_engine"]
+        if runtime_env.get("lkmagic_bridge_url"):
+            merged_overrides["lkmagic_url"] = runtime_env["lkmagic_bridge_url"]
+        if "lkmagic_executable" in runtime_env and runtime_env["lkmagic_executable"]:
+            merged_overrides["lkmagic_executable"] = str(runtime_env["lkmagic_executable"])
+        if "lkmagic_auto_start" in runtime_env:
+            merged_overrides["auto_start_lkmagic"] = bool(runtime_env["lkmagic_auto_start"])
+    if isinstance(raw_overrides, dict):
+        merged_overrides.update(raw_overrides)
+    if preset is None and raw_overrides is None:
         return resolve_beauty_config("off")
-    return resolve_beauty_config(preset, overrides if isinstance(overrides, dict) else None)
+    return resolve_beauty_config(preset, merged_overrides if merged_overrides else None)
 
 
 def load_source(manifest, photo):
@@ -356,8 +539,8 @@ def load_source(manifest, photo):
     return normalized, digest, icc
 
 
-def write_cache_json(path, data):
-    atomic_write_bytes(path, json.dumps(data).encode("utf-8"))
+def write_cache_json(path, data, *, require_existing_parent: bool = False):
+    atomic_write_bytes(path, json.dumps(data).encode("utf-8"), require_existing_parent=require_existing_parent)
 
 
 def read_cache_json(path):
@@ -371,8 +554,17 @@ def cache_key(value):
     return hashlib.sha256(json.dumps(value, sort_keys=True).encode("utf-8")).hexdigest()
 
 
-def prepared_beauty(manifest, cfg, photos):
+def prepared_beauty(
+    manifest,
+    cfg,
+    photos,
+    *,
+    deadline_mono: Optional[float] = None,
+    cancel_check: Optional[Callable[[], bool]] = None,
+    required_output_dir: Optional[Path] = None,
+):
     """Prepare one engine-consistent batch and reuse lossless per-photo results."""
+    _check_execution_active(deadline_mono, cancel_check, required_output_dir)
     folder = Path(manifest["beauty_cache_dir"])
     folder.mkdir(parents=True, exist_ok=True)
     settings = [PIPELINE_VERSION, cfg.to_dict(), cfg.lkmagic_url, "original-resolution"]
@@ -392,71 +584,127 @@ def prepared_beauty(manifest, cfg, photos):
 
     failure = cached_batch.get("fallback") if use_fallback else None
     for engine in engines:
-        results = {}
+        _check_execution_active(deadline_mono, cancel_check, required_output_dir)
+        results: Dict[int, Tuple[Union[Path, Image.Image], str, Dict[str, Any]]] = {}
         report_beauty_progress(manifest, folder, 0, len(photos))
         try:
             from beauty import BeautyProcessor
             from beauty.lkmagic_bridge import check_lkmagic_health
             actual = "lkmagic_native" if engine == "lkmagic" else engine
             engine_cfg = replace(cfg, engine=engine, auto_start_lkmagic=False, lkmagic_timeout_sec=25)
-            with BeautyProcessor(engine_cfg) as processor:
+            local_processor = None if _DAEMON_MODE else BeautyProcessor(engine_cfg)
+            try:
                 for photo in photos:
+                    _check_execution_active(deadline_mono, cancel_check, required_output_dir)
                     if not still_wanted(manifest, hashes):
                         return None, None, "Đã thay đổi lựa chọn Beauty."
                     slot = int(photo["slot"])
                     key = cache_key([settings, photo["sha256"], actual])
                     meta = folder / f"{key}.json"
                     pixels = folder / f"{key}.png"
-                    entry = read_cache_json(meta)
                     hit = False
-                    if isinstance(entry, dict):
-                        try:
-                            hit = sha256_file(pixels) == entry["pixels_sha256"]
-                        except (KeyError, OSError):
-                            pass
+                    pixels_source: Union[Path, Image.Image] = pixels
+                    entry_icc = "assumed_srgb"
+                    entry_stats: Dict[str, Any] = {}
+
+                    if _DAEMON_MODE:
+                        ram_hit = _load_ram_beauty_entry(folder, key)
+                        if ram_hit is not None:
+                            pixels_source, entry_icc, entry_stats = ram_hit
+                            hit = True
+
                     if not hit:
+                        entry = read_cache_json(meta)
+                        if isinstance(entry, dict):
+                            try:
+                                if sha256_file(pixels) == entry["pixels_sha256"]:
+                                    hit = True
+                                    pixels_source = pixels
+                                    entry_icc = entry["icc_status"]
+                                    entry_stats = entry["stats"]
+                                    os.utime(meta)
+                            except (KeyError, OSError):
+                                pass
+
+                    if not hit:
+                        photo_cfg = engine_cfg
+                        if deadline_mono is not None:
+                            remaining = deadline_mono - time.monotonic()
+                            if remaining <= 0:
+                                raise PipelineError("RENDER_TIMEOUT", "Render deadline exceeded")
+                            photo_cfg = replace(engine_cfg, lkmagic_timeout_sec=min(25.0, remaining))
                         if engine == "lkmagic" and not results:
-                            status = check_lkmagic_health(cfg.lkmagic_url)
+                            status = check_lkmagic_health(
+                                cfg.lkmagic_url,
+                                timeout=min(0.8, max(0.1, photo_cfg.lkmagic_timeout_sec)),
+                            )
                             if not (status.get("ok") and status.get("ready")):
                                 raise RuntimeError("LK Magic chưa sẵn sàng.")
                         normalized, digest, icc = load_source(manifest, photo)
-                        adjusted, stats = processor.process(normalized)
+                        _check_execution_active(deadline_mono, cancel_check, required_output_dir)
+                        if _DAEMON_MODE:
+                            adjusted, stats = _process_with_warm_beauty(normalized, photo_cfg)
+                        else:
+                            assert local_processor is not None
+                            adjusted, stats = local_processor.process(normalized, photo_cfg)
+                        _check_execution_active(deadline_mono, cancel_check, required_output_dir)
                         if stats["status"] == "error_fallback":
                             raise RuntimeError(stats.get("error") or "Beauty thất bại.")
                         if sha256_file(Path(photo["path"])) != digest:
                             raise PipelineError("ORIGINAL_MUTATED", f"Original photo in slot {slot} was modified")
-                        pixels_tmp = pixels.with_suffix(".tmp")
-                        try:
-                            adjusted.save(pixels_tmp, format="PNG", compress_level=1)
-                            os.replace(pixels_tmp, pixels)
-                        finally:
-                            pixels_tmp.unlink(missing_ok=True)
-                        entry = {"stats": stats, "icc_status": icc, "pixels_sha256": sha256_file(pixels)}
-                        write_cache_json(meta, entry)
-                    os.utime(meta)
-                    results[slot] = (pixels, entry["icc_status"], {
-                        **entry["stats"], "engine": actual, "cache_hit": hit,
-                        "duration_ms": 0 if hit else entry["stats"]["duration_ms"],
+                        entry_icc = icc
+                        entry_stats = stats
+                        if _DAEMON_MODE:
+                            if folder.is_dir():
+                                _store_ram_beauty_entry(folder, key, adjusted, icc, stats)
+                            pixels_source = adjusted
+                        else:
+                            pixels_tmp = pixels.with_suffix(".tmp")
+                            try:
+                                adjusted.save(pixels_tmp, format="PNG", compress_level=1)
+                                os.replace(pixels_tmp, pixels)
+                            finally:
+                                pixels_tmp.unlink(missing_ok=True)
+                            entry = {"stats": stats, "icc_status": icc, "pixels_sha256": sha256_file(pixels)}
+                            write_cache_json(meta, entry)
+                            os.utime(meta)
+                            pixels_source = pixels
+
+                    results[slot] = (pixels_source, entry_icc, {
+                        **entry_stats, "engine": actual, "cache_hit": hit,
+                        "duration_ms": 0 if hit else entry_stats["duration_ms"],
                     })
                     report_beauty_progress(manifest, folder, len(results), len(photos))
+            finally:
+                if local_processor is not None:
+                    local_processor.close()
+            _check_execution_active(deadline_mono, cancel_check, required_output_dir)
             fallback = failure if engine == "mediapipe" else None
-            write_cache_json(marker, {"batch": batch, "settings": settings_key, "fallback": fallback})
-            prune_beauty_cache(folder)
+            if folder.is_dir():
+                with suppress(PipelineError):
+                    write_cache_json(marker, {"batch": batch, "settings": settings_key, "fallback": fallback}, require_existing_parent=True)
+                prune_beauty_cache(folder)
             return results, fallback, None
         except (ImportError, OSError, RuntimeError, ValueError) as exc:
+            _check_execution_active(deadline_mono, cancel_check, required_output_dir)
             failure = f"{engine}: {exc}"[:360]
             log_err(failure)
             if native_retry:
                 break
 
-    prune_beauty_cache(folder)
+    if folder.is_dir():
+        prune_beauty_cache(folder)
     return None, None, failure
 
 
 def report_beauty_progress(manifest, folder, done, total):
-    if key := manifest.get("beauty_progress_key"):
-        with suppress(OSError):
-            write_cache_json(folder / "progress.json", {"key": key, "done": done, "total": total})
+    if (key := manifest.get("beauty_progress_key")) and folder.is_dir():
+        with suppress(OSError, PipelineError):
+            write_cache_json(
+                folder / "progress.json",
+                {"key": key, "done": done, "total": total},
+                require_existing_parent=True,
+            )
 
 
 def still_wanted(manifest, hashes):
@@ -464,7 +712,7 @@ def still_wanted(manifest, hashes):
     if "beauty_session_id" not in manifest:
         return True
     import sqlite3
-    with sqlite3.connect(Path(manifest["database_path"]).resolve().as_uri() + "?mode=ro", uri=True) as db:
+    with closing(sqlite3.connect(Path(manifest["database_path"]).resolve().as_uri() + "?mode=ro", uri=True)) as db:
         row = db.execute("SELECT state, ui_step, deleted_at, beauty_preset, beauty_smooth, "
                          "beauty_brighten, beauty_tone FROM sessions WHERE id=?",
                          (manifest["beauty_session_id"],)).fetchone()
@@ -486,26 +734,47 @@ def prune_beauty_cache(folder):
         entry.with_suffix(".png").unlink(missing_ok=True)
 
 
-def run_beauty_task(manifest):
+def run_beauty_task(
+    manifest,
+    *,
+    deadline_mono: Optional[float] = None,
+    cancel_check: Optional[Callable[[], bool]] = None,
+):
+    _check_execution_active(deadline_mono, cancel_check)
     cfg = beauty_config_for(manifest)
     if manifest.get("task") == "check_lkmagic":
         import tempfile
         from beauty.lkmagic_bridge import retouch_via_lkmagic
+        timeout_sec = 25.0
+        if deadline_mono is not None:
+            timeout_sec = min(25.0, max(0.1, deadline_mono - time.monotonic()))
         with tempfile.TemporaryDirectory(prefix="pb-beauty-check-") as tmp:
             image, _, _ = load_source(manifest, manifest["photos"][0])
             _, audit = retouch_via_lkmagic(
-                np.asarray(image), replace(cfg, auto_start_lkmagic=False, lkmagic_timeout_sec=25), Path(tmp)
+                np.asarray(image), replace(cfg, auto_start_lkmagic=False, lkmagic_timeout_sec=timeout_sec), Path(tmp)
             )
         return {"status": "ok", "audit": audit}
     photos = manifest["photos"]
     if not cfg.is_active() or not still_wanted(manifest, [p["sha256"] for p in photos]):
         return {"status": "ok", "skipped": True}
-    results, fallback, error = prepared_beauty(manifest, cfg, photos)
+    results, fallback, error = prepared_beauty(
+        manifest,
+        cfg,
+        photos,
+        deadline_mono=deadline_mono,
+        cancel_check=cancel_check,
+    )
     return {"status": "ok", "prepared": bool(results), "fallback": fallback, "error": error}
 
 
-def run_render_from_manifest(manifest: Dict[str, Any]) -> Dict[str, Any]:
+def run_render_from_manifest(
+    manifest: Dict[str, Any],
+    *,
+    deadline_mono: Optional[float] = None,
+    cancel_check: Optional[Callable[[], bool]] = None,
+) -> Dict[str, Any]:
     start_ns = time.monotonic_ns()
+    _check_execution_active(deadline_mono, cancel_check)
 
     photos_input = manifest.get("photos")
     if not isinstance(photos_input, list) or not 1 <= len(photos_input) <= 4:
@@ -532,6 +801,8 @@ def run_render_from_manifest(manifest: Dict[str, Any]) -> Dict[str, Any]:
 
     output_print_path = Path(manifest["output_print_path"])
     output_preview_path = Path(manifest["output_preview_path"])
+    output_parent_existed_at_start = output_print_path.parent.is_dir()
+    required_output_dir = output_print_path.parent if output_parent_existed_at_start else None
 
     # Load LUT if not original
     cube_lut: Optional[CubeLut] = None
@@ -540,7 +811,7 @@ def run_render_from_manifest(manifest: Dict[str, Any]) -> Dict[str, Any]:
         if not lut_path:
             raise PipelineError("INVALID_LUT", f"Missing lut_path for preset '{lut_id}'")
         try:
-            cube_lut = parse_cube_file(lut_path, expected_size=33, require_unit_domain=True)
+            cube_lut = load_cube_lut_cached(lut_path, expected_size=33, require_unit_domain=True)
             lut_hash = cube_lut.sha256
         except LutParseError as exc:
             raise PipelineError("INVALID_LUT", f"LUT parse error for '{lut_id}': {exc}") from exc
@@ -592,14 +863,19 @@ def run_render_from_manifest(manifest: Dict[str, Any]) -> Dict[str, Any]:
     use_cache = beauty_cfg.is_active() and bool(manifest.get("beauty_cache_dir"))
     if use_cache:
         prepared, fallback_reason, beauty_error = prepared_beauty(
-            manifest, beauty_cfg, [photos_by_slot[slot] for slot in expected_slots]
+            manifest,
+            beauty_cfg,
+            [photos_by_slot[slot] for slot in expected_slots],
+            deadline_mono=deadline_mono,
+            cancel_check=cancel_check,
+            required_output_dir=required_output_dir,
         )
         if beauty_error and manifest.get("retry_lkmagic"):
             raise PipelineError("LK_MAGIC_RETOUCH_FAILED", beauty_error)
 
     beauty_processor = None
     beauty_load_error = beauty_error
-    if beauty_cfg.is_active() and not use_cache:
+    if beauty_cfg.is_active() and not use_cache and not _DAEMON_MODE:
         try:
             from beauty import BeautyProcessor
             beauty_processor = BeautyProcessor(beauty_cfg)
@@ -613,6 +889,7 @@ def run_render_from_manifest(manifest: Dict[str, Any]) -> Dict[str, Any]:
 
     try:
         for slot_spec in slots_spec:
+            _check_execution_active(deadline_mono, cancel_check, required_output_dir)
             slot_num = int(slot_spec["slot"])
             slot_info = photos_by_slot[slot_num]
             photo_file = Path(slot_info["path"])
@@ -622,14 +899,40 @@ def run_render_from_manifest(manifest: Dict[str, Any]) -> Dict[str, Any]:
                 file_hash = sha256_file(photo_file)
                 if file_hash != slot_info["sha256"]:
                     raise PipelineError("SOURCE_HASH_MISMATCH", f"Slot {slot_num} SHA-256 mismatch before render")
-                with Image.open(pixels) as cached:
-                    cached.load()
-                    retouched_img = cached.copy()
+                if isinstance(pixels, Image.Image):
+                    retouched_img = pixels.copy()
+                else:
+                    with Image.open(pixels) as cached:
+                        cached.load()
+                        retouched_img = cached.copy()
                 beauty_audit.append({"slot": slot_num, **b_stats})
             else:
                 normalized_img, file_hash, icc_status = load_source(manifest, slot_info)
-                if beauty_processor is not None:
-                    retouched_img, b_stats = beauty_processor.process(normalized_img, beauty_cfg)
+                _check_execution_active(deadline_mono, cancel_check, required_output_dir)
+                slot_beauty_cfg = beauty_cfg
+                if deadline_mono is not None and beauty_cfg.is_active():
+                    remaining = deadline_mono - time.monotonic()
+                    if remaining <= 0:
+                        raise PipelineError("RENDER_TIMEOUT", "Render deadline exceeded")
+                    slot_beauty_cfg = replace(beauty_cfg, lkmagic_timeout_sec=min(beauty_cfg.lkmagic_timeout_sec, remaining))
+                if slot_beauty_cfg.is_active() and _DAEMON_MODE and beauty_load_error is None:
+                    try:
+                        retouched_img, b_stats = _process_with_warm_beauty(normalized_img, slot_beauty_cfg)
+                        _check_execution_active(deadline_mono, cancel_check, required_output_dir)
+                        beauty_audit.append({"slot": slot_num, **b_stats})
+                    except (ImportError, OSError) as exc:
+                        _check_execution_active(deadline_mono, cancel_check, required_output_dir)
+                        beauty_load_error = str(exc)
+                        retouched_img = normalized_img
+                        beauty_audit.append({
+                            "slot": slot_num,
+                            "status": "error_fallback",
+                            "preset": beauty_cfg.preset,
+                            "error": beauty_load_error,
+                        })
+                elif beauty_processor is not None:
+                    retouched_img, b_stats = beauty_processor.process(normalized_img, slot_beauty_cfg)
+                    _check_execution_active(deadline_mono, cancel_check, required_output_dir)
                     beauty_audit.append({"slot": slot_num, **b_stats})
                 else:
                     retouched_img = normalized_img
@@ -686,6 +989,7 @@ def run_render_from_manifest(manifest: Dict[str, Any]) -> Dict[str, Any]:
     srgb_icc_bytes = get_srgb_icc_bytes()
 
     # Step 8: Export print.jpg (1181x1748, Q95, subsampling 0, 300 DPI, sRGB)
+    _check_execution_active(deadline_mono, cancel_check, required_output_dir)
     print_bytes = encode_jpeg_bytes(
         canvas,
         quality=quality,
@@ -694,7 +998,8 @@ def run_render_from_manifest(manifest: Dict[str, Any]) -> Dict[str, Any]:
         icc_bytes=srgb_icc_bytes,
     )
     print_sha256 = hashlib.sha256(print_bytes).hexdigest()
-    atomic_write_bytes(output_print_path, print_bytes)
+    _check_execution_active(deadline_mono, cancel_check, required_output_dir)
+    atomic_write_bytes(output_print_path, print_bytes, require_existing_parent=output_parent_existed_at_start)
 
     # Step 9: Derive preview.jpg from print.jpg without re-running LUT
     print_reloaded = Image.open(io.BytesIO(print_bytes))
@@ -713,7 +1018,12 @@ def run_render_from_manifest(manifest: Dict[str, Any]) -> Dict[str, Any]:
         icc_bytes=srgb_icc_bytes,
     )
     preview_sha256 = hashlib.sha256(preview_bytes).hexdigest()
-    atomic_write_bytes(output_preview_path, preview_bytes)
+    _check_execution_active(deadline_mono, cancel_check, required_output_dir)
+    atomic_write_bytes(
+        output_preview_path,
+        preview_bytes,
+        require_existing_parent=output_parent_existed_at_start and output_preview_path.parent == output_print_path.parent,
+    )
 
     input_signature = compute_input_signature(
         photo_hashes=photo_hashes,
@@ -759,6 +1069,27 @@ def run_render_from_manifest(manifest: Dict[str, Any]) -> Dict[str, Any]:
     }
 
 
+def validate_jpeg_payload(
+    jpeg_path: str | Path,
+    max_bytes: int = DEFAULT_MAX_JPEG_BYTES,
+    max_pixels: int = DEFAULT_MAX_IMAGE_PIXELS,
+) -> Dict[str, Any]:
+    img, file_hash, raw_bytes = validate_and_load_jpeg(jpeg_path, max_bytes, max_pixels)
+    exif = img.getexif()
+    orientation = int(exif.get(274, 1)) if exif else 1
+    normalized, icc_status = normalize_orientation_and_srgb(img, raw_bytes, 1)
+    w, h = normalized.size
+    return {
+        "status": "ok",
+        "sha256": file_hash,
+        "width": w,
+        "height": h,
+        "bytes": len(raw_bytes),
+        "exif_orientation": orientation,
+        "icc_status": icc_status,
+    }
+
+
 def main(argv: List[str]) -> int:
     if len(argv) < 2:
         log_err("Usage: render_pipeline.py <manifest.json> | --validate-jpeg <path>")
@@ -771,25 +1102,7 @@ def main(argv: List[str]) -> int:
         max_bytes = int(argv[3]) if len(argv) >= 4 else DEFAULT_MAX_JPEG_BYTES
         max_pixels = int(argv[4]) if len(argv) >= 5 else DEFAULT_MAX_IMAGE_PIXELS
         try:
-            img, file_hash, raw_bytes = validate_and_load_jpeg(argv[2], max_bytes, max_pixels)
-            exif = img.getexif()
-            orientation = int(exif.get(274, 1)) if exif else 1
-            normalized, icc_status = normalize_orientation_and_srgb(img, raw_bytes, 1)
-            w, h = normalized.size
-            sys.stdout.write(
-                json.dumps(
-                    {
-                        "status": "ok",
-                        "sha256": file_hash,
-                        "width": w,
-                        "height": h,
-                        "bytes": len(raw_bytes),
-                        "exif_orientation": orientation,
-                        "icc_status": icc_status,
-                    }
-                )
-                + "\n"
-            )
+            sys.stdout.write(json.dumps(validate_jpeg_payload(argv[2], max_bytes, max_pixels)) + "\n")
             return 0
         except PipelineError as exc:
             log_err(f"{exc.code}: {exc.message}")

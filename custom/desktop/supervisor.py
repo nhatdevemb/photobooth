@@ -8,6 +8,7 @@ from datetime import datetime
 import json
 import os
 from pathlib import Path
+import secrets
 import socket
 import subprocess
 import sys
@@ -130,13 +131,14 @@ def run_isolated_service(name, command):
 def reserve_ports(operator_port, guest_port):
     sockets = []
     try:
-        for host, port in [("127.0.0.1", operator_port), ("0.0.0.0", guest_port)] + [("127.0.0.1", 0)] * 4:
+        for host, port in [("127.0.0.1", operator_port), ("0.0.0.0", guest_port)] + [("127.0.0.1", 0)] * 5:
             sock = socket.socket()
             if os.name == "nt":
                 sock.setsockopt(socket.SOL_SOCKET, socket.SO_EXCLUSIVEADDRUSE, 1)
             sock.bind((host, port))
             sockets.append(sock)
-        return sockets, [sock.getsockname()[1] for sock in sockets[2:]]
+        ephemeral = [sock.getsockname()[1] for sock in sockets[2:]]
+        return sockets, ephemeral[:4], ephemeral[4]
     except Exception:
         for sock in sockets:
             sock.close()
@@ -177,7 +179,9 @@ def main():
     settings = payload["settings"]
     (data / "logs").mkdir(parents=True, exist_ok=True)
     (data / "tmp").mkdir(exist_ok=True)
-    sockets, ports = reserve_ports(int(settings["operatorPort"]), int(settings["guestPort"]))
+    sockets, ports, daemon_port = reserve_ports(int(settings["operatorPort"]), int(settings["guestPort"]))
+    daemon_token = secrets.token_hex(32)
+    daemon_url = f"http://127.0.0.1:{daemon_port}"
     job = create_job()
     php = runtime / "php" / "php.exe"
     ini = data / "php-desktop.ini"
@@ -205,27 +209,39 @@ def main():
     threading.Thread(target=lambda: (sys.stdin.read(), stopped.set()), daemon=True).start()
     log = (data / "logs/desktop-runtime.log").open("ab", buffering=0)
     log_event(log, f"Runtime started (PID {os.getpid()})")
-    # Individual FastCGI and Beauty failures can degrade without stopping the booth.
-    cgi_env = {**os.environ, "PHP_FCGI_MAX_REQUESTS": "0"}
+    # Individual FastCGI, Image Daemon, and Beauty failures can degrade without stopping the booth.
+    daemon_env = {**os.environ, "PYTHONDONTWRITEBYTECODE": "1", "IMAGE_DAEMON_TOKEN": daemon_token}
+    php_env = {**os.environ, "IMAGE_DAEMON_URL": daemon_url, "IMAGE_DAEMON_TOKEN": daemon_token}
+    cgi_env = {**php_env, "PHP_FCGI_MAX_REQUESTS": "0"}
     config = data / "Caddyfile"
     services = [
-        Service(f"PHP FastCGI :{port}",
-                [str(runtime / "php/php-cgi.exe"), *php_options, "-b", f"127.0.0.1:{port}"],
-                runtime / "php", env=cgi_env, required=False)
-        for port in ports
+        Service("Python Image Daemon",
+                [sys.executable, "-B", str(project / "custom/python/image_daemon.py"), "--host", "127.0.0.1", "--port", str(daemon_port)],
+                project / "custom/python", env=daemon_env, required=False),
+        *[
+            Service(f"PHP FastCGI :{port}",
+                    [str(runtime / "php/php-cgi.exe"), *php_options, "-b", f"127.0.0.1:{port}"],
+                    runtime / "php", env=cgi_env, required=False)
+            for port in ports
+        ],
     ]
     services.extend([
         Service("Caddy", [str(runtime / "caddy/caddy.exe"), "run", "--config", str(config), "--adapter", "caddyfile"],
                 project, isolated=False),
-        Service("Worker chụp/ghép/in", [str(php), *php_options, str(project / "custom/bin/worker.php")], runtime / "php"),
+        Service("Worker chụp/ghép/in", [str(php), *php_options, str(project / "custom/bin/worker.php")],
+                runtime / "php", env=php_env),
         Service("Worker Beauty", [str(php), *php_options, str(project / "custom/bin/beauty-worker.php")],
-                runtime / "php", required=False),
+                runtime / "php", env=php_env, required=False),
     ])
     maintenance = None
-    for sock in sockets:
-        sock.close()
     try:
         config.write_text(caddy_config(project / "custom/public", settings, ports, data), encoding="utf-8")
+        # Release the reserved daemon port right as Python Image Daemon starts to minimize port race window on Windows.
+        sockets.pop().close()
+        services[0].tick(log)
+        for sock in sockets:
+            sock.close()
+        sockets.clear()
         opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))
         deadline = time.monotonic() + 20
         while time.monotonic() < deadline:
@@ -252,12 +268,14 @@ def main():
                 try:
                     maintenance = subprocess.Popen(
                         [str(php), *php_options, str(project / "custom/bin/maintenance.php")],
-                        stdin=subprocess.DEVNULL, stdout=log, stderr=log, cwd=runtime / "php", creationflags=flags)
+                        stdin=subprocess.DEVNULL, stdout=log, stderr=log, cwd=runtime / "php", env=php_env, creationflags=flags)
                     next_maintenance = time.monotonic() + 3600
                 except OSError as error:
                     log_event(log, f"Không khởi động được bảo trì ({error}). Thử lại sau 60 giây.")
                     next_maintenance = time.monotonic() + 60
     finally:
+        for sock in sockets:
+            sock.close()
         children = [service.process for service in reversed(services) if service.process is not None]
         if maintenance is not None:
             children.append(maintenance)

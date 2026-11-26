@@ -414,7 +414,7 @@ final class SessionService
             }
         }
 
-        $sql = 'SELECT id FROM sessions WHERE deleted_at IS NULL' . $whereCursor . ' ORDER BY created_at DESC, id DESC LIMIT ' . ($limit + 1);
+        $sql = 'SELECT * FROM sessions WHERE deleted_at IS NULL' . $whereCursor . ' ORDER BY created_at DESC, id DESC LIMIT ' . ($limit + 1);
         $stmt = $pdo->prepare($sql);
         $stmt->execute($params);
         $rows = $stmt->fetchAll();
@@ -424,10 +424,7 @@ final class SessionService
             array_pop($rows);
         }
 
-        $items = [];
-        foreach ($rows as $r) {
-            $items[] = $this->buildSessionView($pdo, (string) $r['id']);
-        }
+        $items = $this->hydrateSessionRows($pdo, $rows);
 
         $nextCursor = null;
         if ($hasMore && $items !== []) {
@@ -497,7 +494,7 @@ final class SessionService
         }
 
         if ($slot < 1 || $slot > 4) {
-            throw new ApiException('INVALID_SLOT', 'Số thứ tự slot chụp phải là 1, 2 hoặc 3.', 422);
+            throw new ApiException('INVALID_SLOT', 'Số thứ tự slot chụp phải từ 1 đến 4.', 422);
         }
 
         $this->assetStore->assertDiskSpaceAvailable();
@@ -525,8 +522,9 @@ final class SessionService
                 $this->assertRevisionMatches($session, $expectedRevision);
                 $this->assertNoActiveContentJob($session);
 
-                if ($slot > (int) $session['capture_count']) {
-                    throw new ApiException('INVALID_SLOT', 'Slot nằm ngoài bố cục của phiên.', 422);
+                $maxSlot = (int) $session['capture_count'];
+                if ($slot > $maxSlot) {
+                    throw new ApiException('INVALID_SLOT', "Slot {$slot} nằm ngoài bố cục hiện tại (tối đa {$maxSlot} ảnh).", 422);
                 }
                 $state = (string) $session['state'];
                 $slotStmt = $pdo->prepare('SELECT current_photo_id FROM session_slots WHERE session_id = :sid AND slot = :slot');
@@ -1897,6 +1895,33 @@ final class SessionService
         return $template;
     }
 
+    /**
+     * Batch-hydrate full session views for a list of session IDs using constant-count IN(...) queries.
+     *
+     * @param list<string> $sessionIds
+     * @return list<array<string, mixed>>
+     */
+    public function buildSessionViewsBatch(PDO $pdo, array $sessionIds): array
+    {
+        if ($sessionIds === []) {
+            return [];
+        }
+        $placeholders = implode(',', array_fill(0, count($sessionIds), '?'));
+        $stmt = $pdo->prepare("SELECT * FROM sessions WHERE id IN ({$placeholders}) AND deleted_at IS NULL");
+        $stmt->execute(array_values($sessionIds));
+        $byId = [];
+        foreach ($stmt->fetchAll() as $row) {
+            $byId[(string) $row['id']] = $row;
+        }
+        $orderedRows = [];
+        foreach ($sessionIds as $sid) {
+            if (isset($byId[$sid])) {
+                $orderedRows[] = $byId[$sid];
+            }
+        }
+        return $this->hydrateSessionRows($pdo, $orderedRows);
+    }
+
     private function buildSessionView(PDO $pdo, string $sessionId): array
     {
         $stmt = $pdo->prepare('SELECT * FROM sessions WHERE id = :id AND deleted_at IS NULL');
@@ -1905,28 +1930,44 @@ final class SessionService
         if (!is_array($session)) {
             throw new ApiException('NOT_FOUND', 'Không tìm thấy phiên chụp.', 404);
         }
+        $hydrated = $this->hydrateSessionRows($pdo, [$session]);
+        return $hydrated[0];
+    }
 
-        // Slots 1, 2, 3
+    /**
+     * @param list<array<string, mixed>> $sessions
+     * @return list<array<string, mixed>>
+     */
+    private function hydrateSessionRows(PDO $pdo, array $sessions): array
+    {
+        if ($sessions === []) {
+            return [];
+        }
+
+        $sessionIds = array_map(static fn (array $s): string => (string) $s['id'], $sessions);
+        $inSessions = implode(',', array_fill(0, count($sessionIds), '?'));
+
+        // 1. Batch slots + current photos
         $slotStmt = $pdo->prepare(
-            'SELECT ss.slot, ss.current_photo_id, ss.updated_at AS slot_updated_at,
+            "SELECT ss.session_id, ss.slot, ss.current_photo_id, ss.updated_at AS slot_updated_at,
                     p.version, p.sha256, p.width, p.height, p.bytes, p.created_at AS photo_created_at
              FROM session_slots ss
              LEFT JOIN photos p ON p.id = ss.current_photo_id
-             WHERE ss.session_id = :sid
-             ORDER BY ss.slot ASC'
+             WHERE ss.session_id IN ({$inSessions})
+             ORDER BY ss.session_id ASC, ss.slot ASC"
         );
-        $slotStmt->execute([':sid' => $sessionId]);
-        $slots = [];
-        $acceptedSlots = 0;
-
+        $slotStmt->execute($sessionIds);
+        $slotsBySession = [];
+        $acceptedBySession = [];
         foreach ($slotStmt->fetchAll() as $sr) {
+            $sid = (string) $sr['session_id'];
             $hasPhoto = $sr['current_photo_id'] !== null;
             if ($hasPhoto) {
-                $acceptedSlots++;
+                $acceptedBySession[$sid] = ($acceptedBySession[$sid] ?? 0) + 1;
             }
             $slotNum = (int) $sr['slot'];
             $photoId = $hasPhoto ? (string) $sr['current_photo_id'] : null;
-            $slots[] = [
+            $slotsBySession[$sid][] = [
                 'slot' => $slotNum,
                 'photo' => $hasPhoto ? [
                     'id' => $photoId,
@@ -1941,18 +1982,28 @@ final class SessionService
             ];
         }
 
-        // Current render if valid
-        $currentRender = null;
-        if ($session['current_render_id'] !== null) {
-            $rStmt = $pdo->prepare('SELECT * FROM renders WHERE id = :id AND valid = 1');
-            $rStmt->execute([':id' => $session['current_render_id']]);
-            $rRow = $rStmt->fetch();
-            if (is_array($rRow)) {
+        // 2. Batch valid current renders + render job result
+        $renderIds = [];
+        foreach ($sessions as $s) {
+            if ($s['current_render_id'] !== null) {
+                $renderIds[(string) $s['current_render_id']] = true;
+            }
+        }
+        $rendersById = [];
+        if ($renderIds !== []) {
+            $rKeys = array_keys($renderIds);
+            $inRenders = implode(',', array_fill(0, count($rKeys), '?'));
+            $rStmt = $pdo->prepare(
+                "SELECT r.*, j.result AS job_result
+                 FROM renders r
+                 LEFT JOIN jobs j ON j.id = r.job_id
+                 WHERE r.id IN ({$inRenders}) AND r.valid = 1"
+            );
+            $rStmt->execute($rKeys);
+            foreach ($rStmt->fetchAll() as $rRow) {
                 $rid = (string) $rRow['id'];
-                $renderJob = $pdo->prepare('SELECT result FROM jobs WHERE id = :id');
-                $renderJob->execute([':id' => $rRow['job_id']]);
-                $renderResult = json_decode((string) ($renderJob->fetchColumn() ?: '{}'), true) ?: [];
-                $currentRender = [
+                $renderResult = json_decode((string) ($rRow['job_result'] ?: '{}'), true) ?: [];
+                $rendersById[$rid] = [
                     'id' => $rid,
                     'lut_id' => (string) $rRow['lut_id'],
                     'lut_version' => (string) $rRow['lut_version'],
@@ -1972,14 +2023,14 @@ final class SessionService
             }
         }
 
-        // All final assets for this session (current and historical after reopen)
-        $faStmt = $pdo->prepare('SELECT * FROM final_assets WHERE session_id = :sid ORDER BY created_at DESC');
-        $faStmt->execute([':sid' => $sessionId]);
-        $finals = [];
-        $currentFinal = null;
+        // 3. Batch final assets
+        $faStmt = $pdo->prepare("SELECT * FROM final_assets WHERE session_id IN ({$inSessions}) ORDER BY created_at DESC");
+        $faStmt->execute($sessionIds);
+        $finalsBySession = [];
         foreach ($faStmt->fetchAll() as $fRow) {
+            $sid = (string) $fRow['session_id'];
             $fid = (string) $fRow['id'];
-            $item = [
+            $finalsBySession[$sid][] = [
                 'id' => $fid,
                 'render_id' => (string) $fRow['render_id'],
                 'sha256' => (string) $fRow['sha256'],
@@ -1989,21 +2040,25 @@ final class SessionService
                 'url' => '/custom/api/assets/' . $fid . '?variant=final',
                 'created_at' => (string) $fRow['created_at'],
             ];
-            $finals[] = $item;
-            if ($session['current_final_id'] !== null && $fid === (string) $session['current_final_id']) {
-                $currentFinal = $item;
-            }
         }
 
-        // Active job
-        $activeJob = null;
-        if ($session['active_job_id'] !== null) {
-            $jStmt = $pdo->prepare('SELECT * FROM jobs WHERE id = :id');
-            $jStmt->execute([':id' => $session['active_job_id']]);
-            $jRow = $jStmt->fetch();
-            if (is_array($jRow)) {
-                $activeJob = [
-                    'id' => (string) $jRow['id'],
+        // 4. Batch active jobs
+        $activeJobIds = [];
+        foreach ($sessions as $s) {
+            if ($s['active_job_id'] !== null) {
+                $activeJobIds[(string) $s['active_job_id']] = true;
+            }
+        }
+        $jobsById = [];
+        if ($activeJobIds !== []) {
+            $jKeys = array_keys($activeJobIds);
+            $inJobs = implode(',', array_fill(0, count($jKeys), '?'));
+            $jStmt = $pdo->prepare("SELECT * FROM jobs WHERE id IN ({$inJobs})");
+            $jStmt->execute($jKeys);
+            foreach ($jStmt->fetchAll() as $jRow) {
+                $jid = (string) $jRow['id'];
+                $jobsById[$jid] = [
+                    'id' => $jid,
                     'type' => (string) $jRow['type'],
                     'status' => (string) $jRow['status'],
                     'phase' => (string) $jRow['phase'],
@@ -2014,21 +2069,22 @@ final class SessionService
             }
         }
 
-        // Print summary
-        $prStmt = $pdo->prepare('SELECT * FROM print_requests WHERE session_id = :sid ORDER BY created_at DESC');
-        $prStmt->execute([':sid' => $sessionId]);
-        $prints = [];
-        $hasUnknownPrint = false;
-        $hasActivePrint = false;
+        // 5. Batch print requests
+        $prStmt = $pdo->prepare("SELECT * FROM print_requests WHERE session_id IN ({$inSessions}) ORDER BY created_at DESC");
+        $prStmt->execute($sessionIds);
+        $printsBySession = [];
+        $hasUnknownBySession = [];
+        $hasActivePrintBySession = [];
         foreach ($prStmt->fetchAll() as $pRow) {
+            $sid = (string) $pRow['session_id'];
             $st = (string) $pRow['status'];
             if ($st === 'UNKNOWN') {
-                $hasUnknownPrint = true;
+                $hasUnknownBySession[$sid] = true;
             }
             if (in_array($st, ['PENDING', 'SUBMITTING', 'QUEUED', 'PRINTING'], true)) {
-                $hasActivePrint = true;
+                $hasActivePrintBySession[$sid] = true;
             }
-            $prints[] = [
+            $printsBySession[$sid][] = [
                 'id' => (string) $pRow['id'],
                 'final_asset_id' => (string) $pRow['final_asset_id'],
                 'copies' => (int) $pRow['copies'],
@@ -2046,18 +2102,19 @@ final class SessionService
             ];
         }
 
-        // Share tokens metadata (reconstructing QR URL safely for operator UI when token is active)
-        $shStmt = $pdo->prepare('SELECT * FROM share_tokens WHERE session_id = :sid ORDER BY created_at DESC');
-        $shStmt->execute([':sid' => $sessionId]);
-        $shares = [];
+        // 6. Batch share tokens
+        $shStmt = $pdo->prepare("SELECT * FROM share_tokens WHERE session_id IN ({$inSessions}) ORDER BY created_at DESC");
+        $shStmt->execute($sessionIds);
+        $sharesBySession = [];
         $nowUnix = Clock::nowUnix();
         foreach ($shStmt->fetchAll() as $shRow) {
+            $sid = (string) $shRow['session_id'];
             $shId = (string) $shRow['id'];
             $fId = (string) $shRow['final_asset_id'];
             $isRevoked = $shRow['revoked_at'] !== null;
             $isExpired = Clock::toUnix((string) $shRow['expires_at']) <= $nowUnix;
             $signed = $this->shareService->buildSignedToken($shId, $fId);
-            $shares[] = [
+            $sharesBySession[$sid][] = [
                 'id' => $shId,
                 'final_asset_id' => $fId,
                 'url' => (!$isRevoked && !$isExpired) ? $this->shareService->buildShareUrl($signed) : null,
@@ -2068,50 +2125,91 @@ final class SessionService
             ];
         }
 
-        return [
-            'id' => (string) $session['id'],
-            'state' => (string) $session['state'],
-            'revision' => (int) $session['revision'],
-            'accepted_slots' => $acceptedSlots,
-            'selected_lut' => (string) $session['selected_lut'],
-            'lut_version' => (string) $session['lut_version'],
-            'lut_intensity' => (int) $session['lut_intensity'],
-            'lut_sha256' => $session['lut_sha256'],
-            'lut' => $this->luts->describe($session['selected_lut'], $session['lut_version']),
-            'template_id' => (string) $session['template_id'],
-            'template_version' => (string) $session['template_version'],
-            'template' => $this->catalog->describe($session['template_id'], $session['template_version']),
-            'beauty' => [
-                'preset' => (string) ($session['beauty_preset'] ?? 'natural'),
-                'smooth' => (int) ($session['beauty_smooth'] ?? 20),
-                'brighten' => (int) ($session['beauty_brighten'] ?? 5),
-                'tone' => (int) ($session['beauty_tone'] ?? 10),
-                'enabled' => ($session['beauty_preset'] ?? 'natural') !== 'off',
-            ],
-            'layout_id' => (string) $session['layout_id'],
-            'layout_version' => (string) $session['layout_version'],
-            'capture_count' => (int) $session['capture_count'],
-            'configuration_locked' => (bool) $session['configuration_locked'],
-            'event' => array_intersect_key(EventSettings::snapshot($session['event_configuration']), array_flip(['name', 'category', 'frame', 'color'])),
-            'print_quota' => EventSettings::quota($pdo, $session['event_id'], $this->config->printerAdapter),
-            'ui_step' => in_array($session['state'], ['RENDERING','FINALIZED','CLOSED'], true) ? 5 : (int) $session['ui_step'],
-            'slots' => $slots,
-            'current_render' => $currentRender,
-            'current_final' => $currentFinal,
-            'final_assets' => $finals,
-            'active_job' => $activeJob,
-            'print_summary' => [
-                'total_requests' => count($prints),
-                'has_unknown' => $hasUnknownPrint,
-                'has_active' => $hasActivePrint,
-                'requests' => $prints,
-            ],
-            'shares' => $shares,
-            'created_at' => (string) $session['created_at'],
-            'updated_at' => (string) $session['updated_at'],
-            'closed_at' => $session['closed_at'],
-            'retention_deadline' => $session['expires_at'],
-        ];
+        // 7. Single-pass catalog metadata maps and per-event print quota cache
+        $lutMap = count($sessions) > 1 ? $this->luts->describeMap() : [];
+        $tplMap = count($sessions) > 1 ? $this->catalog->describeMap() : [];
+        $quotasByEvent = [];
+
+        $views = [];
+        foreach ($sessions as $session) {
+            $sid = (string) $session['id'];
+            $lutKey = $session['selected_lut'] . '@' . $session['lut_version'];
+            $tplKey = $session['template_id'] . '@' . $session['template_version'];
+            $lutDesc = $lutMap[$lutKey] ?? $this->luts->describe((string) $session['selected_lut'], (string) $session['lut_version']);
+            $tplDesc = $tplMap[$tplKey] ?? $this->catalog->describe((string) $session['template_id'], (string) $session['template_version']);
+
+            $eventId = (string) $session['event_id'];
+            if (!isset($quotasByEvent[$eventId])) {
+                $quotasByEvent[$eventId] = EventSettings::quota($pdo, $eventId, $this->config->printerAdapter);
+            }
+
+            $finals = $finalsBySession[$sid] ?? [];
+            $currentFinal = null;
+            if ($session['current_final_id'] !== null) {
+                $cfid = (string) $session['current_final_id'];
+                foreach ($finals as $fItem) {
+                    if ($fItem['id'] === $cfid) {
+                        $currentFinal = $fItem;
+                        break;
+                    }
+                }
+            }
+
+            $currentRender = $session['current_render_id'] !== null
+                ? ($rendersById[(string) $session['current_render_id']] ?? null)
+                : null;
+            $activeJob = $session['active_job_id'] !== null
+                ? ($jobsById[(string) $session['active_job_id']] ?? null)
+                : null;
+            $prints = $printsBySession[$sid] ?? [];
+
+            $views[] = [
+                'id' => $sid,
+                'state' => (string) $session['state'],
+                'revision' => (int) $session['revision'],
+                'accepted_slots' => $acceptedBySession[$sid] ?? 0,
+                'selected_lut' => (string) $session['selected_lut'],
+                'lut_version' => (string) $session['lut_version'],
+                'lut_intensity' => (int) $session['lut_intensity'],
+                'lut_sha256' => $session['lut_sha256'],
+                'lut' => $lutDesc,
+                'template_id' => (string) $session['template_id'],
+                'template_version' => (string) $session['template_version'],
+                'template' => $tplDesc,
+                'beauty' => [
+                    'preset' => (string) ($session['beauty_preset'] ?? 'natural'),
+                    'smooth' => (int) ($session['beauty_smooth'] ?? 20),
+                    'brighten' => (int) ($session['beauty_brighten'] ?? 5),
+                    'tone' => (int) ($session['beauty_tone'] ?? 10),
+                    'enabled' => ($session['beauty_preset'] ?? 'natural') !== 'off',
+                ],
+                'layout_id' => (string) $session['layout_id'],
+                'layout_version' => (string) $session['layout_version'],
+                'capture_count' => (int) $session['capture_count'],
+                'configuration_locked' => (bool) $session['configuration_locked'],
+                'event' => array_intersect_key(EventSettings::snapshot($session['event_configuration']), array_flip(['name', 'category', 'frame', 'color'])),
+                'print_quota' => $quotasByEvent[$eventId],
+                'ui_step' => in_array($session['state'], ['RENDERING','FINALIZED','CLOSED'], true) ? 5 : (int) $session['ui_step'],
+                'slots' => $slotsBySession[$sid] ?? [],
+                'current_render' => $currentRender,
+                'current_final' => $currentFinal,
+                'final_assets' => $finals,
+                'active_job' => $activeJob,
+                'print_summary' => [
+                    'total_requests' => count($prints),
+                    'has_unknown' => $hasUnknownBySession[$sid] ?? false,
+                    'has_active' => $hasActivePrintBySession[$sid] ?? false,
+                    'requests' => $prints,
+                ],
+                'shares' => $sharesBySession[$sid] ?? [],
+                'created_at' => (string) $session['created_at'],
+                'updated_at' => (string) $session['updated_at'],
+                'closed_at' => $session['closed_at'],
+                'retention_deadline' => $session['expires_at'],
+            ];
+        }
+
+        return $views;
     }
 
     /**

@@ -783,12 +783,14 @@ final class OperatorWorkflowTest extends TestCase
         ]);
         self::assertSame(422, $slot4['status']);
         self::assertSame('INVALID_SLOT', $slot4['json']['error']['code']);
+        self::assertStringContainsString('3 ảnh', (string) $slot4['json']['error']['message']);
 
         $slot0 = $this->apiRequest('POST', "/custom/api/sessions/{$sessionId}/slots/0/capture", [
             'revision' => 1,
         ]);
         self::assertSame(422, $slot0['status']);
         self::assertSame('INVALID_SLOT', $slot0['json']['error']['code']);
+        self::assertStringContainsString('1 đến 4', (string) $slot0['json']['error']['message']);
 
         // TC-02: Capture sequential slots 1, 2, 3
         $rev = 1;

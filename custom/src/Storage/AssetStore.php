@@ -85,7 +85,7 @@ final class AssetStore
     {
         $this->assertValidUuid($sessionId, 'session_id');
         if ($slot < 1 || $slot > 4) {
-            throw new ApiException('INVALID_SLOT', 'Slot ảnh phải từ 1 đến 3.', 422);
+            throw new ApiException('INVALID_SLOT', 'Slot ảnh phải từ 1 đến 4.', 422);
         }
         if ($version < 1) {
             throw new ApiException('INVALID_VERSION', 'Phiên bản ảnh không hợp lệ.', 422);

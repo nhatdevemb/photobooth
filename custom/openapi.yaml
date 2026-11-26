@@ -6,7 +6,7 @@ info:
     Hợp đồng API điều khiển Photobooth năm bước: bốn layout, template có phiên bản và khóa cấu hình từ capture đầu tiên.
     - Mọi endpoint nghiệp vụ dưới `/custom/api` yêu cầu cookie phiên đăng nhập (`pb_operator_sid`).
     - Mọi thao tác thay đổi dữ liệu yêu cầu header `X-CSRF-Token`, kiểm tra `Origin` cùng site và `Idempotency-Key`.
-    - Listener mạng khách (Guest LAN) chỉ phục vụ `/share/{token}` và `/share/{token}/download`.
+    - Listener mạng khách (Guest LAN) chỉ phục vụ `/share/{token}` và `/share/{token}/download`, áp dụng giới hạn tần suất theo IP (`429 GUEST_RATE_LIMITED` kèm `Retry-After`).
 servers:
   - url: http://127.0.0.1:8080/custom/api
     description: Operator Loopback Listener
@@ -963,4 +963,42 @@ paths:
       security: [{ cookieAuth: [] }]
       responses:
         '200': { description: Health report }
+
+  /share/{token}:
+    get:
+      summary: Trang khách tải ảnh qua mã QR LAN (chỉ trên Guest LAN Listener)
+      parameters:
+        - name: token
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        '200': { description: Trang HTML hiển thị và tải ảnh cuối }
+        '404': { description: Token không hợp lệ, đã hết hạn hoặc đã thu hồi }
+        '429':
+          description: GUEST_RATE_LIMITED khi vượt ngưỡng yêu cầu theo IP
+          headers:
+            Retry-After:
+              schema: { type: integer, minimum: 1 }
+
+  /share/{token}/download:
+    get:
+      summary: Tải tệp JPEG ảnh cuối qua mã QR LAN (chỉ trên Guest LAN Listener)
+      parameters:
+        - name: token
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        '200': { description: Tệp ảnh cuối image/jpeg đã kiểm tra SHA-256 }
+        '404': { description: Token không hợp lệ, hết hạn, thu hồi hoặc tệp ảnh không toàn vẹn }
+        '429':
+          description: GUEST_RATE_LIMITED khi vượt ngưỡng yêu cầu theo IP
+          headers:
+            Retry-After:
+              schema: { type: integer, minimum: 1 }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorResponse' }
+
 

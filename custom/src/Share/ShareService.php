@@ -373,6 +373,52 @@ HTML;
 HTML;
     }
 
+    public function renderRateLimitedHtml(int $retryAfterSeconds): string
+    {
+        $wait = max(1, $retryAfterSeconds);
+        return <<<HTML
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="referrer" content="no-referrer">
+    <meta name="robots" content="noindex,nofollow">
+    <title>Tạm giới hạn truy cập</title>
+    <style>
+        body {
+            font-family: "Be Vietnam Pro", "Plus Jakarta Sans", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            background: #0f172a;
+            color: #f8fafc;
+            line-height: 1.6;
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+            text-align: center;
+        }
+        .box {
+            background: #1e293b;
+            border: 1px solid #334155;
+            border-radius: 14px;
+            padding: 28px;
+            max-width: 420px;
+        }
+        h1 { font-size: 1.25rem; font-weight: 700; letter-spacing: -0.015em; line-height: 1.3; margin-bottom: 10px; color: #fbbf24; }
+        p { color: #cbd5e1; font-size: 0.95rem; line-height: 1.6; }
+    </style>
+</head>
+<body>
+    <div class="box">
+        <h1>Quá nhiều yêu cầu truy cập</h1>
+        <p>Vui lòng đợi khoảng {$wait} giây rồi tải lại trang để nhận ảnh.</p>
+    </div>
+</body>
+</html>
+HTML;
+    }
+
     /**
      * Rotate signing key & revoke all active tokens (Section 9.3).
      */

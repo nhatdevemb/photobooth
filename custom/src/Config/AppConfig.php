@@ -55,6 +55,11 @@ final class AppConfig
     public readonly string $beautyEngine;
     public readonly string $lkmagicExecutable;
     public readonly bool $lkmagicAutoStart;
+    public readonly int $guestRateLimitWindowSeconds;
+    public readonly int $guestRateLimitMaxRequests;
+    public readonly int $guestRateLimitMaxInvalid;
+    public readonly string $imageDaemonUrl;
+    public readonly string $imageDaemonToken;
 
     /**
      * @param array<string, string> $overrides
@@ -97,6 +102,14 @@ final class AppConfig
                 return $fileVars[$key];
             }
             return $default;
+        };
+
+        $getInt = static function (string $key, string $default) use ($get): int {
+            $raw = trim($get($key, $default));
+            if (!preg_match('/^-?\d+$/', $raw)) {
+                return -1;
+            }
+            return (int) $raw;
         };
 
         $dataDir = rtrim($get('DATA_DIR', $customDir . '/runtime-data'), '/');
@@ -163,7 +176,12 @@ final class AppConfig
             lkmagicBridgeUrl: rtrim($get('LKMAGIC_BRIDGE_URL', 'http://127.0.0.1:5520'), '/'),
             beautyEngine: strtolower(trim($get('BEAUTY_ENGINE', 'auto'))),
             lkmagicExecutable: $get('LKMAGIC_EXECUTABLE', ''),
-            lkmagicAutoStart: !in_array(strtolower(trim($get('LKMAGIC_AUTO_START', '1'))), ['0', 'false', 'no', 'off'], true)
+            lkmagicAutoStart: !in_array(strtolower(trim($get('LKMAGIC_AUTO_START', '1'))), ['0', 'false', 'no', 'off'], true),
+            guestRateLimitWindowSeconds: $getInt('GUEST_RATE_LIMIT_WINDOW_SECONDS', '60'),
+            guestRateLimitMaxRequests: $getInt('GUEST_RATE_LIMIT_MAX_REQUESTS', '120'),
+            guestRateLimitMaxInvalid: $getInt('GUEST_RATE_LIMIT_MAX_INVALID', '20'),
+            imageDaemonUrl: rtrim($get('IMAGE_DAEMON_URL', ''), '/'),
+            imageDaemonToken: $get('IMAGE_DAEMON_TOKEN', '')
         );
 
         $instance->validate();
@@ -219,7 +237,12 @@ final class AppConfig
         string $lkmagicBridgeUrl = 'http://127.0.0.1:5520',
         string $beautyEngine = 'auto',
         string $lkmagicExecutable = '',
-        bool $lkmagicAutoStart = true
+        bool $lkmagicAutoStart = true,
+        int $guestRateLimitWindowSeconds = 60,
+        int $guestRateLimitMaxRequests = 120,
+        int $guestRateLimitMaxInvalid = 20,
+        string $imageDaemonUrl = '',
+        string $imageDaemonToken = ''
     ) {
         $this->appEnv = $appEnv;
         $this->appVersion = $appVersion;
@@ -267,6 +290,11 @@ final class AppConfig
         $this->beautyEngine = $beautyEngine;
         $this->lkmagicExecutable = $lkmagicExecutable;
         $this->lkmagicAutoStart = $lkmagicAutoStart;
+        $this->guestRateLimitWindowSeconds = $guestRateLimitWindowSeconds;
+        $this->guestRateLimitMaxRequests = $guestRateLimitMaxRequests;
+        $this->guestRateLimitMaxInvalid = $guestRateLimitMaxInvalid;
+        $this->imageDaemonUrl = rtrim($imageDaemonUrl, '/');
+        $this->imageDaemonToken = $imageDaemonToken;
     }
 
     public function validate(): void
@@ -317,6 +345,24 @@ final class AppConfig
             || isset($lk['user'], $lk['pass']) || isset($lk['user']) || isset($lk['query'])
             || isset($lk['fragment']) || !in_array($lk['path'] ?? '', ['', '/'], true)) {
             throw new ApiException('INVALID_BEAUTY_CONFIG', 'LKMAGIC_BRIDGE_URL phải là HTTP loopback, ví dụ http://127.0.0.1:5520.', 503);
+        }
+
+        if ($this->guestRateLimitWindowSeconds < 1 || $this->guestRateLimitMaxRequests < 1 || $this->guestRateLimitMaxInvalid < 1) {
+            throw new ApiException(
+                'INVALID_CONFIG',
+                'Cấu hình GUEST_RATE_LIMIT_WINDOW_SECONDS, GUEST_RATE_LIMIT_MAX_REQUESTS và GUEST_RATE_LIMIT_MAX_INVALID phải là số nguyên dương (>= 1).',
+                503
+            );
+        }
+
+        if ($this->imageDaemonUrl !== '') {
+            $daemon = parse_url($this->imageDaemonUrl);
+            if (!is_array($daemon) || ($daemon['scheme'] ?? '') !== 'http'
+                || !in_array($daemon['host'] ?? '', ['127.0.0.1', '[::1]', 'localhost'], true)
+                || isset($daemon['user'], $daemon['pass']) || isset($daemon['user']) || isset($daemon['query'])
+                || isset($daemon['fragment']) || !in_array($daemon['path'] ?? '', ['', '/'], true)) {
+                throw new ApiException('INVALID_CONFIG', 'IMAGE_DAEMON_URL phải là HTTP loopback, ví dụ http://127.0.0.1:5531.', 503);
+            }
         }
 
         self::validateShareBaseUrl($this->shareBaseUrl);

@@ -43,9 +43,21 @@ final class Renderer
             (string) $this->config->maxImagePixels,
         ];
 
-        $result = $this->runPythonCommand($cmd, $this->config->captureTimeoutSeconds);
+        $result = $this->callDaemonOrFallback(
+            '/validate-jpeg',
+            [
+                'file_path' => $filePath,
+                'max_jpeg_bytes' => $this->config->maxJpegBytes,
+                'max_image_pixels' => $this->config->maxImagePixels,
+            ],
+            static fn (): array => $cmd,
+            $this->config->captureTimeoutSeconds
+        );
         if (($result['status'] ?? '') !== 'ok') {
             $code = (string) ($result['code'] ?? 'INVALID_JPEG');
+            if ($code === 'RENDER_TIMEOUT') {
+                throw new ApiException('RENDER_TIMEOUT', 'Quá thời gian xử lý ảnh (timeout).', 504);
+            }
             $msg = match ($code) {
                 'CORRUPT_JPEG', 'INVALID_JPEG' => 'Tệp ảnh chụp bị hỏng hoặc không đúng định dạng JPEG.',
                 'IMAGE_TOO_LARGE' => 'Dung lượng tệp ảnh vượt quá giới hạn 50 MiB.',
@@ -78,6 +90,7 @@ final class Renderer
             @mkdir($pendingDir, 0750, true);
         }
 
+        $manifestData['runtime_env'] = $this->runtimeEnvPayload();
         $manifestPath = rtrim($pendingDir, '/') . '/render-manifest.json';
         file_put_contents(
             $manifestPath,
@@ -87,10 +100,22 @@ final class Renderer
         $scriptPath = $this->config->customRoot . '/python/render_pipeline.py';
         $cmd = [$this->config->pythonBin, $scriptPath, $manifestPath];
 
-        $run = fn () => $this->runPythonCommand($cmd, $this->config->renderTimeoutSeconds, $jobId);
+        $run = fn (): array => $this->callDaemonOrFallback(
+            '/render',
+            $manifestData,
+            static fn (): array => $cmd,
+            $this->config->renderTimeoutSeconds,
+            $jobId
+        );
         $result = isset($manifestData['beauty_cache_dir']) ? $this->withBeautyLock($run) : $run();
         if (($result['status'] ?? '') !== 'ok') {
             $code = (string) ($result['code'] ?? 'RENDER_FAILED');
+            if ($code === 'RENDER_TIMEOUT') {
+                throw new ApiException('RENDER_TIMEOUT', 'Quá thời gian xử lý ảnh (timeout).', 504);
+            }
+            if ($code === 'RENDER_CANCELLED') {
+                $code = 'RENDER_FAILED';
+            }
             $msg = match ($code) {
                 'INVALID_LUT' => 'Bộ lọc màu (LUT) bị lỗi hoặc không đúng chuẩn .cube size 33.',
                 'INVALID_ICC_PROFILE' => 'Ảnh nguồn chứa hồ sơ màu ICC bị hỏng, không thể chuẩn hóa sRGB.',
@@ -131,14 +156,27 @@ final class Renderer
 
     public function runBeautyTask(array $manifestData): array
     {
+        $manifestData['max_jpeg_bytes'] = $this->config->maxJpegBytes;
+        $manifestData['max_image_pixels'] = $this->config->maxImagePixels;
+        $manifestData['runtime_env'] = $this->runtimeEnvPayload();
+
+        $daemonResult = $this->tryDaemonRequest('/beauty-task', $manifestData, $this->config->renderTimeoutSeconds);
+        if ($daemonResult !== null) {
+            if (($daemonResult['status'] ?? '') === 'error' && ($daemonResult['code'] ?? '') === 'RENDER_TIMEOUT') {
+                throw new ApiException('RENDER_TIMEOUT', 'Quá thời gian xử lý ảnh (timeout).', 504);
+            }
+            return $daemonResult;
+        }
+
         $dir = $this->config->dataDir . '/beauty';
+        if (!is_dir($dir)) {
+            @mkdir($dir, 0750, true);
+        }
         $file = tempnam($dir, 'manifest-');
         if ($file === false) {
             throw new ApiException('BEAUTY_STORAGE', 'Không tạo được tệp xử lý Beauty.', 500);
         }
         try {
-            $manifestData['max_jpeg_bytes'] = $this->config->maxJpegBytes;
-            $manifestData['max_image_pixels'] = $this->config->maxImagePixels;
             if (file_put_contents($file, json_encode($manifestData, JSON_THROW_ON_ERROR)) === false) {
                 throw new ApiException('BEAUTY_STORAGE', 'Không ghi được tệp xử lý Beauty.', 500);
             }
@@ -153,12 +191,28 @@ final class Renderer
 
     public function frameText(array $fields, array $slots, bool $preview = false): array
     {
+        $payload = ['fields' => $fields, 'slots' => $slots, 'preview' => $preview];
+        $daemonResult = $this->tryDaemonRequest('/frame-text', $payload, $this->config->renderTimeoutSeconds);
+        if ($daemonResult !== null) {
+            if (($daemonResult['status'] ?? '') !== 'ok') {
+                $errCode = (string) ($daemonResult['code'] ?? '');
+                if ($errCode === 'RENDER_TIMEOUT') {
+                    throw new ApiException('RENDER_TIMEOUT', 'Quá thời gian xử lý ảnh (timeout).', 504);
+                }
+                if ($errCode === 'RENDER_FAILED') {
+                    throw new ApiException('RENDER_FAILED', 'Tiến trình xử lý ảnh trả về kết quả không hợp lệ.', 500);
+                }
+                throw new ApiException('INVALID_FRAME_TEXT', $daemonResult['message'] ?? 'Không dựng được chữ trên frame.', 422);
+            }
+            return $daemonResult;
+        }
+
         $file = tempnam($this->config->dataDir, 'frame-');
         if ($file === false) {
             throw new ApiException('STORAGE_ERROR', 'Không tạo được tệp xem trước frame.', 500);
         }
         try {
-            $input = json_encode(['fields' => $fields, 'slots' => $slots, 'preview' => $preview], JSON_THROW_ON_ERROR);
+            $input = json_encode($payload, JSON_THROW_ON_ERROR);
             if (file_put_contents($file, $input) === false) {
                 throw new ApiException('STORAGE_ERROR', 'Không ghi được tệp xem trước frame.', 500);
             }
@@ -177,11 +231,138 @@ final class Renderer
 
     public function previewLut(string $filePath, string $outputPath, int $intensity): array
     {
-        $result = $this->runPythonCommand([$this->config->pythonBin, $this->config->customRoot . '/python/lut_preview.py', $filePath, $outputPath, (string) $intensity], $this->config->renderTimeoutSeconds);
+        $result = $this->callDaemonOrFallback(
+            '/lut-preview',
+            ['lut_path' => $filePath, 'output_path' => $outputPath, 'intensity' => $intensity],
+            fn (): array => [$this->config->pythonBin, $this->config->customRoot . '/python/lut_preview.py', $filePath, $outputPath, (string) $intensity],
+            $this->config->renderTimeoutSeconds
+        );
         if (($result['status'] ?? '') !== 'ok') {
+            if (($result['code'] ?? '') === 'RENDER_TIMEOUT') {
+                throw new ApiException('RENDER_TIMEOUT', 'Quá thời gian xử lý ảnh (timeout).', 504);
+            }
             throw new ApiException('INVALID_LUT', 'LUT không hợp lệ: ' . ($result['message'] ?? 'Không thể đọc hoặc dựng ảnh mẫu.'), 422);
         }
         return $result;
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function runtimeEnvPayload(): array
+    {
+        return [
+            'beauty_engine' => $this->config->beautyEngine,
+            'lkmagic_bridge_url' => $this->config->lkmagicBridgeUrl,
+            'lkmagic_executable' => $this->config->lkmagicExecutable,
+            'lkmagic_auto_start' => $this->config->lkmagicAutoStart,
+        ];
+    }
+
+    /**
+     * Send task to warm loopback Python Image Daemon when configured, falling back to CLI subprocess if unreachable.
+     *
+     * @param array<string, mixed> $payload
+     * @param callable(): list<string> $fallbackCmdBuilder
+     * @return array<string, mixed>
+     */
+    private function callDaemonOrFallback(
+        string $route,
+        array $payload,
+        callable $fallbackCmdBuilder,
+        int $timeoutSeconds,
+        ?string $jobId = null
+    ): array {
+        $daemonResult = $this->tryDaemonRequest($route, $payload, $timeoutSeconds, $jobId);
+        if ($daemonResult !== null) {
+            return $daemonResult;
+        }
+        return $this->runPythonCommand($fallbackCmdBuilder(), $timeoutSeconds, $jobId);
+    }
+
+    /**
+     * @param array<string, mixed> $payload
+     * @return ?array<string, mixed>
+     */
+    private function tryDaemonRequest(string $route, array $payload, int $timeoutSeconds, ?string $jobId = null): ?array
+    {
+        $baseUrl = rtrim($this->config->imageDaemonUrl, '/');
+        if ($baseUrl === '' || !function_exists('curl_init')) {
+            return null;
+        }
+
+        $payload['timeout_seconds'] = $timeoutSeconds;
+        $body = json_encode($payload, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
+        if ($body === false) {
+            return null;
+        }
+
+        $headers = ['Content-Type: application/json; charset=utf-8', 'Expect:'];
+        if ($this->config->imageDaemonToken !== '') {
+            $headers[] = 'X-Photobooth-Token: ' . $this->config->imageDaemonToken;
+        }
+
+        $host = strtolower((string) parse_url($baseUrl, PHP_URL_HOST));
+        $options = [
+            CURLOPT_POST => true,
+            CURLOPT_POSTFIELDS => $body,
+            CURLOPT_HTTPHEADER => $headers,
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_CONNECTTIMEOUT_MS => 250,
+            CURLOPT_TIMEOUT_MS => max(1500, ($timeoutSeconds * 1000) + 1500),
+            CURLOPT_PROXY => '',
+            CURLOPT_FOLLOWLOCATION => false,
+        ];
+        if (in_array($host, ['127.0.0.1', 'localhost'], true) && defined('CURL_IPRESOLVE_V4')) {
+            $options[CURLOPT_IPRESOLVE] = CURL_IPRESOLVE_V4;
+        }
+
+        $startTime = microtime(true);
+        $curl = curl_init($baseUrl . $route);
+        curl_setopt_array($curl, $options);
+
+        $responseBody = curl_exec($curl);
+        $errno = curl_errno($curl);
+        $httpCode = (int) curl_getinfo($curl, CURLINFO_RESPONSE_CODE);
+        $connectTimeUs = defined('CURLINFO_CONNECT_TIME_T')
+            ? (int) curl_getinfo($curl, CURLINFO_CONNECT_TIME_T)
+            : (int) round(((float) curl_getinfo($curl, CURLINFO_CONNECT_TIME)) * 1_000_000);
+        curl_close($curl);
+        $elapsed = microtime(true) - $startTime;
+
+        if ($responseBody === false) {
+            // Only treat timeout as RENDER_TIMEOUT if TCP connection to daemon actually succeeded
+            if ($errno === CURLE_OPERATION_TIMEDOUT && $connectTimeUs > 0 && $elapsed >= max(0.8, $timeoutSeconds - 0.5)) {
+                $this->logger->error('python_daemon_timeout', 'RENDER_TIMEOUT', [
+                    'job_id' => $jobId,
+                    'route' => $route,
+                    'timeout_seconds' => $timeoutSeconds,
+                ]);
+                throw new ApiException(
+                    'RENDER_TIMEOUT',
+                    'Quá thời gian xử lý ảnh (timeout).',
+                    504
+                );
+            }
+
+            $this->logger->warning('python_daemon_fallback', 'DAEMON_UNREACHABLE', [
+                'job_id' => $jobId,
+                'route' => $route,
+                'curl_errno' => $errno,
+            ]);
+            return null;
+        }
+
+        if ($httpCode !== 200) {
+            $this->logger->warning('python_daemon_http_fallback', 'DAEMON_HTTP_' . $httpCode, [
+                'job_id' => $jobId,
+                'route' => $route,
+            ]);
+            return null;
+        }
+
+        $decoded = json_decode((string) $responseBody, true);
+        return is_array($decoded) ? $decoded : null;
     }
 
     /**

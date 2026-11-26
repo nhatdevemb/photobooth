@@ -85,6 +85,7 @@ def ensure_lkmagic_background(
     base_url: str = DEFAULT_LKMAGIC_URL,
     executable_path: Optional[str] = None,
     wait_seconds: float = 20.0,
+    allow_auto_start: Optional[bool] = None,
 ) -> Dict[str, Any]:
     """
     Ensure LK Magic-WIN is running and initialized in background mode (`LK_PHOTOBOOTH_BACKGROUND=1`).
@@ -104,7 +105,12 @@ def ensure_lkmagic_background(
                 return health
         return health
 
-    if os.name != "nt" or os.getenv("LKMAGIC_AUTO_START", "1").strip().lower() in ("0", "false", "no", "off"):
+    auto_allowed = (
+        bool(allow_auto_start)
+        if allow_auto_start is not None
+        else os.getenv("LKMAGIC_AUTO_START", "1").strip().lower() not in ("0", "false", "no", "off")
+    )
+    if os.name != "nt" or "PYTEST_CURRENT_TEST" in os.environ or not auto_allowed:
         return health
 
     exe = discover_lkmagic_executable(executable_path)
@@ -172,9 +178,14 @@ def retouch_via_lkmagic(
     base_url = validate_loopback_url(config.lkmagic_url or DEFAULT_LKMAGIC_URL)
 
     health = (
-        ensure_lkmagic_background(base_url, wait_seconds=min(20.0, config.lkmagic_timeout_sec))
+        ensure_lkmagic_background(
+            base_url,
+            executable_path=config.lkmagic_executable,
+            wait_seconds=min(20.0, max(0.2, config.lkmagic_timeout_sec)),
+            allow_auto_start=config.auto_start_lkmagic,
+        )
         if config.auto_start_lkmagic
-        else check_lkmagic_health(base_url, timeout=0.8)
+        else check_lkmagic_health(base_url, timeout=min(0.8, max(0.1, config.lkmagic_timeout_sec)))
     )
     if not (health.get("ok") and health.get("ready")):
         raise RuntimeError(f"LK Magic bridge not ready: {health.get('error', 'ENGINE_NOT_READY')}")
@@ -200,7 +211,7 @@ def retouch_via_lkmagic(
                     "tone": config.tone,
                     "face_slim": False,
                 },
-                "timeout_ms": int(config.lkmagic_timeout_sec * 1000),
+                "timeout_ms": max(100, int(config.lkmagic_timeout_sec * 1000)),
             }
         ).encode("utf-8")
 
@@ -211,7 +222,12 @@ def retouch_via_lkmagic(
             method="POST",
         )
         opener = _build_no_proxy_opener()
-        with opener.open(req, timeout=config.lkmagic_timeout_sec + 3.0) as resp:
+        http_timeout = (
+            max(0.1, float(config.lkmagic_timeout_sec))
+            if config.lkmagic_timeout_sec < 25.0
+            else float(config.lkmagic_timeout_sec) + 3.0
+        )
+        with opener.open(req, timeout=http_timeout) as resp:
             resp_data = json.loads(resp.read().decode("utf-8", errors="replace"))
 
         if not isinstance(resp_data, dict):

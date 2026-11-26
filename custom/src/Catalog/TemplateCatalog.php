@@ -19,6 +19,10 @@ final class TemplateCatalog
 {
     private AppConfig $config;
     private Database $db;
+    /** @var ?array<string, array<string, mixed>> */
+    private ?array $bundledCache = null;
+    /** @var array<string, array<string, mixed>> */
+    private array $layoutCache = [];
 
     public function __construct(AppConfig $config, Database $db)
     {
@@ -29,11 +33,16 @@ final class TemplateCatalog
     public function layout(string $id, string $version = '1.0.0'): array
     {
         $this->validateIdentity($id, $version);
+        $cacheKey = $id . '@' . $version;
+        if (isset($this->layoutCache[$cacheKey])) {
+            return $this->layoutCache[$cacheKey];
+        }
         $path = $this->config->customRoot . '/layouts/' . $id . '.json';
         $layout = is_file($path) ? json_decode((string) file_get_contents($path), true) : null;
         if (!is_array($layout) || $layout['version'] !== $version) {
             throw new ApiException('INVALID_LAYOUT', 'Bố cục hoặc phiên bản không tồn tại.', 422);
         }
+        $this->layoutCache[$cacheKey] = $layout;
         return $layout;
     }
 
@@ -50,6 +59,9 @@ final class TemplateCatalog
 
     private function bundled(): array
     {
+        if ($this->bundledCache !== null) {
+            return $this->bundledCache;
+        }
         $items = [];
         foreach (glob($this->config->customRoot . '/templates/bundled/*/template.json') ?: [] as $file) {
             $item = json_decode((string) file_get_contents($file), true);
@@ -59,19 +71,34 @@ final class TemplateCatalog
                 $items[$item['id'] . '/' . $item['version']] = $item;
             }
         }
+        $this->bundledCache = $items;
         return $items;
     }
 
-    public function templates(?string $layoutId = null, bool $admin = false): array
+    /**
+     * Load merged bundled + DB catalog items keyed by "id/version" with _directory preserved.
+     *
+     * @return array<string, array<string, mixed>>
+     */
+    private function rawCatalogItems(): array
     {
         $items = $this->bundled();
         foreach ($this->db->pdo()->query('SELECT * FROM template_catalog')->fetchAll() as $row) {
             $key = $row['id'] . '/' . $row['version'];
             $item = json_decode((string) $row['manifest'], true);
+            if (!is_array($item)) {
+                continue;
+            }
             $item['status'] = $row['status'];
             $item['_directory'] = $items[$key]['_directory'] ?? ($this->config->dataDir . '/templates/' . $key);
             $items[$key] = $item;
         }
+        return $items;
+    }
+
+    public function templates(?string $layoutId = null, bool $admin = false): array
+    {
+        $items = $this->rawCatalogItems();
         $result = [];
         foreach ($items as $item) {
             if ((!$admin && $item['status'] !== 'active') || ($layoutId !== null && $item['layout_id'] !== $layoutId)) {
@@ -115,22 +142,38 @@ final class TemplateCatalog
         return $item;
     }
 
-    public function resolve(string $id, ?string $version = null, bool $requireActive = false): array
+    /**
+     * Lookup template metadata and directory without hashing artwork files on disk.
+     *
+     * @param ?array<string, array<string, mixed>> $rawItems
+     * @return array<string, mixed>
+     */
+    private function lookupRecord(string $id, ?string $version = null, bool $requireActive = false, ?array $rawItems = null): array
     {
         $this->validateIdentity($id, $version ?? '1.0.0');
-        $choices = array_values(array_filter($this->templates(null, true), static function (array $item) use ($id, $version, $requireActive): bool {
-            return $item['id'] === $id && ($version === null || $item['version'] === $version)
-                && (!$requireActive || $item['status'] === 'active');
-        }));
+        $all = $rawItems ?? $this->rawCatalogItems();
+        $choices = [];
+        foreach ($all as $raw) {
+            if ($raw['id'] === $id && ($version === null || $raw['version'] === $version)
+                && (!$requireActive || $raw['status'] === 'active')) {
+                $directory = $raw['_directory'];
+                $pub = $this->publicItem($raw);
+                $pub['_directory'] = $directory;
+                $choices[] = $pub;
+            }
+        }
         usort($choices, static fn (array $a, array $b): int => version_compare($b['version'], $a['version']));
         if ($choices === []) {
             throw new ApiException('INVALID_TEMPLATE', 'Template không tồn tại hoặc chưa được kích hoạt.', 422);
         }
         $item = $choices[0];
-        $key = $id . '/' . $item['version'];
-        $bundled = $this->bundled();
-        $item['_directory'] = $bundled[$key]['_directory'] ?? ($this->config->dataDir . '/templates/' . $key);
         $this->layout($item['layout_id'], $item['layout_version']);
+        return $item;
+    }
+
+    public function resolve(string $id, ?string $version = null, bool $requireActive = false): array
+    {
+        $item = $this->lookupRecord($id, $version, $requireActive);
         foreach ($item['hashes'] as $name => $expected) {
             $path = $item['_directory'] . '/' . $name;
             if (!is_file($path) || !hash_equals($expected, hash_file('sha256', $path) ?: '')) {
@@ -142,7 +185,21 @@ final class TemplateCatalog
 
     public function describe(string $id, string $version): array
     {
-        return $this->publicItem($this->resolve($id, $version));
+        return $this->publicItem($this->lookupRecord($id, $version));
+    }
+
+    /**
+     * Build a public metadata map keyed by "id@version" with a single DB read and zero artwork disk hashes.
+     *
+     * @return array<string, array<string, mixed>>
+     */
+    public function describeMap(): array
+    {
+        $map = [];
+        foreach ($this->rawCatalogItems() as $raw) {
+            $map[$raw['id'] . '@' . $raw['version']] = $this->publicItem($raw);
+        }
+        return $map;
     }
 
     public function asset(string $id, string $version, string $name, bool $admin): string

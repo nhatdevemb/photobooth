@@ -6,6 +6,7 @@ namespace Photobooth\Operator\Maintenance;
 
 use PDO;
 use Photobooth\Operator\Config\AppConfig;
+use Photobooth\Operator\Share\GuestRateLimiter;
 use Photobooth\Operator\Storage\AssetStore;
 use Photobooth\Operator\Storage\AuditLogger;
 use Photobooth\Operator\Storage\Database;
@@ -18,18 +19,21 @@ final class MaintenanceService
     private AppConfig $config;
     private AssetStore $assetStore;
     private StructuredLogger $logger;
+    private ?GuestRateLimiter $guestRateLimiter;
 
     public function __construct(
         Database $db,
         AppConfig $config,
         AssetStore $assetStore,
-        StructuredLogger $logger
+        StructuredLogger $logger,
+        ?GuestRateLimiter $guestRateLimiter = null
     )
     {
         $this->db = $db;
         $this->config = $config;
         $this->assetStore = $assetStore;
         $this->logger = $logger;
+        $this->guestRateLimiter = $guestRateLimiter;
     }
 
     /**
@@ -181,6 +185,9 @@ final class MaintenanceService
 
         $logStats = $this->logger->rotateLogs();
         $dccPurged = $this->purgeExpiredDccIncoming();
+        $guestBucketsPurged = $this->guestRateLimiter !== null
+            ? $this->guestRateLimiter->purgeExpiredBuckets($nowUnix)
+            : 0;
 
         return [
             'expired_purged' => $expiredTombstoned,
@@ -189,6 +196,7 @@ final class MaintenanceService
             'audit_purged' => $auditPurged,
             'logs_rotated' => $logStats['deleted_files'],
             'dcc_incoming_purged' => $dccPurged,
+            'guest_rate_buckets_purged' => $guestBucketsPurged,
         ];
     }
 

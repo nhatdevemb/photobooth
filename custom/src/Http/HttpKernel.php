@@ -72,7 +72,7 @@ final class HttpKernel
         try {
             // Strictly enforce Guest LAN listener surface isolation (Section 9.2 & IT-13)
             if ($listenerMode === 'guest') {
-                return $this->handleGuestListener($method, $path, $query, $requestId);
+                return $this->handleGuestListener($method, $path, $query, $ip, $requestId);
             }
 
             // Also serve /share/{token} on operator listener for previewing
@@ -166,7 +166,7 @@ final class HttpKernel
      *   file_path: ?string
      * }
      */
-    private function handleGuestListener(string $method, string $path, array $query, string $requestId): array
+    private function handleGuestListener(string $method, string $path, array $query, string $ip, string $requestId): array
     {
         if (!str_starts_with($path, '/share/')) {
             throw new ApiException(
@@ -180,7 +180,40 @@ final class HttpKernel
             throw new ApiException('FORBIDDEN', 'Phương thức HTTP không được phép trên cổng khách.', 403);
         }
 
-        return $this->handleShareRoute($method, $path, $query);
+        try {
+            $this->container->guestRateLimiter->checkAndRecordHit($ip);
+        } catch (ApiException $e) {
+            if ($e->getErrorCode() === 'GUEST_RATE_LIMITED' && preg_match('#^/share/[^/]+/download$#', $path) !== 1) {
+                $retryAfter = (int) ($e->getDetails()['retry_after_seconds'] ?? 10);
+                return [
+                    'status' => 429,
+                    'headers' => array_merge(
+                        [
+                            'Content-Type' => 'text/html; charset=utf-8',
+                            'Referrer-Policy' => 'no-referrer',
+                            'Cache-Control' => 'no-store, no-cache, must-revalidate',
+                            'X-Content-Type-Options' => 'nosniff',
+                            'X-Frame-Options' => 'DENY',
+                            'X-Robots-Tag' => 'noindex, nofollow',
+                            'Content-Security-Policy' => "default-src 'none'; img-src 'self' data:; style-src 'unsafe-inline'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'",
+                            'X-Request-Id' => $requestId,
+                        ],
+                        $e->getHeaders()
+                    ),
+                    'cookies' => [],
+                    'body' => $this->container->shareService->renderRateLimitedHtml($retryAfter),
+                    'file_path' => null,
+                ];
+            }
+            throw $e;
+        }
+
+        $response = $this->handleShareRoute($method, $path, $query);
+        if ($response['status'] === 404) {
+            $this->container->guestRateLimiter->recordInvalidAttempt($ip);
+        }
+
+        return $response;
     }
 
     /**
@@ -205,6 +238,7 @@ final class HttpKernel
             'X-Content-Type-Options' => 'nosniff',
             'X-Frame-Options' => 'DENY',
             'X-Robots-Tag' => 'noindex, nofollow',
+            'Content-Security-Policy' => "default-src 'none'; img-src 'self' data:; style-src 'unsafe-inline'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'",
         ];
 
         if (preg_match('#^/share/([^/]+)/download$#', $path, $m) === 1) {
@@ -564,7 +598,7 @@ final class HttpKernel
             $idemKey = $headers['idempotency-key'] ?? '';
 
             if (preg_match('/^-?\d+$/', $rawSlot) !== 1) {
-                throw new ApiException('INVALID_SLOT', 'Số slot phải là số nguyên 1, 2 hoặc 3.', 422);
+                throw new ApiException('INVALID_SLOT', 'Số slot phải là số nguyên từ 1 đến 4.', 422);
             }
             $slot = (int) $rawSlot;
             $revision = $this->extractRevision($payload);
